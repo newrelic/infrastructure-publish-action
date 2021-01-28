@@ -1,0 +1,37 @@
+name: 'Publish to S3'
+description: 'Publish artifacts to S3 bucket'
+inputs:
+  aws_secret_access_key:
+    description: AWS secret access key
+    required: true
+  aws_access_key:
+    description: AWS access key
+    required: true
+  aws_s3_bucket_name:
+    description: Name of the S3 bucket
+    required: true
+  repo_name:
+    description: Combination of organization and repository (i.e. newrelic/nri-redis)
+    required: true
+  app_name:
+    description: Name of the package (i.e. nri-redis)
+    required: true
+  tag:
+    description: Tag pointing to the release
+    required: true
+  schema:
+    description: Name of the schema describing the packages to be published (i.e. infra-agent, ohi or nrjmx)
+    required: true
+runs:
+  using: "composite"
+  steps:
+    - run: ./actions/publish/action-run.sh
+      shell: bash
+      env:
+        AWS_SECRET_ACCESS_KEY: ${{ inputs.aws_secret_access_key }}
+        AWS_ACCESS_KEY: ${{ inputs.aws_access_key }}
+        AWS_S3_BUCKET_NAME: ${{ inputs.aws_s3_bucket_name }}
+        REPO_NAME: ${{ inputs.repo_name }}
+        APP_NAME: ${{ inputs.app_name }}
+        TAG: ${{ inputs.tag }}
+        SCHEMA: ${{ inputs.schema }}
