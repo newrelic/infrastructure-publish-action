@@ -1,42 +1,15 @@
 #!/bin/bash
 
-DEST_PREFIX=""
-
-case $ENV in
-  release)
-    DEST_PREFIX="infrastructure_agent/"
-    ;;
-  pre-release)
-    DEST_PREFIX="infrastructure_agent/test/"
-    ;;
-  *)
-    echo "error: \"${ENV}\" is not valid environment"
-    exit 1
-    ;;
-esac
-
-case $SCHEMA in
-  infra-agent)
-    ;;
-  ohi)
-    ;;
-  nrjmx)
-    ;;
-#  custom)
-    # wget if custom schema link provided
-    # SCHEMA_URL
-    ;;
-  *)
-    echo "error: \"${SCHEMA}\" is not valid schema"
-    exit 1
-    ;;
-esac
-
 # build docker image form Dockerfile
-docker build -t newrelic/infrastructure-publish-action -f ./actions/publish/Dockerfile ./actions/publish
+echo "Build fresh docker image for newrelic/infrastructure-publish-action"
+# @TODO add --no-cache
+docker build  -t newrelic/infrastructure-publish-action -f ./Dockerfile .
 
 # run docker container to perform all actions inside
-docker run --rm -it --security-opt apparmor:unconfined \
+echo "Run docker container with action logic inside"
+docker run --rm -it \
+        --name=infrastructure-publish-action\
+        --security-opt apparmor:unconfined \
         --device /dev/fuse \
         --cap-add SYS_ADMIN \
         -e AWS_SECRET_ACCESS_KEY \
@@ -47,6 +20,7 @@ docker run --rm -it --security-opt apparmor:unconfined \
         -e TAG \
         -e ARTIFACTS_DEST_FOLDER=/mnt/s3 \
         -e ARTIFACTS_SRC_FOLDER=/home/gha/assets \
-        -e UPLOADSCHEMA_FILE_PATH=/home/gha/schemas/${SCHEMA}.yml \
-        -e DEST_PREFIX=$DEST_PREFIX \
+        -e SCHEMA \
+        -e SCHEMA_URL \
+        -e ENV \
         newrelic/infrastructure-publish-action

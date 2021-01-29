@@ -117,7 +117,7 @@ func loadConfig() config {
 		version:              strings.Replace(viper.GetString("tag"), "v", "", -1),
 		artifactsDestFolder:  getFirstNotEmpty(viper.GetString("artifactsDestFolder"), viper.GetString("artifacts_dest_folder")),
 		artifactsSrcFolder:   getFirstNotEmpty(viper.GetString("artifactsSrcFolder"), viper.GetString("artifacts_src_folder")),
-		uploadSchemaFilePath: getFirstNotEmpty(viper.GetString("uploadSchemaFilePath"), viper.GetString("uploadSchema_file_path")),
+		uploadSchemaFilePath: getFirstNotEmpty(viper.GetString("uploadSchemaFilePath"), viper.GetString("upload_schema_file_path")),
 	}
 }
 
