@@ -22,4 +22,4 @@ RUN cd ./publisher && go get -d -v && go build -o /bin/publisher publisher.go
 
 RUN chmod +x /bin/publisher
 
-CMD ["make"]
+CMD ["make", "--jobs=1"]
