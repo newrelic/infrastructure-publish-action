@@ -44,7 +44,7 @@ type uploadArtifactSchema struct {
 	Src            string           `yaml:"src"`
 	Arch           []string         `yaml:"arch"`
 	Dest           []string         `yaml:"dest"`
-	PackageManager []PackageManager `yaml:"package_manager"`
+	PackageManager []PackageManager `yaml:"uploads"`
 }
 
 type PackageManager []struct {

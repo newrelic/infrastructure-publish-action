@@ -1,31 +1,36 @@
 ---
 - src: "{app_name}_linux_{version}_{arch}.tar.gz"
-  dest:
-    - "{dest_prefix}binaries/linux/{arch}/{src}"
+  uploads:
+    - type: file
+      dest: "{dest_prefix}binaries/linux/{arch}/{src}"
   arch:
     - amd64
     - noarch
 
 - src: "{app_name}_windows_{version}_{arch}.zip"
-  dest:
-    - "{dest_prefix}binaries/windows/{arch}/{src}"
+  uploads:
+    - type: file
+      dest: "{dest_prefix}binaries/windows/{arch}/{src}"
   arch:
     - amd64
 
+
 - src: "{app_name}-{arch}.{version}.msi"
-  dest:
-    - "{dest_prefix}windows/integrations/{app_name}/{src}"
-    - "{dest_prefix}windows/integrations/{app_name}/{app_name}-{arch}.msi"
+  uploads:
+    - type: file
+      dest: "{dest_prefix}windows/integrations/{app_name}/{src}"
+    - type: file
+      dest: "{dest_prefix}windows/integrations/{app_name}/{app_name}-{arch}.msi"
   arch:
     - amd64
 
 - src: "{app_name}_{version}-1_{arch}.deb"
   arch:
     - amd64
-  package_manager:
-    - name: apt
+  uploads:
+    - type: apt
       source_repo: "http://download.newrelic.com/infrastructure_agent/linux/apt"
-      dest_repo: "s3://nr-downloads-main/{dest_prefix}linux/apt"
+      dest: "s3://nr-downloads-main/{dest_prefix}linux/apt"
       os_version:
         - bionic
         - buster
@@ -39,19 +44,17 @@
 - src: "{app_name}-{version}-1_{arch}.rpm"
   arch:
     - x86_64
-  package_manager:
-    - name: yum
-      # source_repo: "" OPTIONAL
-      dest_repo: "{dest_prefix}linux/yum/el/{os_version}/{arch}"
+  uploads:
+    - type: yum
+      dest: "{dest_prefix}linux/yum/el/{os_version}/{arch}"
       os_version:
         - 5
         - 6
         - 7
         - 8
 
-    - name: zypp
-      # source_repo: "" OPTIONAL
-      dest_repo: "{dest_prefix}linux/zypp/sles/{os_version}/{arch}"
+    - type: zypp
+      dest: "{dest_prefix}linux/zypp/sles/{os_version}/{arch}"
       os_version:
         - 11.4
         - 12.1
