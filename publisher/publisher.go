@@ -24,6 +24,9 @@ const (
 	placeholderForVersion    = "{version}"
 	placeholderForSrc        = "{src}"
 	urlTemplate              = "https://github.com/{repo_name}/releases/download/{tag}/{src}"
+
+	//Erorrs
+	noDestinationError = "no destination was provided for the schema"
 )
 
 type config struct {
@@ -38,9 +41,16 @@ type config struct {
 }
 
 type uploadArtifactSchema struct {
-	Src  string   `yaml:"src"`
-	Dest string   `yaml:"dest"`
-	Arch []string `yaml:"arch"`
+	Src            string           `yaml:"src"`
+	Arch           []string         `yaml:"arch"`
+	Dest           []string         `yaml:"dest"`
+	PackageManager []PackageManager `yaml:"package_manager"`
+}
+
+type PackageManager []struct {
+	Name      string `yaml:"name"`
+	DestRepo  string `yaml:"dest_repo"`
+	OsVersion []int  `yaml:"os_version"`
 }
 
 type uploadArtifactsSchema []uploadArtifactSchema
@@ -62,7 +72,6 @@ func main() {
 	}
 
 	err = downloadArtifacts(conf, uploadSchema)
-
 
 	if err != nil {
 		log.Fatal(err)
@@ -134,13 +143,15 @@ func parseUploadSchema(fileContent []byte) (uploadArtifactsSchema, error) {
 	err := yaml.Unmarshal(fileContent, &schema)
 
 	if err != nil {
-		return uploadArtifactsSchema{}, err
-
+		return nil, err
 	}
 
 	for i, _ := range schema {
 		if schema[i].Arch == nil {
 			schema[i].Arch = []string{""}
+		}
+		if len(schema[i].Dest) == 0 {
+			return nil, fmt.Errorf("error: '%s' in the schema: %v ", noDestinationError, schema[i].Src)
 		}
 	}
 
@@ -149,20 +160,12 @@ func parseUploadSchema(fileContent []byte) (uploadArtifactsSchema, error) {
 
 func downloadArtifact(conf config, schema uploadArtifactSchema) error {
 	for _, arch := range schema.Arch {
-		srcFile, _ := replaceSrcDestTemplates(
-			schema.Src,
-			schema.Dest,
-			conf.repoName,
-			conf.appName,
-			arch,
-			conf.tag,
-			conf.version,
-			conf.destPrefix)
+		srcFile := replacePlaceholders(schema.Src, conf.repoName, conf.appName, arch, conf.tag, conf.version, conf.destPrefix)
 		url := generateDownloadUrl(urlTemplate, conf.repoName, conf.tag, srcFile)
 
 		destPath := path.Join(conf.artifactsSrcFolder, srcFile)
 
-		log.Println(fmt.Sprintf("[ ] Download %s into %s", url ,destPath))
+		log.Println(fmt.Sprintf("[ ] Download %s into %s", url, destPath))
 
 		err := downloadFile(url, destPath)
 		if err != nil {
@@ -174,7 +177,7 @@ func downloadArtifact(conf config, schema uploadArtifactSchema) error {
 			return err
 		}
 
-		log.Println(fmt.Sprintf("[✔] Download %s into %s %d bytes", url ,destPath, fi.Size()))
+		log.Println(fmt.Sprintf("[✔] Download %s into %s %d bytes", url, destPath, fi.Size()))
 	}
 
 	return nil
@@ -192,42 +195,44 @@ func downloadArtifacts(conf config, schema uploadArtifactsSchema) error {
 
 func uploadArtifact(conf config, schema uploadArtifactSchema) error {
 	for _, arch := range schema.Arch {
-		srcPath, destPath := replaceSrcDestTemplates(
-			schema.Src,
-			schema.Dest,
-			conf.repoName,
-			conf.appName,
-			arch,
-			conf.tag,
-			conf.version,
-			conf.destPrefix)
+		for _, destination := range schema.Dest {
+			srcPath, destPath := replaceSrcDestTemplates(
+				schema.Src,
+				destination,
+				conf.repoName,
+				conf.appName,
+				arch,
+				conf.tag,
+				conf.version,
+				conf.destPrefix)
 
-		srcPath = path.Join(conf.artifactsSrcFolder, srcPath)
-		destPath = path.Join(conf.artifactsDestFolder, destPath)
+			srcPath = path.Join(conf.artifactsSrcFolder, srcPath)
+			destPath = path.Join(conf.artifactsDestFolder, destPath)
 
-		destDirectory := filepath.Dir(destPath)
+			destDirectory := filepath.Dir(destPath)
 
-		if _, err := os.Stat(destDirectory); os.IsNotExist(err) {
-			// set right permissions
-			err = os.MkdirAll(destDirectory, 0744)
+			if _, err := os.Stat(destDirectory); os.IsNotExist(err) {
+				// set right permissions
+				err = os.MkdirAll(destDirectory, 0744)
+				if err != nil {
+					return err
+				}
+			}
+
+			log.Println("[ ] Copy " + srcPath + " into " + destPath)
+
+			input, err := ioutil.ReadFile(srcPath)
 			if err != nil {
 				return err
 			}
+
+			err = ioutil.WriteFile(destPath, input, 0744)
+			if err != nil {
+				return err
+			}
+
+			log.Println("[✔] Copy " + srcPath + " into " + destPath)
 		}
-
-		log.Println("[ ] Copy " + srcPath + " into " + destPath)
-
-		input, err := ioutil.ReadFile(srcPath)
-		if err != nil {
-			return err
-		}
-
-		err = ioutil.WriteFile(destPath, input, 0744)
-		if err != nil {
-			return err
-		}
-
-		log.Println("[✔] Copy " + srcPath + " into " + destPath)
 	}
 
 	return nil
@@ -235,6 +240,7 @@ func uploadArtifact(conf config, schema uploadArtifactSchema) error {
 
 func uploadArtifacts(conf config, schema uploadArtifactsSchema) error {
 	for _, artifactSchema := range schema {
+
 		err := uploadArtifact(conf, artifactSchema)
 		if err != nil {
 			return err

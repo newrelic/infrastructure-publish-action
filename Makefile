@@ -63,7 +63,7 @@ mount-s3-check: mount-s3
 
 publish-artifacts: mount-s3-check
 	@echo "Publish artifacts"
-	@/bin/publisher --uploadSchemaFilePath=${UPLOAD_SCHEMA_FILE_PATH} --destPrefix={DEST_PREFIX}
+	@/bin/publisher --uploadSchemaFilePath=${UPLOAD_SCHEMA_FILE_PATH} --destPrefix=${DEST_PREFIX}
 
 unmount-s3: publish-artifacts
 	@echo "Unmounting S3"
