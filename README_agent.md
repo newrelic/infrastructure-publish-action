@@ -1,31 +1,83 @@
 [![Community Project header](https://github.com/newrelic/opensource-website/raw/master/src/images/categories/Community_Project.png)](https://opensource.newrelic.com/oss-category/#community-project)
 
-# [Name of Project] [build badges go here when available]
+# Infrastructure publish action
 
->[Brief description - what is the software and what value does it provide? How often should users expect to get releases? How is versioning set up? What are some next phases for the project or how will it evolve?]
+A GitHub Action to publish artifacts from GitHub release assets into S3 bucket.
 
-## Installing and using [project name]
+## Inputs
+| Key                     | Required | Default | Description |
+| ---------------         | -------- | ------- | ----------- |
+| `repo_name`             | **yes**  | -       | Github repository name, should follow name convention. |
+| `app_name`              | **yes**  | -       | Application name to publish to S3.. |
+| `tag`                   | **yes**  | -       | Tag version from GitHub release. |
 
-> [Link to the relevant information for this agent on docs.newrelic.com. Create a bulleted list with links to install, usage, and getting started info on docs. Avoid duplicating information from docs in the open source content to ensure there's no inconsistency between the two.]
+## Use Publish Tag
+
+ The following example could be added as a job to your existing workflow that upload Infrastructure agent assets to S3 bucket.
+ 
+ Github secrets assumed to be set:
+ 
+     AWS_SECRET_ACCESS_KEY - Specifies the secret key associated with the access key.
+     AWS_ACCESS_KEY - Personal AWS access key.
+     AWS_S3_BUCKET - Name of the AWS S3 bucket.
+
+### Example Usage
+    
+    name: Publish
+    
+    on:
+      push:
+        branches:
+          - s3_publish_packages
+    
+    env:
+      DOCKER_HUB_ID: ${{ secrets.OHAI_DOCKER_HUB_ID }}
+      DOCKER_HUB_PASSWORD: ${{ secrets.OHAI_DOCKER_HUB_PASSWORD }}
+    
+    jobs:
+    
+      publish:
+        name: Publish artifacts to s3
+        runs-on: ubuntu-20.04
+        steps:
+          - uses: actions/checkout@v2
+          - name: Login to DockerHub
+            uses: docker/login-action@v1
+            with:
+              username: ${{ env.DOCKER_HUB_ID }}
+              password: ${{ env.DOCKER_HUB_PASSWORD }}
+          - name: Publish to S3 action
+            uses: ./actions/publish
+            with:
+              aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+              aws_access_key: ${{ secrets.AWS_ACCESS_KEY }}
+              aws_s3_bucket_name: ${{ secrets.AWS_S3_BUCKET }}
+              tag: "v1.0.0"
+              app_name: "my-app"
+              repo_name: "my-org/my-app"
 
 
-## Building
+## Consistency
 
->[**Optional** - Include this section if users will need to follow specific instructions to build the software from source. Be sure to include any third-party build dependencies that need to be installed separately. As mentioned, link to docs for install info that's already included there. Remove this section if it's not needed.]
-
-## Testing
-
->[**Optional** - Include instructions on how to run tests if we include tests with the codebase. Remove this section if it's not needed.]
+As GitHub Actions can run many workflows in parallel, once a publish-action is called will execute a lock mechanism in S3 to avoid conflicts. 
 
 ## Support
 
-New Relic hosts and moderates an online forum where customers can interact with New Relic employees as well as other customers to get help and share best practices. Like all official New Relic open source projects, there's a related Community topic in the New Relic Explorers Hub. You can find this project's topic/threads here:
+Should you need assistance with New Relic products, you are in good hands with several support diagnostic tools and support channels.
 
->[Add the url for the support thread here: discuss.newrelic.com]
+If the issue has been confirmed as a bug or is a feature request, file a GitHub issue.
+
+**Support Channels**
+
+* [New Relic Documentation](https://docs.newrelic.com): Comprehensive guidance for using our platform
+* [New Relic Community](https://discuss.newrelic.com/c/support-products-agents/new-relic-infrastructure): The best place to engage in troubleshooting questions
+* [New Relic Developer](https://developer.newrelic.com/): Resources for building a custom observability applications
+* [New Relic University](https://learn.newrelic.com/): A range of online training for New Relic users of every level
+* [New Relic Technical Support](https://support.newrelic.com/) 24/7/365 ticketed support. Read more about our [Technical Support Offerings](https://docs.newrelic.com/docs/licenses/license-information/general-usage-licenses/support-plan).
 
 ## Contribute
 
-We encourage your contributions to improve [project name]! Keep in mind that when you submit your pull request, you'll need to sign the CLA via the click-through using CLA-Assistant. You only have to sign the CLA one time per project.
+We encourage your contributions to improve Infrastructure publish action! Keep in mind that when you submit your pull request, you'll need to sign the CLA via the click-through using CLA-Assistant. You only have to sign the CLA one time per project.
 
 If you have any questions, or to execute our corporate CLA (which is required if your contribution is on behalf of a company), drop us an email at opensource@newrelic.com.
 
@@ -40,5 +92,4 @@ If you would like to contribute to this project, review [these guidelines](./CON
 To all contributors, we thank you!  Without your contribution, this project would not be what it is today.  We also host a community project page dedicated to [Project Name](<LINK TO https://opensource.newrelic.com/projects/... PAGE>).
 
 ## License
-[Project name] is licensed under the [Apache 2.0](http://apache.org/licenses/LICENSE-2.0.txt) License.
->[If applicable: The [project name] also uses source code from third-party libraries. Full details on which libraries are used and the terms under which they are licensed can be found in the third-party notices document.]
+Infrastructure publish action use repolinter-action which is licensed under the [Apache 2.0](http://apache.org/licenses/LICENSE-2.0.txt) License.
