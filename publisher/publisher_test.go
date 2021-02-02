@@ -2,6 +2,7 @@ package main
 
 import (
 	"github.com/stretchr/testify/assert"
+	"log"
 	"os"
 	"path"
 	"testing"
@@ -69,7 +70,7 @@ func TestParseConfig(t *testing.T) {
 			}},
 		}},
 		"src is omitted": {schemaNoSrc, []uploadArtifactSchema{
-			{"",  []string{"amd64"}, []Upload{
+			{"", []string{"amd64"}, []Upload{
 				{
 					Type: "file",
 					Dest: "/tmp",
@@ -174,7 +175,7 @@ func TestReplacePlaceholders(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			tag := "v" + tt.version
-			src, dest := replaceSrcDestTemplates(tt.srcTemplate, tt.destTemplate, "newrelic/foobar", tt.appName, tt.arch, tag, tt.version, tt.destPrefix)
+			src, dest := replaceSrcDestTemplates(tt.srcTemplate, tt.destTemplate, "newrelic/foobar", tt.appName, tt.arch, tag, tt.version, tt.destPrefix, "")
 			assert.EqualValues(t, tt.srcOutput, src)
 			assert.EqualValues(t, tt.destOutput, dest)
 		})
@@ -236,4 +237,15 @@ func TestUploadArtifacts(t *testing.T) {
 
 	_, err = os.Stat(path.Join(dest, "386/nri-foobar/nri-foobar-386-2.0.0.txt"))
 	assert.NoError(t, err)
+}
+
+func TestSchema(t *testing.T) {
+	uploadSchemaContent, err := readFileContent("../schemas/nrjmx.yml")
+
+	uploadSchema, err := parseUploadSchema(uploadSchemaContent)
+
+	if err != nil {
+		log.Fatal(err)
+	}
+	log.Println(uploadSchema)
 }

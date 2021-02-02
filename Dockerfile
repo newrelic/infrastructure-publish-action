@@ -6,7 +6,7 @@ ENV AWS_S3_MOUNT_DIRECTORY $AWS_S3_MOUNT_DIRECTORY
 
 # validate s3fs-fuse with the sec team
 RUN apt-get update && \
-  apt-get install -y s3fs make curl
+  apt-get install -y s3fs make curl gnupg2 gpg-agent createrepo
 
 RUN mkdir $AWS_S3_MOUNT_DIRECTORY
 
@@ -18,8 +18,11 @@ ADD Makefile .
 
 RUN mkdir ./assets
 
-RUN cd ./publisher && go get -d -v && go build -o /bin/publisher publisher.go
+WORKDIR ./publisher
+RUN go get -d -v
+RUN go build -o /bin/publisher publisher.go
 
+WORKDIR /home/gha
 RUN chmod +x /bin/publisher
 
 CMD ["make", "--jobs=1"]

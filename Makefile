@@ -1,6 +1,6 @@
 SHELL := /bin/bash
 
-default: check-env prepare-schema dest-prefix prepare-secrets mount-s3 mount-s3-check prepare-schema publish-artifacts unmount-s3
+default: check-env prepare-schema dest-prefix prepare-secrets mount-s3 mount-s3-check prepare-schema import-GPG-key publish-artifacts unmount-s3
 
 check-env:
 ifndef AWS_SECRET_ACCESS_KEY
@@ -12,6 +12,13 @@ endif
 ifndef AWS_S3_BUCKET_NAME
 	$(error AWS_S3_BUCKET_NAME is undefined)
 endif
+ifndef GPG_PRIVATE_KEY_BASE64
+	$(error GPG_PRIVATE_KEY_BASE64 is undefined)
+endif
+ifndef GPG_PASSPHRASE
+	$(error GPG_PASSPHRASE is undefined)
+endif
+
 
 prepare-schema: check-env
 	@echo "prepare schema file for: ${SCHEMA}"
@@ -61,12 +68,15 @@ mount-s3-check: mount-s3
 	@echo "List files from s3 bucket to confirm mount"
 	@du -sh $(AWS_S3_MOUNT_DIRECTORY)
 
-publish-artifacts: mount-s3-check
+publish-artifacts: import-GPG-key mount-s3-check
 	@echo "Publish artifacts"
-	@/bin/publisher --uploadSchemaFilePath=${UPLOAD_SCHEMA_FILE_PATH} --destPrefix=${DEST_PREFIX}
+	@UPLOAD_SCHEMA_FILE_PATH=${UPLOAD_SCHEMA_FILE_PATH} DEST_PREFIX=${DEST_PREFIX} /bin/publisher
 
 unmount-s3: publish-artifacts
 	@echo "Unmounting S3"
 	@umount $(ARTIFACTS_DEST_FOLDER)
 
-.PHONY: prepare-secrets mount-s3 mount-s3-check publish-artifacts prepare-schema dest-prefix unmount-s3
+import-GPG-key:
+	@printf %s ${GPG_PRIVATE_KEY_BASE64} | base64 --decode | gpg --batch --import -
+
+.PHONY: prepare-secrets mount-s3 mount-s3-check publish-artifacts prepare-schema dest-prefix unmount-s3 import-GPG-key

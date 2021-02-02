@@ -1,5 +1,5 @@
 #!/bin/bash
-
+set -e
 # build docker image form Dockerfile
 echo "Build fresh docker image for newrelic/infrastructure-publish-action"
 # @TODO add --no-cache
@@ -23,4 +23,6 @@ docker run --rm -it \
         -e SCHEMA \
         -e SCHEMA_URL \
         -e ENV \
+        -e GPG_PRIVATE_KEY_BASE64 \
+        -e GPG_PASSPHRASE \
         newrelic/infrastructure-publish-action

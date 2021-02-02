@@ -28,6 +28,12 @@ inputs:
   env:
     description: Type of environment (release, pre-release)
     required: true
+  gpg_passphrase:
+    description: Passphrase for the gpg key
+    required: false
+  gpg_private_key_base64:
+    description: Encoded gpg key
+    required: true
 runs:
   using: "composite"
   steps:
@@ -37,6 +43,8 @@ runs:
         AWS_SECRET_ACCESS_KEY: ${{ inputs.aws_secret_access_key }}
         AWS_ACCESS_KEY: ${{ inputs.aws_access_key }}
         AWS_S3_BUCKET_NAME: ${{ inputs.aws_s3_bucket_name }}
+        GPG_PASSPHRASE: ${{ inputs.gpg_passphrase }}
+        GPG_PRIVATE_KEY_BASE64: ${{ inputs.gpg_private_key_base64}}
         REPO_NAME: ${{ inputs.repo_name }}
         APP_NAME: ${{ inputs.app_name }}
         TAG: ${{ inputs.tag }}

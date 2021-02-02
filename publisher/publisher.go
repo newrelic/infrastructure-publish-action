@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 	"gopkg.in/yaml.v2"
 	"io"
@@ -10,12 +9,15 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"os/exec"
 	"path"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
 const (
+	placeholderForOsVersion  = "{os_version}"
 	placeholderForDestPrefix = "{dest_prefix}"
 	placeholderForRepoName   = "{repo_name}"
 	placeholderForAppName    = "{app_name}"
@@ -27,7 +29,15 @@ const (
 
 	//Erorrs
 	noDestinationError = "no uploads were provided for the schema"
-	typeFile           = "file"
+
+	//FileTypes
+	typeFile        = "file"
+	typeZypp        = "zypp"
+	typeYum         = "yum"
+	typeApt         = "apt"
+	repodataRpmPath = "/repodata/repomd.xml"
+
+	timeoutFileCreation = time.Second * 300
 )
 
 type config struct {
@@ -39,6 +49,7 @@ type config struct {
 	artifactsDestFolder  string
 	artifactsSrcFolder   string
 	uploadSchemaFilePath string
+	gpgPassphrase        string
 }
 
 type uploadArtifactSchema struct {
@@ -61,13 +72,11 @@ func main() {
 	log.Println(fmt.Sprintf("config: %v", conf))
 
 	uploadSchemaContent, err := readFileContent(conf.uploadSchemaFilePath)
-
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	uploadSchema, err := parseUploadSchema(uploadSchemaContent)
-
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -96,38 +105,20 @@ func loadConfig() config {
 	viper.BindEnv("tag")
 	viper.BindEnv("artifacts_dest_folder")
 	viper.BindEnv("artifacts_src_folder")
-	viper.BindEnv("uploadSchema_file_path")
+	viper.BindEnv("upload_schema_file_path")
 	viper.BindEnv("dest_prefix")
-
-	pflag.String("repoName", "", "repo name")
-	pflag.String("appName", "", "app name")
-	pflag.String("tag", "", "asset git tag")
-	pflag.String("artifactsDestFolder", "", "artifacts destination folder")
-	pflag.String("artifactsSrcFolder", "", "artifacts source folder")
-	pflag.String("uploadSchemaFilePath", "", "upload schema file path")
-	pflag.String("destPrefix", "", "prefix for artifacts destination")
-
-	pflag.Parse()
-
-	viper.BindPFlags(pflag.CommandLine)
-
-	getFirstNotEmpty := func(first, second string) string {
-		if first != "" {
-			return first
-		}
-
-		return second
-	}
+	viper.BindEnv("gpg_passphrase")
 
 	return config{
-		destPrefix:           getFirstNotEmpty(viper.GetString("destPrefix"), viper.GetString("dest_prefix")),
-		repoName:             getFirstNotEmpty(viper.GetString("repoName"), viper.GetString("repo_name")),
-		appName:              getFirstNotEmpty(viper.GetString("appName"), viper.GetString("app_name")),
+		destPrefix:           viper.GetString("dest_prefix"),
+		repoName:             viper.GetString("repo_name"),
+		appName:              viper.GetString("app_name"),
 		tag:                  viper.GetString("tag"),
 		version:              strings.Replace(viper.GetString("tag"), "v", "", -1),
-		artifactsDestFolder:  getFirstNotEmpty(viper.GetString("artifactsDestFolder"), viper.GetString("artifacts_dest_folder")),
-		artifactsSrcFolder:   getFirstNotEmpty(viper.GetString("artifactsSrcFolder"), viper.GetString("artifacts_src_folder")),
-		uploadSchemaFilePath: getFirstNotEmpty(viper.GetString("uploadSchemaFilePath"), viper.GetString("upload_schema_file_path")),
+		artifactsDestFolder:  viper.GetString("artifacts_dest_folder"),
+		artifactsSrcFolder:   viper.GetString("artifacts_src_folder"),
+		uploadSchemaFilePath: viper.GetString("upload_schema_file_path"),
+		gpgPassphrase:        viper.GetString("gpg_passphrase"),
 	}
 }
 
@@ -160,8 +151,10 @@ func parseUploadSchema(fileContent []byte) (uploadArtifactsSchema, error) {
 }
 
 func downloadArtifact(conf config, schema uploadArtifactSchema) error {
+
+	log.Println("Starting downloading artifacts!")
 	for _, arch := range schema.Arch {
-		srcFile := replacePlaceholders(schema.Src, conf.repoName, conf.appName, arch, conf.tag, conf.version, conf.destPrefix)
+		srcFile := replacePlaceholders(schema.Src, conf.repoName, conf.appName, arch, conf.tag, conf.version, conf.destPrefix, "")
 		url := generateDownloadUrl(urlTemplate, conf.repoName, conf.tag, srcFile)
 
 		destPath := path.Join(conf.artifactsSrcFolder, srcFile)
@@ -194,15 +187,23 @@ func downloadArtifacts(conf config, schema uploadArtifactsSchema) error {
 	return nil
 }
 
-func uploadArtifact(conf config, schema uploadArtifactSchema) error {
+func uploadArtifact(conf config, schema uploadArtifactSchema) (err error) {
+
 	for _, arch := range schema.Arch {
 		for _, upload := range schema.Uploads {
 
 			if upload.Type == typeFile {
-				err := uploadFileArtifact(conf, schema, upload, arch)
-				if err != nil {
-					return err
-				}
+				log.Println("Uploading file artifact")
+				err = uploadFileArtifact(conf, schema, upload, arch)
+			} else if upload.Type == typeYum || upload.Type == typeZypp {
+				log.Println("Uploading rpm as yum or zypp")
+				err = uploadRpm(conf, schema.Src, upload, arch)
+			} else if upload.Type == typeApt {
+				log.Println("Uploading apt")
+				err = uploadApt(conf, schema, upload, arch)
+			}
+			if err != nil {
+				return err
 			}
 		}
 	}
@@ -210,7 +211,87 @@ func uploadArtifact(conf config, schema uploadArtifactSchema) error {
 	return nil
 }
 
-func uploadFileArtifact(conf config, schema uploadArtifactSchema, upload Upload, arch string) error {
+func uploadRpm(conf config, srcTemplate string, upload Upload, arch string) (err error) {
+
+	for _, osVersion := range upload.OsVersion {
+		log.Printf("[ ] Start uploading rpm for os %s and %s", osVersion, arch)
+
+		fileName, destPath := replaceSrcDestTemplates(
+			srcTemplate,
+			upload.Dest,
+			conf.repoName,
+			conf.appName,
+			arch,
+			conf.tag,
+			conf.version,
+			conf.destPrefix,
+			osVersion)
+
+		srcPath := path.Join(conf.artifactsSrcFolder, fileName)
+		repoPath := path.Join(conf.artifactsDestFolder, destPath)
+		filePath := path.Join(repoPath, fileName)
+
+		log.Println(srcPath, repoPath, filePath)
+		err = copyFile(srcPath, filePath)
+		if err != nil {
+			return err
+		}
+
+		cmd := exec.Command("createrepo", "--update", "-s", "sha", repoPath)
+
+		log.Printf("Executing in shell '%s'", cmd.String())
+		//TODO add timeout to the command to avoid having it hanging
+		output, err := cmd.CombinedOutput()
+		log.Println(string(output))
+		if err != nil {
+			return err
+		}
+
+		log.Printf("Waiting for file creation")
+		repomd := path.Join(destPath, repodataRpmPath)
+		err = waitForFileCreation(repomd)
+		if err != nil {
+			return fmt.Errorf("error while creating repository %s for source %s and destination %s", err.Error(), srcPath, destPath)
+		}
+
+		cmd = exec.Command("gpg", "--batch", "--pinentry-mode=loopback", "--passphrase", conf.gpgPassphrase, "--detach-sign", "--armor", repomd)
+		//TODO add timeout to the command to avoid having it hanging
+		log.Printf("Executing in shell '%s'", cmd.String())
+
+		output, err = cmd.CombinedOutput()
+		log.Println(string(output))
+		if err != nil {
+			return err
+		}
+		log.Printf("[✔] Uploading RPM succeded for src %s and dest %s \n", srcPath, destPath)
+	}
+
+	return nil
+}
+
+func waitForFileCreation(repomd string) error {
+	t := time.NewTicker(time.Second * 5)
+	timeout := time.After(timeoutFileCreation)
+	for {
+		select {
+		case <-t.C:
+			_, err := os.Stat(repomd)
+			if err == nil {
+				return nil
+			}
+		case <-timeout:
+			return fmt.Errorf("the repo creation failed for RPM")
+		}
+	}
+}
+func uploadApt(conf config, schema uploadArtifactSchema, upload Upload, arch string) error {
+	Aptscript := "./Aptcript"
+
+	fmt.Printf("Calling script %s", Aptscript)
+	return nil
+}
+
+func uploadFileArtifact(conf config, schema uploadArtifactSchema, upload Upload, arch string) (err error) {
 	srcPath, destPath := replaceSrcDestTemplates(
 		schema.Src,
 		upload.Dest,
@@ -219,14 +300,25 @@ func uploadFileArtifact(conf config, schema uploadArtifactSchema, upload Upload,
 		arch,
 		conf.tag,
 		conf.version,
-		conf.destPrefix)
+		conf.destPrefix,
+		"")
 
 	srcPath = path.Join(conf.artifactsSrcFolder, srcPath)
 	destPath = path.Join(conf.artifactsDestFolder, destPath)
 
+	err = copyFile(srcPath, destPath)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func copyFile(srcPath string, destPath string) (err error) {
+
 	destDirectory := filepath.Dir(destPath)
 
-	if _, err := os.Stat(destDirectory); os.IsNotExist(err) {
+	if _, err = os.Stat(destDirectory); os.IsNotExist(err) {
 		// set right permissions
 		err = os.MkdirAll(destDirectory, 0744)
 		if err != nil {
@@ -235,7 +327,6 @@ func uploadFileArtifact(conf config, schema uploadArtifactSchema, upload Upload,
 	}
 
 	log.Println("[ ] Copy " + srcPath + " into " + destPath)
-
 	input, err := ioutil.ReadFile(srcPath)
 	if err != nil {
 		return err
@@ -261,27 +352,28 @@ func uploadArtifacts(conf config, schema uploadArtifactsSchema) error {
 	return nil
 }
 
-func replacePlaceholders(template, repoName, appName, arch, tag, version, destPrefix string) (str string) {
+func replacePlaceholders(template, repoName, appName, arch, tag, version, destPrefix, osVersion string) (str string) {
 	str = strings.Replace(template, placeholderForRepoName, repoName, -1)
 	str = strings.Replace(str, placeholderForAppName, appName, -1)
 	str = strings.Replace(str, placeholderForArch, arch, -1)
 	str = strings.Replace(str, placeholderForTag, tag, -1)
 	str = strings.Replace(str, placeholderForVersion, version, -1)
 	str = strings.Replace(str, placeholderForDestPrefix, destPrefix, -1)
+	str = strings.Replace(str, placeholderForOsVersion, osVersion, -1)
 
 	return
 }
 
-func replaceSrcDestTemplates(srcFileTemplate, destPathTemplate, repoName, appName, arch, tag, version, destPrefix string) (srcFile string, destPath string) {
-	srcFile = replacePlaceholders(srcFileTemplate, repoName, appName, arch, tag, version, destPrefix)
-	destPath = replacePlaceholders(destPathTemplate, repoName, appName, arch, tag, version, destPrefix)
+func replaceSrcDestTemplates(srcFileTemplate, destPathTemplate, repoName, appName, arch, tag, version, destPrefix, osVersion string) (srcFile string, destPath string) {
+	srcFile = replacePlaceholders(srcFileTemplate, repoName, appName, arch, tag, version, destPrefix, osVersion)
+	destPath = replacePlaceholders(destPathTemplate, repoName, appName, arch, tag, version, destPrefix, osVersion)
 	destPath = strings.Replace(destPath, placeholderForSrc, srcFile, -1)
 
 	return
 }
 
 func generateDownloadUrl(template, repoName, tag, srcFile string) (url string) {
-	url = replacePlaceholders(template, repoName, "", "", tag, "", "")
+	url = replacePlaceholders(template, repoName, "", "", tag, "", "", "")
 	url = strings.Replace(url, placeholderForSrc, srcFile, -1)
 
 	return

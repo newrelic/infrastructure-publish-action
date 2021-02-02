@@ -1,47 +1,47 @@
 ---
-- src: "{app_name}_linux_{version}_{arch}.tar.gz"
-  uploads:
-    - type: file
-      dest: "{dest_prefix}binaries/linux/{arch}/{src}"
-  arch:
-    - amd64
-    - noarch
+#- src: "{app_name}_linux_{version}_{arch}.tar.gz"
+#  uploads:
+#    - type: file
+#      dest: "{dest_prefix}binaries/linux/{arch}/{src}"
+#  arch:
+#    - amd64
+#    - noarch
+#
+#- src: "{app_name}_windows_{version}_{arch}.zip"
+#  uploads:
+#    - type: file
+#      dest: "{dest_prefix}binaries/windows/{arch}/{src}"
+#  arch:
+#    - amd64
+#
+#
+#- src: "{app_name}-{arch}.{version}.msi"
+#  uploads:
+#    - type: file
+#      dest: "{dest_prefix}windows/integrations/{app_name}/{src}"
+#    - type: file
+#      dest: "{dest_prefix}windows/integrations/{app_name}/{app_name}-{arch}.msi"
+#  arch:
+#    - amd64
 
-- src: "{app_name}_windows_{version}_{arch}.zip"
-  uploads:
-    - type: file
-      dest: "{dest_prefix}binaries/windows/{arch}/{src}"
-  arch:
-    - amd64
+#- src: "{app_name}_{version}-1_{arch}.deb"
+#  arch:
+#    - amd64
+#  uploads:
+#    - type: apt
+#      src_repo: "http://download.newrelic.com/infrastructure_agent/linux/apt"
+#      dest: "s3://nr-downloads-main/{dest_prefix}linux/apt"
+#      os_version:
+#        - bionic
+#        - buster
+#        - jessie
+#        - precise
+#        - stretch
+#        - trusty
+#        - wheezy
+#        - xenial
 
-
-- src: "{app_name}-{arch}.{version}.msi"
-  uploads:
-    - type: file
-      dest: "{dest_prefix}windows/integrations/{app_name}/{src}"
-    - type: file
-      dest: "{dest_prefix}windows/integrations/{app_name}/{app_name}-{arch}.msi"
-  arch:
-    - amd64
-
-- src: "{app_name}_{version}-1_{arch}.deb"
-  arch:
-    - amd64
-  uploads:
-    - type: apt
-      src_repo: "http://download.newrelic.com/infrastructure_agent/linux/apt"
-      dest: "s3://nr-downloads-main/{dest_prefix}linux/apt"
-      os_version:
-        - bionic
-        - buster
-        - jessie
-        - precise
-        - stretch
-        - trusty
-        - wheezy
-        - xenial
-
-- src: "{app_name}-{version}-1_{arch}.rpm"
+- src: "{app_name}-{version}-1.{arch}.rpm"
   arch:
     - x86_64
   uploads:
