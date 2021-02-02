@@ -29,7 +29,7 @@
     - amd64
   uploads:
     - type: apt
-      source_repo: "http://download.newrelic.com/infrastructure_agent/linux/apt"
+      src_repo: "http://download.newrelic.com/infrastructure_agent/linux/apt"
       dest: "s3://nr-downloads-main/{dest_prefix}linux/apt"
       os_version:
         - bionic

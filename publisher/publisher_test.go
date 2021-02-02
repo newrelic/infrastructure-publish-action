@@ -8,22 +8,25 @@ import (
 )
 
 var (
-	schema = ` 
+	schemaValidMultipleEntries = ` 
 - src: "foo.tar.gz"
-  dest: 
-    - /tmp
+  uploads:
+    - type: file
+      dest: /tmp
   arch:
     - amd64
     - 386
 - src: "{integration_name}_linux_{version}_{arch}.tar.gz"
-  dest: 
-    - "infrastructure_agent/binaries/linux/{arch}/"
+  uploads:
+    - type: file
+      dest: "infrastructure_agent/binaries/linux/{arch}/"
   arch:
     - ppc`
 
 	schemaNoSrc = `
-- dest: 
-    - /tmp
+- uploads:
+    - type: file
+      dest: /tmp
   arch:
    - amd64
 `
@@ -34,12 +37,13 @@ var (
 `
 	schemaNoArch = `
 - src: foo.tar.gz
-  dest: 
-    - /tmp
+  uploads:
+    - type: file
+      dest: /tmp
 `
 	schemaNotValid = `
 - src: foo.tar.gz
-  dest: /tmp
+  uploads: /tmp
 `
 )
 
@@ -50,15 +54,35 @@ func TestParseConfig(t *testing.T) {
 		schema string
 		output []uploadArtifactSchema
 	}{
-		"multiple entries": {schema, []uploadArtifactSchema{
-			{"foo.tar.gz", []string{"/tmp"}, []string{"amd64", "386"}},
-			{"{integration_name}_linux_{version}_{arch}.tar.gz", []string{"infrastructure_agent/binaries/linux/{arch}/"}, []string{"ppc"}},
+		"multiple entries": {schemaValidMultipleEntries, []uploadArtifactSchema{
+			{"foo.tar.gz", []string{"amd64", "386"}, []Upload{
+				{
+					Type: "file",
+					Dest: "/tmp",
+				},
+			}},
+			{"{integration_name}_linux_{version}_{arch}.tar.gz", []string{"ppc"}, []Upload{
+				{
+					Type: "file",
+					Dest: "infrastructure_agent/binaries/linux/{arch}/",
+				},
+			}},
 		}},
 		"src is omitted": {schemaNoSrc, []uploadArtifactSchema{
-			{"", []string{"/tmp"}, []string{"amd64"}},
+			{"",  []string{"amd64"}, []Upload{
+				{
+					Type: "file",
+					Dest: "/tmp",
+				},
+			}},
 		}},
 		"arch is omitted": {schemaNoArch, []uploadArtifactSchema{
-			{"foo.tar.gz", []string{"/tmp"}, []string{""}},
+			{"foo.tar.gz", []string{""}, []Upload{
+				{
+					Type: "file",
+					Dest: "/tmp",
+				},
+			}},
 		}},
 	}
 	for name, tt := range tests {
@@ -174,8 +198,18 @@ func writeDummyFile(path string) error {
 
 func TestUploadArtifacts(t *testing.T) {
 	schema := []uploadArtifactSchema{
-		{"{app_name}-{arch}-{version}.txt", []string{"{arch}/{app_name}/{src}"}, []string{"amd64", "386"}},
-		{"{app_name}-{arch}-{version}.txt", []string{"{arch}/{app_name}/{src}"}, nil},
+		{"{app_name}-{arch}-{version}.txt", []string{"amd64", "386"}, []Upload{
+			{
+				Type: "file",
+				Dest: "{arch}/{app_name}/{src}",
+			},
+		}},
+		{"{app_name}-{arch}-{version}.txt", nil, []Upload{
+			{
+				Type: "file",
+				Dest: "{arch}/{app_name}/{src}",
+			},
+		}},
 	}
 
 	dest := t.TempDir()

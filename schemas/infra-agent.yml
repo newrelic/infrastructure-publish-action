@@ -1,7 +1,8 @@
 ---
 - src: "newrelic-infra_linux_{version}.tar.gz"
-  dest:
-    - "{dest_prefix}binaries/linux/{arch}/{src}"
+  uploads:
+    - type: file
+      dest: "{dest_prefix}binaries/linux/{arch}/{src}"
   arch:
     - 386
     - amd64
@@ -15,19 +16,25 @@
     - s390x
 
 - src: "newrelic-infra.{version}.msi"
-  dest:
-    - "{dest_prefix}windows/{src}"
-    - "{dest_prefix}windows/newrelic-infra.msi"
+  uploads:
+    - type: file
+      dest: "{dest_prefix}windows/{src}"
+    - type: file
+      dest: "{dest_prefix}windows/newrelic-infra.msi"
 
 - src: "newrelic-infra-386.{version}.msi"
-  dest:
-    - "{dest_prefix}windows/386/{src}"
-    - "{dest_prefix}windows/386/newrelic-infra-386.msi"
+  uploads:
+    - type: file
+      dest: "{dest_prefix}windows/386/{src}"
+    - type: file
+      dest: "{dest_prefix}windows/386/newrelic-infra-386.msi"
 
 - src: "newrelic-infra-386.{version}.zip"
-  dest:
-    - "{dest_prefix}binaries/windows/386/{src}"
+  uploads:
+    - type: file
+      dest: "{dest_prefix}binaries/windows/386/{src}"
 
 - src: "newrelic-infra-amd64.{version}.zip"
-  dest:
-    - "{dest_prefix}binaries/windows/amd64/{src}"
+  uploads:
+    - type: file
+      dest: "{dest_prefix}binaries/windows/amd64/{src}"
