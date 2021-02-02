@@ -7,9 +7,10 @@ A GitHub Action to publish artifacts from GitHub release assets into S3 bucket.
 ## Inputs
 | Key                     | Required | Default | Description |
 | ---------------         | -------- | ------- | ----------- |
-| `repo_name`             | **yes**  | -       | Github repository name, should follow name convention. |
-| `app_name`              | **yes**  | -       | Application name to publish to S3.. |
+| `repo_name`             | **yes**  | -       | Github repository name, combination of organization and repository. |
+| `app_name`              | **yes**  | -       | Name of the package. |
 | `tag`                   | **yes**  | -       | Tag version from GitHub release. |
+| `schema`                | **yes**  | -       | Name of the schema describing the packages to be published. (infra-agent, ohi or nrjmx) |
 
 ## Use Publish Tag
 
@@ -55,6 +56,7 @@ A GitHub Action to publish artifacts from GitHub release assets into S3 bucket.
               tag: "v1.0.0"
               app_name: "my-app"
               repo_name: "my-org/my-app"
+              schema: "ohi"
 
 
 ## Consistency
