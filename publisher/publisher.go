@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"github.com/spf13/viper"
 	"gopkg.in/yaml.v2"
@@ -66,6 +67,9 @@ type Upload struct {
 }
 
 type uploadArtifactsSchema []uploadArtifactSchema
+
+// TODO use this globally
+var l = log.New(log.Writer(), "", 0)
 
 func main() {
 	conf := loadConfig()
@@ -243,14 +247,14 @@ func uploadRpm(conf config, srcTemplate string, upload Upload, arch string) (err
 
 			// TODO: set right permissions
 
-			if err := exeCmd("createrepo", repoPath); err != nil {
+			if err := execLogStream(l, "createrepo", repoPath); err != nil {
 				return err
 			}
 
 			log.Printf("[✔] Repo created: %s", repoPath)
 		}
 
-		if err := exeCmd("createrepo", "--update", "-s", "sha", repoPath); err != nil {
+		if err := execLogStream(l, "createrepo", "--update", "-s", "sha", repoPath); err != nil {
 			return err
 		}
 
@@ -261,7 +265,7 @@ func uploadRpm(conf config, srcTemplate string, upload Upload, arch string) (err
 			return fmt.Errorf("error while creating repository %s for source %s and destination %s", err.Error(), srcPath, destPath)
 		}
 
-		if err := exeCmd("gpg", "--batch", "--pinentry-mode=loopback", "--passphrase", conf.gpgPassphrase, "--detach-sign", "--armor", repomd); err != nil {
+		if err := execLogStream(l, "gpg", "--batch", "--pinentry-mode=loopback", "--passphrase", conf.gpgPassphrase, "--detach-sign", "--armor", repomd); err != nil {
 			return err
 		}
 		log.Printf("[✔] Uploading RPM succeded for src %s and dest %s \n", srcPath, destPath)
@@ -292,7 +296,7 @@ func uploadApt(conf config, srcTemplate string, upload Upload, arch string) erro
 
 		log.Printf("[ ] Create local repo for os %s/%s", osVersion, arch)
 		// aptly repo create --distribution=${DISTRO} ${DISTRO}
-		if err := exeCmd("aptly", "repo", "create", "--distribution=" + osVersion, osVersion); err != nil{
+		if err := execLogStream(l, "aptly", "repo", "create", "--distribution=" + osVersion, osVersion); err != nil{
 			return err
 		}
 		log.Printf("[✔] Local repo created for os %s/%s", osVersion, arch)
@@ -305,14 +309,14 @@ func uploadApt(conf config, srcTemplate string, upload Upload, arch string) erro
 
 		log.Printf("[ ] Add package %s into deb repo for %s/%s", srcPath, osVersion, arch)
 		// aptly repo add -force-replace=true ${DISTRO} ${srcPath}
-		if err := exeCmd("aptly", "repo", "add", "-force-replace=true", osVersion, srcPath); err != nil{
+		if err := execLogStream(l, "aptly", "repo", "add", "-force-replace=true", osVersion, srcPath); err != nil{
 			return err
 		}
 		log.Printf("[✔] Added succecfully package %s into deb repo for %s/%s", osVersion, arch)
 
 		log.Printf("[ ] Publish deb repo for %s/%s", osVersion, arch)
 		// aptly publish repo -gpg-key=${GPG_KEY_NAME} -keyring=${GPG_KEYRING} -passphrase-file=${GPG_KEY_PASSPHRASE} ${DISTRO}
-		if err := exeCmd("aptly", "repo", "repo", "-gpg-key=${GPG_KEY_NAME}", "-keyring=${GPG_KEYRING}", "-passphrase-file=" + conf.gpgPassphrase, osVersion); err != nil{
+		if err := execLogStream(l, "aptly", "repo", "repo", "-gpg-key=${GPG_KEY_NAME}", "-keyring=${GPG_KEYRING}", "-passphrase-file=" + conf.gpgPassphrase, osVersion); err != nil{
 			return err
 		}
 		log.Printf("[✔] Published succesfully deb repo for %s/%s", osVersion, arch)
@@ -334,13 +338,47 @@ func uploadApt(conf config, srcTemplate string, upload Upload, arch string) erro
 // TODO command with context
 // TODO add timeout to the command to avoid having it hanging
 
-func exeCmd(name string, args ...string) error {
-	cmd := exec.Command(name, args...)
+// execLogStream executes a command streaming outputs to provided log.
+func execLogStream(l *log.Logger, cmdName string, cmdArgs ...string) (err error) {
+	cmd := exec.Command(cmdName, cmdArgs...)
 
-	log.Printf("Executing in shell '%s'", cmd.String())
-	output, err := cmd.CombinedOutput()
-	log.Println(string(output))
-	return err
+	l.Printf("Executing in shell '%s'", cmd.String())
+
+	stdoutR, err := cmd.StdoutPipe()
+	if err != nil {
+		return
+	}
+	stderrR, err := cmd.StderrPipe()
+	if err != nil {
+		return
+	}
+
+	go streamAsLog(l, stdoutR, "stdout")
+	go streamAsLog(l, stderrR, "stderr")
+
+	defer l.Println()
+	return cmd.Run()
+}
+
+func streamAsLog(l *log.Logger, r io.ReadCloser, prefix string) {
+	if prefix != "" {
+		prefix += ": "
+	}
+
+	stdoutBufR := bufio.NewReader(r)
+	var err error
+	var line []byte
+	for {
+		line, _, err = stdoutBufR.ReadLine()
+		if err != nil {
+			if err == io.EOF {
+				return
+			}
+			l.Fatalf("Got unknown error: %s", err)
+		}
+
+		l.Printf("%s%s\n", prefix, string(line))
+	}
 }
 
 // TODO remove?
