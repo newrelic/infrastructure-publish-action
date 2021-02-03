@@ -231,13 +231,8 @@ func uploadRpm(conf config, srcTemplate string, upload Upload, arch string) (err
 		repoPath := path.Join(conf.artifactsDestFolder, destPath)
 		filePath := path.Join(repoPath, fileName)
 
-		log.Println(srcPath, repoPath, filePath)
-		err = copyFile(srcPath, filePath)
-		if err != nil {
-			return err
-		}
-
-		cmd := exec.Command("createrepo", "--update", "-s", "sha", repoPath)
+		//debug
+		cmd := exec.Command("createrepo", repoPath)
 
 		log.Printf("Executing in shell '%s'", cmd.String())
 		//TODO add timeout to the command to avoid having it hanging
@@ -246,9 +241,26 @@ func uploadRpm(conf config, srcTemplate string, upload Upload, arch string) (err
 		if err != nil {
 			return err
 		}
+		//debug
+
+		log.Println(srcPath, repoPath, filePath)
+		err = copyFile(srcPath, filePath)
+		if err != nil {
+			return err
+		}
+
+		cmd = exec.Command("createrepo", "--update", "-s", "sha", repoPath)
+
+		log.Printf("Executing in shell '%s'", cmd.String())
+		//TODO add timeout to the command to avoid having it hanging
+		output, err = cmd.CombinedOutput()
+		log.Println(string(output))
+		if err != nil {
+			return err
+		}
 
 		log.Printf("Waiting for file creation")
-		repomd := path.Join(destPath, repodataRpmPath)
+		repomd := path.Join(repoPath, repodataRpmPath)
 		err = waitForFileCreation(repomd)
 		if err != nil {
 			return fmt.Errorf("error while creating repository %s for source %s and destination %s", err.Error(), srcPath, destPath)
@@ -270,6 +282,7 @@ func uploadRpm(conf config, srcTemplate string, upload Upload, arch string) (err
 }
 
 func waitForFileCreation(repomd string) error {
+	log.Printf("W f %s", repomd)
 	t := time.NewTicker(time.Second * 5)
 	timeout := time.After(timeoutFileCreation)
 	for {
