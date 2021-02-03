@@ -37,7 +37,7 @@ inputs:
 runs:
   using: "composite"
   steps:
-    - run: ./actions/publish/action-run.sh
+    - run: ./action-run.sh
       shell: bash
       env:
         AWS_SECRET_ACCESS_KEY: ${{ inputs.aws_secret_access_key }}

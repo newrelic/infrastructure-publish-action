@@ -65,7 +65,7 @@ mount-s3: prepare-secrets
 	@s3fs $(AWS_S3_BUCKET_NAME) $(ARTIFACTS_DEST_FOLDER)
 
 mount-s3-check: mount-s3
-	@echo "List files from s3 bucket to confirm mount"
+	@echo "Calculate size s3 bucket to confirm mount"
 	@du -sh $(AWS_S3_MOUNT_DIRECTORY)
 
 publish-artifacts: import-GPG-key mount-s3-check

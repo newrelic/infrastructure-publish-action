@@ -230,44 +230,52 @@ func uploadRpm(conf config, srcTemplate string, upload Upload, arch string) (err
 		srcPath := path.Join(conf.artifactsSrcFolder, fileName)
 		repoPath := path.Join(conf.artifactsDestFolder, destPath)
 		filePath := path.Join(repoPath, fileName)
+		repomd := path.Join(repoPath, repodataRpmPath)
 
-		//debug
-		cmd := exec.Command("createrepo", repoPath)
+		// - exec tooling
+		// TODO handle command output as channel to see logs
+		// TODO command with context
+		// TODO add timeout to the command to avoid having it hanging
 
-		log.Printf("Executing in shell '%s'", cmd.String())
-		//TODO add timeout to the command to avoid having it hanging
-		output, err := cmd.CombinedOutput()
-		log.Println(string(output))
-		if err != nil {
-			return err
-		}
-		//debug
-
-		log.Println(srcPath, repoPath, filePath)
 		err = copyFile(srcPath, filePath)
 		if err != nil {
 			return err
 		}
 
-		cmd = exec.Command("createrepo", "--update", "-s", "sha", repoPath)
+		if _, err = os.Stat(repomd); os.IsNotExist(err) {
+
+			log.Printf("[ ] Didn't fine repo for %s, run repo init command", repoPath)
+
+			// set right permissions
+			cmd := exec.Command("createrepo", repoPath)
+
+			log.Printf("Executing in shell '%s'", cmd.String())
+			output, err := cmd.CombinedOutput()
+			log.Println(string(output))
+			if err != nil {
+				return err
+			}
+
+			log.Printf("[✔] Repo created: %s", repoPath)
+		}
+
+		cmd := exec.Command("createrepo", "--update", "-s", "sha", repoPath)
 
 		log.Printf("Executing in shell '%s'", cmd.String())
-		//TODO add timeout to the command to avoid having it hanging
-		output, err = cmd.CombinedOutput()
+		output, err := cmd.CombinedOutput()
 		log.Println(string(output))
 		if err != nil {
 			return err
 		}
 
 		log.Printf("Waiting for file creation")
-		repomd := path.Join(repoPath, repodataRpmPath)
+
 		err = waitForFileCreation(repomd)
 		if err != nil {
 			return fmt.Errorf("error while creating repository %s for source %s and destination %s", err.Error(), srcPath, destPath)
 		}
 
 		cmd = exec.Command("gpg", "--batch", "--pinentry-mode=loopback", "--passphrase", conf.gpgPassphrase, "--detach-sign", "--armor", repomd)
-		//TODO add timeout to the command to avoid having it hanging
 		log.Printf("Executing in shell '%s'", cmd.String())
 
 		output, err = cmd.CombinedOutput()
@@ -281,8 +289,8 @@ func uploadRpm(conf config, srcTemplate string, upload Upload, arch string) (err
 	return nil
 }
 
+// TODO remove?
 func waitForFileCreation(repomd string) error {
-	log.Printf("W f %s", repomd)
 	t := time.NewTicker(time.Second * 5)
 	timeout := time.After(timeoutFileCreation)
 	for {
