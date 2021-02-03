@@ -27,7 +27,7 @@ const (
 	placeholderForSrc        = "{src}"
 	urlTemplate              = "https://github.com/{repo_name}/releases/download/{tag}/{src}"
 
-	//Erorrs
+	//Errors
 	noDestinationError = "no uploads were provided for the schema"
 
 	//FileTypes
@@ -246,25 +246,16 @@ func uploadRpm(conf config, srcTemplate string, upload Upload, arch string) (err
 
 			log.Printf("[ ] Didn't fine repo for %s, run repo init command", repoPath)
 
-			// set right permissions
-			cmd := exec.Command("createrepo", repoPath)
+			// TODO: set right permissions
 
-			log.Printf("Executing in shell '%s'", cmd.String())
-			output, err := cmd.CombinedOutput()
-			log.Println(string(output))
-			if err != nil {
+			if err := exeCmd("createrepo", repoPath); err != nil {
 				return err
 			}
 
 			log.Printf("[✔] Repo created: %s", repoPath)
 		}
 
-		cmd := exec.Command("createrepo", "--update", "-s", "sha", repoPath)
-
-		log.Printf("Executing in shell '%s'", cmd.String())
-		output, err := cmd.CombinedOutput()
-		log.Println(string(output))
-		if err != nil {
+		if err := exeCmd("createrepo", "--update", "-s", "sha", repoPath); err != nil {
 			return err
 		}
 
@@ -275,18 +266,22 @@ func uploadRpm(conf config, srcTemplate string, upload Upload, arch string) (err
 			return fmt.Errorf("error while creating repository %s for source %s and destination %s", err.Error(), srcPath, destPath)
 		}
 
-		cmd = exec.Command("gpg", "--batch", "--pinentry-mode=loopback", "--passphrase", conf.gpgPassphrase, "--detach-sign", "--armor", repomd)
-		log.Printf("Executing in shell '%s'", cmd.String())
-
-		output, err = cmd.CombinedOutput()
-		log.Println(string(output))
-		if err != nil {
+		if err := exeCmd("gpg", "--batch", "--pinentry-mode=loopback", "--passphrase", conf.gpgPassphrase, "--detach-sign", "--armor", repomd); err != nil {
 			return err
 		}
 		log.Printf("[✔] Uploading RPM succeded for src %s and dest %s \n", srcPath, destPath)
 	}
 
 	return nil
+}
+
+func exeCmd(name string, args ...string) error {
+	cmd := exec.Command(name, args...)
+
+	log.Printf("Executing in shell '%s'", cmd.String())
+	output, err := cmd.CombinedOutput()
+	log.Println(string(output))
+	return err
 }
 
 // TODO remove?
