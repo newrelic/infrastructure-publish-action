@@ -214,7 +214,7 @@ func uploadArtifact(conf config, schema uploadArtifactSchema) (err error) {
 func uploadRpm(conf config, srcTemplate string, upload Upload, arch string) (err error) {
 
 	for _, osVersion := range upload.OsVersion {
-		log.Printf("[ ] Start uploading rpm for os %s and %s", osVersion, arch)
+		log.Printf("[ ] Start uploading rpm for os %s/%s", osVersion, arch)
 
 		fileName, destPath := replaceSrcDestTemplates(
 			srcTemplate,
@@ -231,11 +231,6 @@ func uploadRpm(conf config, srcTemplate string, upload Upload, arch string) (err
 		repoPath := path.Join(conf.artifactsDestFolder, destPath)
 		filePath := path.Join(repoPath, fileName)
 		repomd := path.Join(repoPath, repodataRpmPath)
-
-		// - exec tooling
-		// TODO handle command output as channel to see logs
-		// TODO command with context
-		// TODO add timeout to the command to avoid having it hanging
 
 		err = copyFile(srcPath, filePath)
 		if err != nil {
@@ -275,6 +270,70 @@ func uploadRpm(conf config, srcTemplate string, upload Upload, arch string) (err
 	return nil
 }
 
+func uploadApt(conf config, srcTemplate string, upload Upload, arch string) error {
+
+	// @TODO save snapshots
+
+	for _, osVersion := range upload.OsVersion {
+		log.Printf("[ ] Start uploading deb for os %s/%s", osVersion, arch)
+
+		fileName, _ := replaceSrcDestTemplates(
+			srcTemplate,
+			upload.Dest,
+			conf.repoName,
+			conf.appName,
+			arch,
+			conf.tag,
+			conf.version,
+			conf.destPrefix,
+			osVersion)
+
+		srcPath := path.Join(conf.artifactsSrcFolder, fileName)
+
+		log.Printf("[ ] Create local repo for os %s/%s", osVersion, arch)
+		// aptly repo create --distribution=${DISTRO} ${DISTRO}
+		if err := exeCmd("aptly", "repo", "create", "--distribution=" + osVersion, osVersion); err != nil{
+			return err
+		}
+		log.Printf("[✔] Local repo created for os %s/%s", osVersion, arch)
+
+		// decide do we need to mirror ?
+		//aptly mirror create -keyring=${GPG_KEYRING} mirror-${DISTRO} http://download.newrelic.com/infrastructure_agent/linux/apt ${DISTRO} main
+		//aptly mirror update -keyring=${GPG_KEYRING} mirror-${DISTRO}
+		//aptly repo import mirror-${DISTRO} ${DISTRO} Name
+
+
+		log.Printf("[ ] Add package %s into deb repo for %s/%s", srcPath, osVersion, arch)
+		// aptly repo add -force-replace=true ${DISTRO} ${srcPath}
+		if err := exeCmd("aptly", "repo", "add", "-force-replace=true", osVersion, srcPath); err != nil{
+			return err
+		}
+		log.Printf("[✔] Added succecfully package %s into deb repo for %s/%s", osVersion, arch)
+
+		log.Printf("[ ] Publish deb repo for %s/%s", osVersion, arch)
+		// aptly publish repo -gpg-key=${GPG_KEY_NAME} -keyring=${GPG_KEYRING} -passphrase-file=${GPG_KEY_PASSPHRASE} ${DISTRO}
+		if err := exeCmd("aptly", "repo", "repo", "-gpg-key=${GPG_KEY_NAME}", "-keyring=${GPG_KEYRING}", "-passphrase-file=" + conf.gpgPassphrase, osVersion); err != nil{
+			return err
+		}
+		log.Printf("[✔] Published succesfully deb repo for %s/%s", osVersion, arch)
+
+		// TODO shoudl we sync once all repos updated?
+		log.Printf("[ ] Sync local repo for %s/%s into s3", osVersion, arch)
+		// ??? aws s3 sync aptly/public s3://nr-downloads-main/infrastructure_agent/test/linux/apt
+		// do copy into s3 folder instead
+		log.Printf("[✔] Synced succesfully local repo for %s/%s into s3", osVersion, arch)
+
+	}
+
+	return nil
+}
+
+
+// - exec tooling
+// TODO handle command output as channel to see logs
+// TODO command with context
+// TODO add timeout to the command to avoid having it hanging
+
 func exeCmd(name string, args ...string) error {
 	cmd := exec.Command(name, args...)
 
@@ -299,12 +358,6 @@ func waitForFileCreation(repomd string) error {
 			return fmt.Errorf("the repo creation failed for RPM")
 		}
 	}
-}
-func uploadApt(conf config, schema uploadArtifactSchema, upload Upload, arch string) error {
-	Aptscript := "./Aptcript"
-
-	fmt.Printf("Calling script %s", Aptscript)
-	return nil
 }
 
 func uploadFileArtifact(conf config, schema uploadArtifactSchema, upload Upload, arch string) (err error) {

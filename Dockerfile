@@ -6,7 +6,14 @@ ENV AWS_S3_MOUNT_DIRECTORY $AWS_S3_MOUNT_DIRECTORY
 
 # validate s3fs-fuse with the sec team
 RUN apt-get update && \
-  apt-get install -y s3fs make curl gnupg2 gpg-agent createrepo
+  apt-get install -y \
+            s3fs \
+            make \
+            curl \
+            gnupg2 \
+            gpg-agent \
+            createrepo \
+            aptly
 
 RUN mkdir $AWS_S3_MOUNT_DIRECTORY
 
