@@ -39,3 +39,5 @@ publish-artifacts:
 	@/bin/publisher
 
 .PHONY: prepare-secrets mount-s3 mount-s3-check publish-artifacts download-from-gh-check unmount-s3
+
+include $(CURDIR)/publisher/build.mk
