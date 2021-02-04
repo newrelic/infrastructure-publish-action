@@ -25,4 +25,5 @@ docker run --rm -it \
         -e ENV \
         -e GPG_PRIVATE_KEY_BASE64 \
         -e GPG_PASSPHRASE \
+        -e GPG_KEY_NAME \
         newrelic/infrastructure-publish-action

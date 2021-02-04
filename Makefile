@@ -18,7 +18,9 @@ endif
 ifndef GPG_PASSPHRASE
 	$(error GPG_PASSPHRASE is undefined)
 endif
-
+ifndef GPG_KEY_NAME
+	$(error GPG_KEY_NAME is undefined)
+endif
 
 prepare-schema: check-env
 	@echo "prepare schema file for: ${SCHEMA}"

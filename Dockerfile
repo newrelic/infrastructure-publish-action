@@ -11,9 +11,13 @@ RUN apt-get update && \
             make \
             curl \
             gnupg2 \
-            gpg-agent \
-            createrepo \
-            aptly
+            bzip2 \
+            createrepo
+
+# Sadly installing aptly with apt lead you to a old version not supporting gpg2
+RUN wget https://github.com/aptly-dev/aptly/releases/download/v1.4.0/aptly_1.4.0_linux_amd64.tar.gz
+RUN tar xzf aptly_1.4.0_linux_amd64.tar.gz
+RUN mv ./aptly_1.4.0_linux_amd64/aptly /usr/bin/aptly
 
 RUN mkdir $AWS_S3_MOUNT_DIRECTORY
 
@@ -26,7 +30,7 @@ ADD Makefile .
 RUN mkdir ./assets
 
 WORKDIR ./publisher
-RUN go get -d -v
+#RUN go get -d -v
 RUN go build -o /bin/publisher publisher.go
 
 WORKDIR /home/gha

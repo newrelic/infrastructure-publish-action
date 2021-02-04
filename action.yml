@@ -34,6 +34,9 @@ inputs:
   gpg_private_key_base64:
     description: Encoded gpg key
     required: true
+  gpg_key_name:
+    description: Name of gpg key
+    required: true
 runs:
   using: "composite"
   steps:
@@ -51,3 +54,4 @@ runs:
         ENV: ${{ inputs.env }}
         SCHEMA: ${{ inputs.schema }}
         SCHEMA_URL: ${{ inputs.schema_url }}
+        GPG_KEY_NAME: ${{ inputs.gpg_key_name }}

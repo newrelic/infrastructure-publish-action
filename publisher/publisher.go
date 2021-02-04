@@ -31,12 +31,13 @@ const (
 	noDestinationError = "no uploads were provided for the schema"
 
 	//FileTypes
-	typeFile        = "file"
-	typeZypp        = "zypp"
-	typeYum         = "yum"
-	typeApt         = "apt"
-	repodataRpmPath = "/repodata/repomd.xml"
-
+	typeFile            = "file"
+	typeZypp            = "zypp"
+	typeYum             = "yum"
+	typeApt             = "apt"
+	repodataRpmPath     = "/repodata/repomd.xml"
+	aptPublicFolderPath = "/root/.aptly/public/"
+	aptPoolMain         = "pool/main/"
 	timeoutFileCreation = time.Second * 300
 )
 
@@ -50,6 +51,7 @@ type config struct {
 	artifactsSrcFolder   string
 	uploadSchemaFilePath string
 	gpgPassphrase        string
+	gpgKeyName           string
 }
 
 type uploadArtifactSchema struct {
@@ -108,6 +110,7 @@ func loadConfig() config {
 	viper.BindEnv("upload_schema_file_path")
 	viper.BindEnv("dest_prefix")
 	viper.BindEnv("gpg_passphrase")
+	viper.BindEnv("gpg_key_name")
 
 	return config{
 		destPrefix:           viper.GetString("dest_prefix"),
@@ -119,6 +122,7 @@ func loadConfig() config {
 		artifactsSrcFolder:   viper.GetString("artifacts_src_folder"),
 		uploadSchemaFilePath: viper.GetString("upload_schema_file_path"),
 		gpgPassphrase:        viper.GetString("gpg_passphrase"),
+		gpgKeyName:           viper.GetString("gpg_key_name"),
 	}
 }
 
@@ -200,7 +204,7 @@ func uploadArtifact(conf config, schema uploadArtifactSchema) (err error) {
 				err = uploadRpm(conf, schema.Src, upload, arch)
 			} else if upload.Type == typeApt {
 				log.Println("Uploading apt")
-				err = uploadApt(conf, schema, upload, arch)
+				err = uploadApt(conf, schema.Src, upload, arch)
 			}
 			if err != nil {
 				return err
@@ -273,11 +277,12 @@ func uploadRpm(conf config, srcTemplate string, upload Upload, arch string) (err
 func uploadApt(conf config, srcTemplate string, upload Upload, arch string) error {
 
 	// @TODO save snapshots
-
+	// the dest path for apt is the same for each distribution since it does not depend on it
+	var destPath string
 	for _, osVersion := range upload.OsVersion {
 		log.Printf("[ ] Start uploading deb for os %s/%s", osVersion, arch)
 
-		fileName, _ := replaceSrcDestTemplates(
+		fileName, dest := replaceSrcDestTemplates(
 			srcTemplate,
 			upload.Dest,
 			conf.repoName,
@@ -289,10 +294,11 @@ func uploadApt(conf config, srcTemplate string, upload Upload, arch string) erro
 			osVersion)
 
 		srcPath := path.Join(conf.artifactsSrcFolder, fileName)
+		destPath = path.Join(conf.artifactsDestFolder, dest, "dist")
+		filePath := path.Join(conf.artifactsDestFolder, dest, aptPoolMain, string(fileName[0]), "/", fileName)
 
 		log.Printf("[ ] Create local repo for os %s/%s", osVersion, arch)
-		// aptly repo create --distribution=${DISTRO} ${DISTRO}
-		if err := exeCmd("aptly", "repo", "create", "--distribution=" + osVersion, osVersion); err != nil{
+		if err := exeCmd("aptly", "repo", "create", "--distribution="+osVersion, osVersion); err != nil {
 			return err
 		}
 		log.Printf("[✔] Local repo created for os %s/%s", osVersion, arch)
@@ -302,32 +308,41 @@ func uploadApt(conf config, srcTemplate string, upload Upload, arch string) erro
 		//aptly mirror update -keyring=${GPG_KEYRING} mirror-${DISTRO}
 		//aptly repo import mirror-${DISTRO} ${DISTRO} Name
 
-
 		log.Printf("[ ] Add package %s into deb repo for %s/%s", srcPath, osVersion, arch)
-		// aptly repo add -force-replace=true ${DISTRO} ${srcPath}
-		if err := exeCmd("aptly", "repo", "add", "-force-replace=true", osVersion, srcPath); err != nil{
+		if err := exeCmd("aptly", "repo", "add", "-force-replace=true", osVersion, srcPath); err != nil {
 			return err
 		}
 		log.Printf("[✔] Added succecfully package %s into deb repo for %s/%s", osVersion, arch)
 
 		log.Printf("[ ] Publish deb repo for %s/%s", osVersion, arch)
-		// aptly publish repo -gpg-key=${GPG_KEY_NAME} -keyring=${GPG_KEYRING} -passphrase-file=${GPG_KEY_PASSPHRASE} ${DISTRO}
-		if err := exeCmd("aptly", "repo", "repo", "-gpg-key=${GPG_KEY_NAME}", "-keyring=${GPG_KEYRING}", "-passphrase-file=" + conf.gpgPassphrase, osVersion); err != nil{
+		if err := exeCmd("aptly", "publish", "repo", "-gpg-key", conf.gpgKeyName, "-passphrase", conf.gpgPassphrase, "-batch", osVersion); err != nil {
 			return err
 		}
 		log.Printf("[✔] Published succesfully deb repo for %s/%s", osVersion, arch)
 
-		// TODO shoudl we sync once all repos updated?
-		log.Printf("[ ] Sync local repo for %s/%s into s3", osVersion, arch)
-		// ??? aws s3 sync aptly/public s3://nr-downloads-main/infrastructure_agent/test/linux/apt
-		// do copy into s3 folder instead
-		log.Printf("[✔] Synced succesfully local repo for %s/%s into s3", osVersion, arch)
+		// TODO should we sync once all repos updated?
 
+		err := copyFile(srcPath, filePath)
+		if err != nil {
+			return err
+		}
+
+		if _, err = os.Stat(destPath); os.IsNotExist(err) {
+			// set right permissions
+			err = os.MkdirAll(destPath, 0744)
+			if err != nil {
+				return err
+			}
+		}
+		log.Printf("[ ] Sync local repo for %s/%s into s3", osVersion, arch)
+		if err := exeCmd("cp", "-rf", aptPublicFolderPath+"dists/"+osVersion, destPath); err != nil {
+			return err
+		}
 	}
 
+	log.Printf("[✔] Synced succesfully local repo for %s into s3", arch)
 	return nil
 }
-
 
 // - exec tooling
 // TODO handle command output as channel to see logs
