@@ -5,7 +5,7 @@ GO_FMT 	?= gofmt -s -w -l $(SOURCE_DIR)
 deps:
 	@printf '\n------------------------------------------------------\n'
 	@printf 'Installing package dependencies required by the project.\n'
-	$(SOURCE_DIR) go mod vendor
+	(cd $(SOURCE_DIR) && go mod vendor)
 	@echo 'Success.'
 
 .PHONY: validate
