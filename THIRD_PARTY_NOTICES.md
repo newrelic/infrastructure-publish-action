@@ -41,9 +41,3 @@ Distributed under the following license(s):
 
 * BSD-3-Clause
 
-
-## [github.com/git-chglog/git-chglog](https://github.com/git-chglog/git-chglog)
-
-Distributed under the following license(s):
-
-* MIT
