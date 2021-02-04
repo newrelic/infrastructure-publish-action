@@ -12,6 +12,8 @@ RUN mkdir $AWS_S3_MOUNT_DIRECTORY
 
 WORKDIR /home/gha
 
+ADD go.mod ./
+ADD go.sum ./
 ADD publisher ./publisher
 ADD schemas ./schemas
 ADD Makefile .
