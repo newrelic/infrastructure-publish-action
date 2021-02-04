@@ -19,5 +19,5 @@ validate:
 test: deps
 	@printf '\n------------------------------------------------------\n'
 	@printf 'Running unit tests.\n'
-	go test -race ./...
+	(cd $(SOURCE_DIR) && go test -race ./...)
 	@echo 'Success.'
