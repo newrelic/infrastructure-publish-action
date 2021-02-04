@@ -1,10 +1,11 @@
-GO_FMT 	?= gofmt -s -w -l $(CURDIR)/publisher
+SOURCE_DIR = $(CURDIR)/publisher
+GO_FMT 	?= gofmt -s -w -l $(SOURCE_DIR)
 
 .PHONY: deps
 deps:
 	@printf '\n------------------------------------------------------\n'
 	@printf 'Installing package dependencies required by the project.\n'
-	go mod download
+	$(SOURCE_DIR) go mod vendor
 	@echo 'Success.'
 
 .PHONY: validate
