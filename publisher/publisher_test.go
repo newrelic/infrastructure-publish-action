@@ -281,7 +281,9 @@ func Test_streamAsLog(t *testing.T) {
 	}
 }
 
-func Test_execLogStream(t *testing.T) {
+func Test_execLogOutput_streamExecOutputEnabled(t *testing.T) {
+	streamExecOutput = true
+
 	tests := []struct {
 		name        string
 		cmdName     string
@@ -300,7 +302,7 @@ func Test_execLogStream(t *testing.T) {
 			var output bytes.Buffer
 			l := log.New(&output, "", 0)
 
-			err = execLogStream(l, tt.cmdName, tt.cmdArgs...)
+			err = execLogOutput(l, tt.cmdName, tt.cmdArgs...)
 
 			if tt.wantErr {
 				assert.Error(t, err)
