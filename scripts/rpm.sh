@@ -11,7 +11,7 @@ set -e
 #######################################
 
 echo "===> Importing GPG signature"
-printf %s ${GPG_PRIVATE_KEY_BASE64} | base64 --decode | gpg --batch --import -
+printf %s ${GPG_PRIVATE_KEY_BASE64} | base64 --decode | gpg --batch --no-default-keyring --keyring ${GPG_KEY_RING} --import -
 
 echo "===> Download RPM packages from GH"
 for arch in "${ARCH_LIST[@]}"; do
@@ -43,4 +43,4 @@ while [ ! -f $FILE ];do
    echo "===> Waiting repomd.xml exists..."
 done
 echo "===> Updating GPG metadata dettached signature in ${BASE_PATH}/${os_version}/${arch}"
-gpg --batch --pinentry-mode=loopback --passphrase ${GPG_PASSPHRASE} --detach-sign --armor "${LOCAL_REPO_PATH}/repodata/repomd.xml"
+gpg --batch --pinentry-mode=loopback --passphrase ${GPG_PASSPHRASE} --no-default-keyring --keyring ${GPG_KEY_RING}  --detach-sign --armor "${LOCAL_REPO_PATH}/repodata/repomd.xml"

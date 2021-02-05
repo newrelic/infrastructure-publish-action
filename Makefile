@@ -15,6 +15,9 @@ endif
 ifndef GPG_PRIVATE_KEY_BASE64
 	$(error GPG_PRIVATE_KEY_BASE64 is undefined)
 endif
+ifndef GPG_KEY_RING
+	$(error GPG_KEY_RING is undefined)
+endif
 ifndef GPG_PASSPHRASE
 	$(error GPG_PASSPHRASE is undefined)
 endif
@@ -79,6 +82,6 @@ unmount-s3: publish-artifacts
 	@umount $(ARTIFACTS_DEST_FOLDER)
 
 import-GPG-key:
-	@printf %s ${GPG_PRIVATE_KEY_BASE64} | base64 --decode | gpg --batch --import -
+	@printf %s ${GPG_PRIVATE_KEY_BASE64} | base64 --decode | gpg --batch --import --no-default-keyring --keyring ${GPG_KEY_RING} -
 
 .PHONY: prepare-secrets mount-s3 mount-s3-check publish-artifacts prepare-schema dest-prefix unmount-s3 import-GPG-key
