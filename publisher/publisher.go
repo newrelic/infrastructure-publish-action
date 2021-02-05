@@ -79,33 +79,33 @@ type uploadArtifactsSchema []uploadArtifactSchema
 
 func main() {
 	conf := loadConfig()
-	log.Println(fmt.Sprintf("config: %v", conf))
+	l.Println(fmt.Sprintf("config: %v", conf))
 
 	uploadSchemaContent, err := readFileContent(conf.uploadSchemaFilePath)
 	if err != nil {
-		log.Fatal(err)
+		l.Fatal(err)
 	}
 
 	uploadSchema, err := parseUploadSchema(uploadSchemaContent)
 	if err != nil {
-		log.Fatal(err)
+		l.Fatal(err)
 	}
 
 	err = downloadArtifacts(conf, uploadSchema)
 
 	if err != nil {
-		log.Fatal(err)
+		l.Fatal(err)
 	}
 
-	log.Println("🎉 download phase complete")
+	l.Println("🎉 download phase complete")
 
 	err = uploadArtifacts(conf, uploadSchema)
 
 	if err != nil {
-		log.Fatal(err)
+		l.Fatal(err)
 	}
 
-	log.Println("🎉 upload phase complete")
+	l.Println("🎉 upload phase complete")
 }
 
 func loadConfig() config {
@@ -152,12 +152,12 @@ func parseUploadSchema(fileContent []byte) (uploadArtifactsSchema, error) {
 		return nil, err
 	}
 
-	for i, _ := range schema {
-		if schema[i].Arch == nil {
-			schema[i].Arch = []string{""}
+	for _, s := range schema {
+		if s.Arch == nil {
+			s.Arch = []string{""}
 		}
-		if len(schema[i].Uploads) == 0 {
-			return nil, fmt.Errorf("error: '%s' in the schema: %v ", noDestinationError, schema[i].Src)
+		if len(s.Uploads) == 0 {
+			return nil, fmt.Errorf("error: '%s' in the schema: %v ", noDestinationError, s.Src)
 		}
 	}
 
@@ -166,14 +166,14 @@ func parseUploadSchema(fileContent []byte) (uploadArtifactsSchema, error) {
 
 func downloadArtifact(conf config, schema uploadArtifactSchema) error {
 
-	log.Println("Starting downloading artifacts!")
+	l.Println("Starting downloading artifacts!")
 	for _, arch := range schema.Arch {
 		srcFile := replacePlaceholders(schema.Src, conf.repoName, conf.appName, arch, conf.tag, conf.version, conf.destPrefix, "")
 		url := generateDownloadUrl(urlTemplate, conf.repoName, conf.tag, srcFile)
 
 		destPath := path.Join(conf.artifactsSrcFolder, srcFile)
 
-		log.Println(fmt.Sprintf("[ ] Download %s into %s", url, destPath))
+		l.Println(fmt.Sprintf("[ ] Download %s into %s", url, destPath))
 
 		err := downloadFile(url, destPath)
 		if err != nil {
@@ -185,7 +185,7 @@ func downloadArtifact(conf config, schema uploadArtifactSchema) error {
 			return err
 		}
 
-		log.Println(fmt.Sprintf("[✔] Download %s into %s %d bytes", url, destPath, fi.Size()))
+		l.Println(fmt.Sprintf("[✔] Download %s into %s %d bytes", url, destPath, fi.Size()))
 	}
 
 	return nil
@@ -207,13 +207,13 @@ func uploadArtifact(conf config, schema uploadArtifactSchema) (err error) {
 		for _, upload := range schema.Uploads {
 
 			if upload.Type == typeFile {
-				log.Println("Uploading file artifact")
+				l.Println("Uploading file artifact")
 				err = uploadFileArtifact(conf, schema, upload, arch)
 			} else if upload.Type == typeYum || upload.Type == typeZypp {
-				log.Println("Uploading rpm as yum or zypp")
+				l.Println("Uploading rpm as yum or zypp")
 				err = uploadRpm(conf, schema.Src, upload, arch)
 			} else if upload.Type == typeApt {
-				log.Println("Uploading apt")
+				l.Println("Uploading apt")
 				err = uploadApt(conf, schema.Src, upload, arch)
 			}
 			if err != nil {
@@ -228,7 +228,7 @@ func uploadArtifact(conf config, schema uploadArtifactSchema) (err error) {
 func uploadRpm(conf config, srcTemplate string, upload Upload, arch string) (err error) {
 
 	for _, osVersion := range upload.OsVersion {
-		log.Printf("[ ] Start uploading rpm for os %s/%s", osVersion, arch)
+		l.Printf("[ ] Start uploading rpm for os %s/%s", osVersion, arch)
 
 		fileName, destPath := replaceSrcDestTemplates(
 			srcTemplate,
@@ -253,7 +253,7 @@ func uploadRpm(conf config, srcTemplate string, upload Upload, arch string) (err
 
 		if _, err = os.Stat(repomd); os.IsNotExist(err) {
 
-			log.Printf("[ ] Didn't fine repo for %s, run repo init command", repoPath)
+			l.Printf("[ ] Didn't fine repo for %s, run repo init command", repoPath)
 
 			// TODO: set right permissions
 
@@ -261,14 +261,14 @@ func uploadRpm(conf config, srcTemplate string, upload Upload, arch string) (err
 				return err
 			}
 
-			log.Printf("[✔] Repo created: %s", repoPath)
+			l.Printf("[✔] Repo created: %s", repoPath)
 		}
 
 		if err := execLogOutput(l, "createrepo", "--update", "-s", "sha", repoPath); err != nil {
 			return err
 		}
 
-		log.Printf("Waiting for file creation")
+		l.Printf("Waiting for file creation")
 
 		err = waitForFileCreation(repomd)
 		if err != nil {
@@ -278,7 +278,7 @@ func uploadRpm(conf config, srcTemplate string, upload Upload, arch string) (err
 		if err := execLogOutput(l, "gpg", "--batch", "--pinentry-mode=loopback", "--passphrase", conf.gpgPassphrase, "--keyring", conf.gpgKeyRing, "--detach-sign", "--armor", repomd); err != nil {
 			return err
 		}
-		log.Printf("[✔] Uploading RPM succeded for src %s and dest %s \n", srcPath, destPath)
+		l.Printf("[✔] Uploading RPM succeded for src %s and dest %s \n", srcPath, destPath)
 	}
 
 	return nil
@@ -290,7 +290,7 @@ func uploadApt(conf config, srcTemplate string, upload Upload, arch string) erro
 	// the dest path for apt is the same for each distribution since it does not depend on it
 	var destPath string
 	for _, osVersion := range upload.OsVersion {
-		log.Printf("[ ] Start uploading deb for os %s/%s", osVersion, arch)
+		l.Printf("[ ] Start uploading deb for os %s/%s", osVersion, arch)
 
 		fileName, dest := replaceSrcDestTemplates(
 			srcTemplate,
@@ -307,29 +307,29 @@ func uploadApt(conf config, srcTemplate string, upload Upload, arch string) erro
 		destPath = path.Join(conf.artifactsDestFolder, dest, "dists")
 		filePath := path.Join(conf.artifactsDestFolder, dest, aptPoolMain, string(fileName[0]), "/", conf.appName, fileName)
 
-		log.Printf("[ ] Create local repo for os %s/%s", osVersion, arch)
+		l.Printf("[ ] Create local repo for os %s/%s", osVersion, arch)
 		// aptly repo create --distribution=${DISTRO} ${DISTRO}
 		if err := execLogOutput(l, "aptly", "repo", "create", "--distribution="+osVersion, osVersion); err != nil {
 			return err
 		}
-		log.Printf("[✔] Local repo created for os %s/%s", osVersion, arch)
+		l.Printf("[✔] Local repo created for os %s/%s", osVersion, arch)
 
 		// decide do we need to mirror ?
 		//aptly mirror create -keyring=${GPG_KEYRING} mirror-${DISTRO} http://download.newrelic.com/infrastructure_agent/linux/apt ${DISTRO} main
 		//aptly mirror update -keyring=${GPG_KEYRING} mirror-${DISTRO}
 		//aptly repo import mirror-${DISTRO} ${DISTRO} Name
 
-		log.Printf("[ ] Add package %s into deb repo for %s/%s", srcPath, osVersion, arch)
+		l.Printf("[ ] Add package %s into deb repo for %s/%s", srcPath, osVersion, arch)
 		if err := execLogOutput(l, "aptly", "repo", "add", "-force-replace=true", osVersion, srcPath); err != nil {
 			return err
 		}
-		log.Printf("[✔] Added succecfully package into deb repo for %s/%s", osVersion, arch)
+		l.Printf("[✔] Added succecfully package into deb repo for %s/%s", osVersion, arch)
 
-		log.Printf("[ ] Publish deb repo for %s/%s", osVersion, arch)
+		l.Printf("[ ] Publish deb repo for %s/%s", osVersion, arch)
 		if err := execLogOutput(l, "aptly", "publish", "repo", "-keyring", conf.gpgKeyRing, "-gpg-key", conf.gpgKeyName, "-passphrase", conf.gpgPassphrase, "-batch", osVersion); err != nil {
 			return err
 		}
-		log.Printf("[✔] Published succesfully deb repo for %s/%s", osVersion, arch)
+		l.Printf("[✔] Published succesfully deb repo for %s/%s", osVersion, arch)
 
 		err := copyFile(srcPath, filePath)
 		if err != nil {
@@ -343,13 +343,13 @@ func uploadApt(conf config, srcTemplate string, upload Upload, arch string) erro
 				return err
 			}
 		}
-		log.Printf("[ ] Sync local repo for %s/%s into s3", osVersion, arch)
+		l.Printf("[ ] Sync local repo for %s/%s into s3", osVersion, arch)
 		if err := execLogOutput(l, "cp", "-rf", aptPublicFolderPath+"dists/"+osVersion, destPath); err != nil {
 			return err
 		}
 	}
 
-	log.Printf("[✔] Synced succesfully local repo for %s into s3", arch)
+	l.Printf("[✔] Synced succesfully local repo for %s into s3", arch)
 	return nil
 }
 
@@ -358,7 +358,7 @@ func uploadApt(conf config, srcTemplate string, upload Upload, arch string) erro
 // TODO command with context
 // TODO add timeout to the command to avoid having it hanging
 
-// execLogOutput executes a command writing stdout & stderr to provided log.
+// execLogOutput executes a command writing stdout & stderr to provided l.
 func execLogOutput(l *log.Logger, cmdName string, cmdArgs ...string) (err error) {
 	cmd := exec.Command(cmdName, cmdArgs...)
 
@@ -366,7 +366,7 @@ func execLogOutput(l *log.Logger, cmdName string, cmdArgs ...string) (err error)
 
 	if !streamExecOutput {
 		output, err := cmd.CombinedOutput()
-		log.Println(string(output))
+		l.Println(string(output))
 		return err
 	}
 
@@ -459,7 +459,7 @@ func copyFile(srcPath string, destPath string) (err error) {
 		}
 	}
 
-	log.Println("[ ] Copy " + srcPath + " into " + destPath)
+	l.Println("[ ] Copy " + srcPath + " into " + destPath)
 	input, err := ioutil.ReadFile(srcPath)
 	if err != nil {
 		return err
@@ -470,7 +470,7 @@ func copyFile(srcPath string, destPath string) (err error) {
 		return err
 	}
 
-	log.Println("[✔] Copy " + srcPath + " into " + destPath)
+	l.Println("[✔] Copy " + srcPath + " into " + destPath)
 	return nil
 }
 
