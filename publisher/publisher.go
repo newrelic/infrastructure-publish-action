@@ -299,8 +299,8 @@ func uploadApt(conf config, srcTemplate string, upload Upload, arch string) erro
 			osVersion)
 
 		srcPath := path.Join(conf.artifactsSrcFolder, fileName)
-		destPath = path.Join(conf.artifactsDestFolder, dest, "dist")
-		filePath := path.Join(conf.artifactsDestFolder, dest, aptPoolMain, string(fileName[0]), "/", fileName)
+		destPath = path.Join(conf.artifactsDestFolder, dest, "dists")
+		filePath := path.Join(conf.artifactsDestFolder, dest, aptPoolMain, string(fileName[0]), "/", conf.appName, fileName)
 
 		log.Printf("[ ] Create local repo for os %s/%s", osVersion, arch)
 		// aptly repo create --distribution=${DISTRO} ${DISTRO}
