@@ -71,8 +71,10 @@ type Upload struct {
 
 type uploadArtifactsSchema []uploadArtifactSchema
 
-// TODO use this globally
-var l = log.New(log.Writer(), "", 0)
+var (
+	l                = log.New(log.Writer(), "", 0)
+	streamExecOutput = false
+)
 
 func main() {
 	conf := loadConfig()
@@ -252,14 +254,14 @@ func uploadRpm(conf config, srcTemplate string, upload Upload, arch string) (err
 
 			// TODO: set right permissions
 
-			if err := execLogStream(l, "createrepo", repoPath); err != nil {
+			if err := execLogOutput(l, "createrepo", repoPath); err != nil {
 				return err
 			}
 
 			log.Printf("[✔] Repo created: %s", repoPath)
 		}
 
-		if err := execLogStream(l, "createrepo", "--update", "-s", "sha", repoPath); err != nil {
+		if err := execLogOutput(l, "createrepo", "--update", "-s", "sha", repoPath); err != nil {
 			return err
 		}
 
@@ -270,7 +272,7 @@ func uploadRpm(conf config, srcTemplate string, upload Upload, arch string) (err
 			return fmt.Errorf("error while creating repository %s for source %s and destination %s", err.Error(), srcPath, destPath)
 		}
 
-		if err := execLogStream(l, "gpg", "--batch", "--pinentry-mode=loopback", "--passphrase", conf.gpgPassphrase, "--detach-sign", "--armor", repomd); err != nil {
+		if err := execLogOutput(l, "gpg", "--batch", "--pinentry-mode=loopback", "--passphrase", conf.gpgPassphrase, "--detach-sign", "--armor", repomd); err != nil {
 			return err
 		}
 		log.Printf("[✔] Uploading RPM succeded for src %s and dest %s \n", srcPath, destPath)
@@ -304,7 +306,7 @@ func uploadApt(conf config, srcTemplate string, upload Upload, arch string) erro
 
 		log.Printf("[ ] Create local repo for os %s/%s", osVersion, arch)
 		// aptly repo create --distribution=${DISTRO} ${DISTRO}
-		if err := execLogStream(l, "aptly", "repo", "create", "--distribution="+osVersion, osVersion); err != nil {
+		if err := execLogOutput(l, "aptly", "repo", "create", "--distribution="+osVersion, osVersion); err != nil {
 			return err
 		}
 		log.Printf("[✔] Local repo created for os %s/%s", osVersion, arch)
@@ -315,13 +317,13 @@ func uploadApt(conf config, srcTemplate string, upload Upload, arch string) erro
 		//aptly repo import mirror-${DISTRO} ${DISTRO} Name
 
 		log.Printf("[ ] Add package %s into deb repo for %s/%s", srcPath, osVersion, arch)
-		if err := execLogStream(l, "aptly", "repo", "add", "-force-replace=true", osVersion, srcPath); err != nil {
+		if err := execLogOutput(l, "aptly", "repo", "add", "-force-replace=true", osVersion, srcPath); err != nil {
 			return err
 		}
 		log.Printf("[✔] Added succecfully package into deb repo for %s/%s", osVersion, arch)
 
 		log.Printf("[ ] Publish deb repo for %s/%s", osVersion, arch)
-		if err := execLogStream(l, "aptly", "publish", "repo", "-gpg-key", conf.gpgKeyName, "-passphrase", conf.gpgPassphrase, "-batch", osVersion); err != nil {
+		if err := execLogOutput(l, "aptly", "publish", "repo", "-gpg-key", conf.gpgKeyName, "-passphrase", conf.gpgPassphrase, "-batch", osVersion); err != nil {
 			return err
 		}
 		log.Printf("[✔] Published succesfully deb repo for %s/%s", osVersion, arch)
@@ -339,7 +341,7 @@ func uploadApt(conf config, srcTemplate string, upload Upload, arch string) erro
 			}
 		}
 		log.Printf("[ ] Sync local repo for %s/%s into s3", osVersion, arch)
-		if err := execLogStream(l, "cp", "-rf", aptPublicFolderPath+"dists/"+osVersion, destPath); err != nil {
+		if err := execLogOutput(l, "cp", "-rf", aptPublicFolderPath+"dists/"+osVersion, destPath); err != nil {
 			return err
 		}
 	}
@@ -353,11 +355,17 @@ func uploadApt(conf config, srcTemplate string, upload Upload, arch string) erro
 // TODO command with context
 // TODO add timeout to the command to avoid having it hanging
 
-// execLogStream executes a command streaming outputs to provided log.
-func execLogStream(l *log.Logger, cmdName string, cmdArgs ...string) (err error) {
+// execLogOutput executes a command writing stdout & stderr to provided log.
+func execLogOutput(l *log.Logger, cmdName string, cmdArgs ...string) (err error) {
 	cmd := exec.Command(cmdName, cmdArgs...)
 
 	l.Printf("Executing in shell '%s'", cmd.String())
+
+	if !streamExecOutput {
+		output, err := cmd.CombinedOutput()
+		log.Println(string(output))
+		return err
+	}
 
 	stdoutR, err := cmd.StdoutPipe()
 	if err != nil {
