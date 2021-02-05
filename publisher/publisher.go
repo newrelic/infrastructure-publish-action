@@ -43,6 +43,11 @@ const (
 	timeoutFileCreation = time.Second * 300
 )
 
+var (
+	l                = log.New(log.Writer(), "", 0)
+	streamExecOutput = false
+)
+
 type config struct {
 	destPrefix           string
 	repoName             string
@@ -71,11 +76,6 @@ type Upload struct {
 }
 
 type uploadArtifactsSchema []uploadArtifactSchema
-
-var (
-	l                = log.New(log.Writer(), "", 0)
-	streamExecOutput = false
-)
 
 func main() {
 	conf := loadConfig()
