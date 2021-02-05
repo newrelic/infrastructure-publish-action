@@ -2,21 +2,23 @@
 
 # Infrastructure publish action
 
-A GitHub Action to publish artifacts from GitHub release assets into S3 bucket.
+A GitHub Action to publish artifacts from GitHub release assets into an S3 bucket.
 
 ## Inputs
-| Key                     | Required | Default | Description |
-| ---------------         | -------- | ------- | ----------- |
-| `repo_name`             | **yes**  | -       | Github repository name, combination of organization and repository. |
-| `app_name`              | **yes**  | -       | Name of the package. |
-| `tag`                   | **yes**  | -       | Tag version from GitHub release. |
-| `schema`                | **yes**  | -       | Name of the schema describing the packages to be published. (infra-agent, ohi or nrjmx) |
+| Key                     | Description |
+| ---------------         | ----------- |
+| `repo_name`             | Github repository name, combination of organization and repository. |
+| `app_name`              | Name of the package. |
+| `tag`                   | Tag version from GitHub release. |
+| `schema`                | Describes the packages to be published: infra-agent, ohi, or nrjmx. |
+
+All keys are required.
 
 ## Use Publish Tag
 
- The following example could be added as a job to your existing workflow that upload Infrastructure agent assets to S3 bucket.
+The example demonstrates how to add a job to your existing workflow to upload Infrastructure agents assets to your S3 bucket.
 
- Github secrets assumed to be set:
+GitHub secrets to be set:
 
      AWS_SECRET_ACCESS_KEY - Specifies the secret key associated with the access key.
      AWS_ACCESS_KEY - Personal AWS access key.
@@ -61,11 +63,11 @@ A GitHub Action to publish artifacts from GitHub release assets into S3 bucket.
 
 ## Consistency
 
-As GitHub Actions can run many workflows in parallel, once a publish-action is called will execute a lock mechanism in S3 to avoid conflicts.
+As GitHub Actions can run many workflows in parallel, once a publish-action is called it execute a lock mechanism in S3 to avoid conflicts.
 
 ## Support
 
-Should you need assistance with New Relic products, you are in good hands with several support diagnostic tools and support channels.
+If you need assistance with New Relic products, you are in good hands with several support diagnostic tools and support channels.
 
 If the issue has been confirmed as a bug or is a feature request, file a GitHub issue.
 
