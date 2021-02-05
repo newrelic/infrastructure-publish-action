@@ -321,10 +321,27 @@ func uploadApt(conf config, srcTemplate string, upload Upload, arch string) erro
 		}
 		l.Printf("[✔] Local repo created for os %s/%s", osVersion, arch)
 
-		// decide do we need to mirror ?
-		//aptly mirror create -keyring=${GPG_KEYRING} mirror-${DISTRO} http://download.newrelic.com/infrastructure_agent/linux/apt ${DISTRO} main
-		//aptly mirror update -keyring=${GPG_KEYRING} mirror-${DISTRO}
-		//aptly repo import mirror-${DISTRO} ${DISTRO} Name
+		// Mirror repo start
+
+		l.Printf("[ ] Mirror create APT repo for %s/%s", srcPath, osVersion, arch)
+		if err := execLogOutput(l, "aptly", "mirror", "create", "-keyring", conf.gpgKeyRing, "mirror-", osVersion, "http://download.newrelic.com/infrastructure_agent/linux/apt", osVersion, "main"); err != nil {
+			return err
+		}
+		l.Printf("[✔] Mirror create succesfully APT repo for %s/%s", srcPath, osVersion, arch)
+
+		l.Printf("[ ] Mirror update APT repo for %s/%s", srcPath, osVersion, arch)
+		if err := execLogOutput(l, "aptly", "mirror", "update", "-keyring", conf.gpgKeyRing, "mirror-", osVersion); err != nil {
+			return err
+		}
+		l.Printf("[✔] Mirror update succesfully APT repo for %s/%s", srcPath, osVersion, arch)
+
+		l.Printf("[ ] Mirror repo import APT repo for %s/%s", srcPath, osVersion, arch)
+		if err := execLogOutput(l, "aptly", "repo", "import", "mirror-", osVersion, osVersion, "Name"); err != nil {
+			return err
+		}
+		l.Printf("[✔] Mirror repo import succesfully APT repo for %s/%s", srcPath, osVersion, arch)
+
+		// Mirror repo end
 
 		l.Printf("[ ] Add package %s into deb repo for %s/%s", srcPath, osVersion, arch)
 		if err := execLogOutput(l, "aptly", "repo", "add", "-force-replace=true", osVersion, srcPath); err != nil {
@@ -351,7 +368,7 @@ func uploadApt(conf config, srcTemplate string, upload Upload, arch string) erro
 			}
 		}
 		l.Printf("[ ] Sync local repo for %s/%s into s3", osVersion, arch)
-		if err := execLogOutput(l, "cp", "-rf", conf.aptlyFolder + "/public/dists/"+osVersion, destPath); err != nil {
+		if err := execLogOutput(l, "cp", "-rf", conf.aptlyFolder+"/public/dists/"+osVersion, destPath); err != nil {
 			return err
 		}
 	}
