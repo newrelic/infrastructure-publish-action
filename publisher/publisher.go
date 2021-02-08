@@ -38,14 +38,14 @@ const (
 	typeYum             = "yum"
 	typeApt             = "apt"
 	repodataRpmPath     = "/repodata/repomd.xml"
-	aptPublicFolderPath = "/root/.aptly/public/"
+	defaultAptlyFolder  = "/root/.aptly"
 	aptPoolMain         = "pool/main/"
 	timeoutFileCreation = time.Second * 300
 )
 
 var (
 	l                = log.New(log.Writer(), "", 0)
-	streamExecOutput = false
+	streamExecOutput = true
 )
 
 type config struct {
@@ -56,6 +56,7 @@ type config struct {
 	version              string
 	artifactsDestFolder  string
 	artifactsSrcFolder   string
+	aptlyFolder          string
 	uploadSchemaFilePath string
 	gpgPassphrase        string
 	gpgKeyName           string
@@ -115,12 +116,17 @@ func loadConfig() config {
 	viper.BindEnv("tag")
 	viper.BindEnv("artifacts_dest_folder")
 	viper.BindEnv("artifacts_src_folder")
+	viper.BindEnv("aptly_folder")
 	viper.BindEnv("upload_schema_file_path")
 	viper.BindEnv("dest_prefix")
 	viper.BindEnv("gpg_passphrase")
 	viper.BindEnv("gpg_key_name")
 	viper.BindEnv("gpg_key_ring")
 
+	aptlyF := viper.GetString("aptly_folder")
+	if aptlyF == "" {
+		aptlyF = defaultAptlyFolder
+	}
 	return config{
 		destPrefix:           viper.GetString("dest_prefix"),
 		repoName:             viper.GetString("repo_name"),
@@ -129,6 +135,7 @@ func loadConfig() config {
 		version:              strings.Replace(viper.GetString("tag"), "v", "", -1),
 		artifactsDestFolder:  viper.GetString("artifacts_dest_folder"),
 		artifactsSrcFolder:   viper.GetString("artifacts_src_folder"),
+		aptlyFolder:          aptlyF,
 		uploadSchemaFilePath: viper.GetString("upload_schema_file_path"),
 		gpgPassphrase:        viper.GetString("gpg_passphrase"),
 		gpgKeyName:           viper.GetString("gpg_key_name"),
@@ -344,7 +351,7 @@ func uploadApt(conf config, srcTemplate string, upload Upload, arch string) erro
 			}
 		}
 		l.Printf("[ ] Sync local repo for %s/%s into s3", osVersion, arch)
-		if err := execLogOutput(l, "cp", "-rf", aptPublicFolderPath+"dists/"+osVersion, destPath); err != nil {
+		if err := execLogOutput(l, "cp", "-rf", conf.aptlyFolder + "/public/dists/"+osVersion, destPath); err != nil {
 			return err
 		}
 	}
