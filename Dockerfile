@@ -28,7 +28,7 @@ RUN chmod +x /bin/publisher
 
 WORKDIR /home/gha
 ADD schemas ./schemas
-ADD Makefile .
+ADD scripts/Makefile .
 RUN mkdir ./assets
 RUN mkdir $AWS_S3_MOUNT_DIRECTORY
 ENV AWS_S3_MOUNT_DIRECTORY $AWS_S3_MOUNT_DIRECTORY
