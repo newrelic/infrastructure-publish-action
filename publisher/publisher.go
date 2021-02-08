@@ -54,6 +54,7 @@ type config struct {
 	uploadSchemaFilePath string
 	gpgPassphrase        string
 	gpgKeyName           string
+	gpgKeyRing           string
 }
 
 type uploadArtifactSchema struct {
@@ -118,6 +119,7 @@ func loadConfig() config {
 	viper.BindEnv("dest_prefix")
 	viper.BindEnv("gpg_passphrase")
 	viper.BindEnv("gpg_key_name")
+	viper.BindEnv("gpg_key_ring")
 
 	return config{
 		destPrefix:           viper.GetString("dest_prefix"),
@@ -130,6 +132,7 @@ func loadConfig() config {
 		uploadSchemaFilePath: viper.GetString("upload_schema_file_path"),
 		gpgPassphrase:        viper.GetString("gpg_passphrase"),
 		gpgKeyName:           viper.GetString("gpg_key_name"),
+		gpgKeyRing:           viper.GetString("gpg_key_ring"),
 	}
 }
 
@@ -272,7 +275,7 @@ func uploadRpm(conf config, srcTemplate string, upload Upload, arch string) (err
 			return fmt.Errorf("error while creating repository %s for source %s and destination %s", err.Error(), srcPath, destPath)
 		}
 
-		if err := execLogOutput(l, "gpg", "--batch", "--pinentry-mode=loopback", "--passphrase", conf.gpgPassphrase, "--detach-sign", "--armor", repomd); err != nil {
+		if err := execLogOutput(l, "gpg", "--batch", "--pinentry-mode=loopback", "--passphrase", conf.gpgPassphrase, "--keyring", conf.gpgKeyRing, "--detach-sign", "--armor", repomd); err != nil {
 			return err
 		}
 		log.Printf("[✔] Uploading RPM succeded for src %s and dest %s \n", srcPath, destPath)
@@ -323,7 +326,7 @@ func uploadApt(conf config, srcTemplate string, upload Upload, arch string) erro
 		log.Printf("[✔] Added succecfully package into deb repo for %s/%s", osVersion, arch)
 
 		log.Printf("[ ] Publish deb repo for %s/%s", osVersion, arch)
-		if err := execLogOutput(l, "aptly", "publish", "repo", "-gpg-key", conf.gpgKeyName, "-passphrase", conf.gpgPassphrase, "-batch", osVersion); err != nil {
+		if err := execLogOutput(l, "aptly", "publish", "repo", "-keyring", conf.gpgKeyRing, "-gpg-key", conf.gpgKeyName, "-passphrase", conf.gpgPassphrase, "-batch", osVersion); err != nil {
 			return err
 		}
 		log.Printf("[✔] Published succesfully deb repo for %s/%s", osVersion, arch)
