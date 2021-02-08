@@ -152,12 +152,12 @@ func parseUploadSchema(fileContent []byte) (uploadArtifactsSchema, error) {
 		return nil, err
 	}
 
-	for _, s := range schema {
-		if s.Arch == nil {
-			s.Arch = []string{""}
+	for i, _ := range schema {
+		if schema[i].Arch == nil {
+			schema[i].Arch = []string{""}
 		}
-		if len(s.Uploads) == 0 {
-			return nil, fmt.Errorf("error: '%s' in the schema: %v ", noDestinationError, s.Src)
+		if len(schema[i].Uploads) == 0 {
+			return nil, fmt.Errorf("error: '%s' in the schema: %v ", noDestinationError, schema[i].Src)
 		}
 	}
 
