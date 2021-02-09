@@ -43,10 +43,6 @@ ifeq ($(SCHEMA), custom)
 	@cat ${UPLOAD_SCHEMA_FILE_PATH}
 endif
 
-#ifndef UPLOAD_SCHEMA_FILE_PATH
-#	$(error UPLOAD_SCHEMA_FILE_PATH is not set)
-#endif
-
 dest-prefix: prepare-schema
 	@echo "prepare destination prefix"
 ifeq ($(ENV), pre-release)
@@ -55,10 +51,6 @@ endif
 ifeq ($(ENV), release)
 	$(eval DEST_PREFIX := "infrastructure_agent/")
 endif
-
-#ifndef DEST_PREFIX
-#	$(error DEST_PREFIX is not set)
-#endif
 
 prepare-secrets: dest-prefix
 	@echo "Generating secrets file into /etc/passwd-s3fs"
