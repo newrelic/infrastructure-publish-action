@@ -14,6 +14,7 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/spf13/viper"
@@ -405,14 +406,23 @@ func execLogOutput(l *log.Logger, cmdName string, cmdArgs ...string) (err error)
 		return
 	}
 
-	go streamAsLog(l, stdoutR, "stdout")
-	go streamAsLog(l, stderrR, "stderr")
-
+	wg := sync.WaitGroup{}
+	wg.Add(2)
 	defer l.Println()
-	return cmd.Run()
+	if err = cmd.Start(); err != nil {
+		return err
+	}
+
+	go streamAsLog(&wg, l, stdoutR, "stdout")
+	go streamAsLog(&wg, l, stderrR, "stderr")
+
+	wg.Wait()
+	return cmd.Wait()
 }
 
-func streamAsLog(l *log.Logger, r io.ReadCloser, prefix string) {
+func streamAsLog(wg *sync.WaitGroup, l *log.Logger, r io.ReadCloser, prefix string) {
+	defer wg.Done()
+
 	if prefix != "" {
 		prefix += ": "
 	}

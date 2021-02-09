@@ -10,6 +10,7 @@ import (
 	"os"
 	"path"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -276,7 +277,9 @@ func Test_streamAsLog(t *testing.T) {
 			var output bytes.Buffer
 			l := log.New(&output, "", 0)
 
-			streamAsLog(l, reader(tt.args.content), tt.args.prefix)
+			wg := sync.WaitGroup{}
+			wg.Add(1)
+			streamAsLog(&wg, l, reader(tt.args.content), tt.args.prefix)
 
 			assert.Equal(t, expectedLog(tt.args.prefix, tt.args.content), output.String())
 		})
