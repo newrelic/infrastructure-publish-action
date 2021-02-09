@@ -12,6 +12,7 @@ RUN apt-get update && apt-get install -y \
     curl \
     gnupg2 \
     bzip2 \
+    apt-utils \
     createrepo
 
 # Sadly installing aptly with apt lead you to a old version not supporting gpg2

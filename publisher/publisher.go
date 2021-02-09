@@ -4,11 +4,13 @@ package main
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"path"
@@ -36,19 +38,20 @@ const (
 	noDestinationError = "no uploads were provided for the schema"
 
 	//FileTypes
-	typeFile            = "file"
-	typeZypp            = "zypp"
-	typeYum             = "yum"
-	typeApt             = "apt"
-	repodataRpmPath     = "/repodata/repomd.xml"
-	defaultAptlyFolder  = "/root/.aptly"
-	aptPoolMain         = "pool/main/"
-	timeoutFileCreation = time.Second * 300
+	typeFile           = "file"
+	typeZypp           = "zypp"
+	typeYum            = "yum"
+	typeApt            = "apt"
+	repodataRpmPath    = "/repodata/repomd.xml"
+	defaultAptlyFolder = "/root/.aptly"
+	aptPoolMain        = "pool/main/"
+	aptDists           = "dists/"
+	commandTimeout     = time.Hour * 1
 )
 
 var (
 	l                = log.New(log.Writer(), "", 0)
-	streamExecOutput = true
+	streamExecOutput = false
 )
 
 type config struct {
@@ -74,7 +77,7 @@ type uploadArtifactSchema struct {
 
 type Upload struct {
 	Type      string   `yaml:"type"` // verify type in allowed list file, apt, yum, zypp
-	SrcRepo   string   `yaml:"source_repo"`
+	SrcRepo   string   `yaml:"src_repo"`
 	Dest      string   `yaml:"dest"`
 	OsVersion []string `yaml:"os_version"`
 }
@@ -174,28 +177,53 @@ func parseUploadSchema(fileContent []byte) (uploadArtifactsSchema, error) {
 	return schema, nil
 }
 
-func downloadArtifact(conf config, schema uploadArtifactSchema) error {
+func downloadArtifact(conf config, src, arch string) error {
 
 	l.Println("Starting downloading artifacts!")
-	for _, arch := range schema.Arch {
-		srcFile := replacePlaceholders(schema.Src, conf.repoName, conf.appName, arch, conf.tag, conf.version, conf.destPrefix, "")
-		url := generateDownloadUrl(urlTemplate, conf.repoName, conf.tag, srcFile)
 
-		destPath := path.Join(conf.artifactsSrcFolder, srcFile)
+	srcFile := replacePlaceholders(src, conf.repoName, conf.appName, arch, conf.tag, conf.version, conf.destPrefix, "")
+	url := generateDownloadUrl(urlTemplate, conf.repoName, conf.tag, srcFile)
 
-		l.Println(fmt.Sprintf("[ ] Download %s into %s", url, destPath))
+	destPath := path.Join(conf.artifactsSrcFolder, srcFile)
 
-		err := downloadFile(url, destPath)
-		if err != nil {
-			return err
-		}
+	l.Println(fmt.Sprintf("[ ] Download %s into %s", url, destPath))
 
-		fi, err := os.Stat(destPath)
-		if err != nil {
-			return err
-		}
+	err := downloadFile(url, destPath)
+	if err != nil {
+		return err
+	}
 
-		l.Println(fmt.Sprintf("[✔] Download %s into %s %d bytes", url, destPath, fi.Size()))
+	fi, err := os.Stat(destPath)
+	if err != nil {
+		return err
+	}
+
+	l.Println(fmt.Sprintf("[✔] Download %s into %s %d bytes", url, destPath, fi.Size()))
+
+	return nil
+}
+
+func downloadFile(url, destPath string) error {
+
+	response, err := http.Get(url)
+	if err != nil {
+		return err
+	}
+	defer response.Body.Close()
+
+	if response.StatusCode != 200 {
+		return fmt.Errorf("error on download %s with status code %v", url, response.StatusCode)
+	}
+
+	file, err := os.Create(destPath)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	_, err = io.Copy(file, response.Body)
+	if err != nil {
+		return err
 	}
 
 	return nil
@@ -203,35 +231,46 @@ func downloadArtifact(conf config, schema uploadArtifactSchema) error {
 
 func downloadArtifacts(conf config, schema uploadArtifactsSchema) error {
 	for _, artifactSchema := range schema {
-		err := downloadArtifact(conf, artifactSchema)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func uploadArtifact(conf config, schema uploadArtifactSchema) (err error) {
-
-	for _, arch := range schema.Arch {
-		for _, upload := range schema.Uploads {
-
-			if upload.Type == typeFile {
-				l.Println("Uploading file artifact")
-				err = uploadFileArtifact(conf, schema, upload, arch)
-			} else if upload.Type == typeYum || upload.Type == typeZypp {
-				l.Println("Uploading rpm as yum or zypp")
-				err = uploadRpm(conf, schema.Src, upload, arch)
-			} else if upload.Type == typeApt {
-				l.Println("Uploading apt")
-				err = uploadApt(conf, schema.Src, upload, arch)
-			}
+		for _, arch := range artifactSchema.Arch {
+			err := downloadArtifact(conf, artifactSchema.Src, arch)
 			if err != nil {
 				return err
 			}
 		}
 	}
+	return nil
+}
 
+func uploadArtifact(conf config, schema uploadArtifactSchema, arch string, upload Upload) (err error) {
+
+	if upload.Type == typeFile {
+		l.Println("Uploading file artifact")
+		err = uploadFileArtifact(conf, schema, upload, arch)
+	} else if upload.Type == typeYum || upload.Type == typeZypp {
+		l.Println("Uploading rpm as yum or zypp")
+		err = uploadRpm(conf, schema.Src, upload, arch)
+	} else if upload.Type == typeApt {
+		l.Println("Uploading apt")
+		err = uploadApt(conf, schema.Src, upload, arch)
+	}
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func uploadArtifacts(conf config, schema uploadArtifactsSchema) error {
+	for _, artifactSchema := range schema {
+		for _, arch := range artifactSchema.Arch {
+			for _, upload := range artifactSchema.Uploads {
+				err := uploadArtifact(conf, artifactSchema, arch, upload)
+				if err != nil {
+					return err
+				}
+			}
+		}
+	}
 	return nil
 }
 
@@ -280,7 +319,7 @@ func uploadRpm(conf config, srcTemplate string, upload Upload, arch string) (err
 
 		l.Printf("Waiting for file creation")
 
-		err = waitForFileCreation(repomd)
+		_, err := os.Stat(repomd)
 		if err != nil {
 			return fmt.Errorf("error while creating repository %s for source %s and destination %s", err.Error(), srcPath, destPath)
 		}
@@ -294,9 +333,8 @@ func uploadRpm(conf config, srcTemplate string, upload Upload, arch string) (err
 	return nil
 }
 
-func uploadApt(conf config, srcTemplate string, upload Upload, arch string) error {
+func uploadApt(conf config, srcTemplate string, upload Upload, arch string) (err error) {
 
-	// @TODO save snapshots
 	// the dest path for apt is the same for each distribution since it does not depend on it
 	var destPath string
 	for _, osVersion := range upload.OsVersion {
@@ -314,80 +352,111 @@ func uploadApt(conf config, srcTemplate string, upload Upload, arch string) erro
 			osVersion)
 
 		srcPath := path.Join(conf.artifactsSrcFolder, fileName)
-		destPath = path.Join(conf.artifactsDestFolder, dest, "dists")
+		destPath = path.Join(conf.artifactsDestFolder, dest, aptDists)
 		filePath := path.Join(conf.artifactsDestFolder, dest, aptPoolMain, string(fileName[0]), "/", conf.appName, fileName)
 
 		l.Printf("[ ] Create local repo for os %s/%s", osVersion, arch)
+
 		// aptly repo create --distribution=${DISTRO} ${DISTRO}
-		if err := execLogOutput(l, "aptly", "repo", "create", "--distribution="+osVersion, osVersion); err != nil {
+		if err = execLogOutput(l, "aptly", "repo", "create", "--distribution="+osVersion, osVersion); err != nil {
 			return err
 		}
 		l.Printf("[✔] Local repo created for os %s/%s", osVersion, arch)
 
 		// Mirror repo start
-
-		l.Printf("[ ] Mirror create APT repo for %s/%s/%s", srcPath, osVersion, arch)
-		if err := execLogOutput(l, "aptly", "mirror", "create", "-keyring", conf.gpgKeyRing, "mirror-", osVersion, "http://download.newrelic.com/infrastructure_agent/linux/apt", osVersion, "main"); err != nil {
+		err = mirrorAPTRepo(conf, upload.SrcRepo, srcPath, osVersion, arch)
+		if err != nil {
 			return err
 		}
-		l.Printf("[✔] Mirror create succesfully APT repo for %s/%s/%s", srcPath, osVersion, arch)
-
-		l.Printf("[ ] Mirror update APT repo for %s/%s/%s", srcPath, osVersion, arch)
-		if err := execLogOutput(l, "aptly", "mirror", "update", "-keyring", conf.gpgKeyRing, "mirror-", osVersion); err != nil {
-			return err
-		}
-		l.Printf("[✔] Mirror update succesfully APT repo for %s/%s/%s", srcPath, osVersion, arch)
-
-		l.Printf("[ ] Mirror repo import APT repo for %s/%s/%s", srcPath, osVersion, arch)
-		if err := execLogOutput(l, "aptly", "repo", "import", "mirror-", osVersion, osVersion, "Name"); err != nil {
-			return err
-		}
-		l.Printf("[✔] Mirror repo import succesfully APT repo for %s/%s/%s", srcPath, osVersion, arch)
-
-		// Mirror repo end
 
 		l.Printf("[ ] Add package %s into deb repo for %s/%s", srcPath, osVersion, arch)
-		if err := execLogOutput(l, "aptly", "repo", "add", "-force-replace=true", osVersion, srcPath); err != nil {
+		if err = execLogOutput(l, "aptly", "repo", "add", "-force-replace=true", osVersion, srcPath); err != nil {
 			return err
 		}
 		l.Printf("[✔] Added succecfully package into deb repo for %s/%s", osVersion, arch)
 
 		l.Printf("[ ] Publish deb repo for %s/%s", osVersion, arch)
-		if err := execLogOutput(l, "aptly", "publish", "repo", "-keyring", conf.gpgKeyRing, "-gpg-key", conf.gpgKeyName, "-passphrase", conf.gpgPassphrase, "-batch", osVersion); err != nil {
+		if err = execLogOutput(l, "aptly", "publish", "repo", "-keyring", conf.gpgKeyRing, "-gpg-key", conf.gpgKeyName, "-passphrase", conf.gpgPassphrase, "-batch", osVersion); err != nil {
 			return err
 		}
 		l.Printf("[✔] Published succesfully deb repo for %s/%s", osVersion, arch)
 
-		err := copyFile(srcPath, filePath)
-		if err != nil {
+		// Copying the binary
+		if err = copyFile(srcPath, filePath); err != nil {
 			return err
 		}
 
-		if _, err = os.Stat(destPath); os.IsNotExist(err) {
-			// set right permissions
-			err = os.MkdirAll(destPath, 0744)
-			if err != nil {
-				return err
-			}
-		}
-		l.Printf("[ ] Sync local repo for %s/%s into s3", osVersion, arch)
-		if err := execLogOutput(l, "cp", "-rf", conf.aptlyFolder+"/public/dists/"+osVersion, destPath); err != nil {
+		if err = syncAPTMetadata(conf, destPath, osVersion, arch); err != nil {
 			return err
 		}
 	}
 
-	l.Printf("[✔] Synced succesfully local repo for %s into s3", arch)
+	l.Printf("[✔] Synced successfully local repo for %s into s3", arch)
 	return nil
 }
 
-// - exec tooling
-// TODO handle command output as channel to see logs
-// TODO command with context
-// TODO add timeout to the command to avoid having it hanging
+func syncAPTMetadata(conf config, destPath string, osVersion string, arch string) (err error) {
+	if _, err = os.Stat(destPath); os.IsNotExist(err) {
+		// set right permissions
+		err = os.MkdirAll(destPath, 0744)
+		if err != nil {
+			return err
+		}
+	}
+	l.Printf("[ ] Sync local repo for %s/%s into s3", osVersion, arch)
+	if err = execLogOutput(l, "cp", "-rf", conf.aptlyFolder+"/public/"+aptDists+osVersion, destPath); err != nil {
+		return err
+	}
+	l.Printf("[✔] Sync local repo was succesfull for %s/%s into s3", osVersion, arch)
+
+	return err
+}
+
+func mirrorAPTRepo(conf config, repoUrl string, srcPath string, osVersion string, arch string) (err error) {
+
+	// Creating test Url, example http://newrelic-test-20200121.s3-website.eu-west-3.amazonaws.com/infrastructure_agent/test/linux/apt/dists/xenial/Release
+	u, err := url.Parse(repoUrl + "/" + aptDists + osVersion + "/Release")
+	if err != nil {
+		return err
+	}
+
+	// Checking if the repo already exists if not mirroring is useless
+	resp, err := http.Get(u.String())
+	if err != nil {
+		return err
+	}
+	if resp.StatusCode == http.StatusNotFound {
+		l.Printf("[X] Mirroring skipped since since %s was not present in mounted repo", u.String())
+		return nil
+	}
+
+	l.Printf("[ ] Mirror create APT repo for %s/%s/%s from %s", srcPath, osVersion, arch, repoUrl)
+	if err = execLogOutput(l, "aptly", "mirror", "create", "-keyring", conf.gpgKeyRing, "mirror-"+osVersion, repoUrl, osVersion, "main"); err != nil {
+		return err
+	}
+	l.Printf("[✔] Mirror create succesfully APT repo for %s/%s/%s", srcPath, osVersion, arch)
+
+	l.Printf("[ ] Mirror update APT repo for %s/%s/%s", srcPath, osVersion, arch)
+	if err = execLogOutput(l, "aptly", "mirror", "update", "-keyring", conf.gpgKeyRing, "mirror-"+osVersion); err != nil {
+		return err
+	}
+	l.Printf("[✔] Mirror update succesfully APT repo for %s/%s/%s", srcPath, osVersion, arch)
+
+	// The last parameter is `Name` that means a query matches all the packages (as it means “package name is not empty”).
+	l.Printf("[ ] Mirror repo import APT repo for %s/%s/%s", srcPath, osVersion, arch)
+	if err = execLogOutput(l, "aptly", "repo", "import", "mirror-"+osVersion, osVersion, "Name"); err != nil {
+		return err
+	}
+	l.Printf("[✔] Mirror repo import succesfully APT repo for %s/%s/%s", srcPath, osVersion, arch)
+
+	return nil
+}
 
 // execLogOutput executes a command writing stdout & stderr to provided l.
 func execLogOutput(l *log.Logger, cmdName string, cmdArgs ...string) (err error) {
-	cmd := exec.Command(cmdName, cmdArgs...)
+	ctx, cancel := context.WithTimeout(context.Background(), commandTimeout)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, cmdName, cmdArgs...)
 
 	l.Printf("Executing in shell '%s'", cmd.String())
 
@@ -443,23 +512,6 @@ func streamAsLog(wg *sync.WaitGroup, l *log.Logger, r io.ReadCloser, prefix stri
 	}
 }
 
-// TODO remove?
-func waitForFileCreation(repomd string) error {
-	t := time.NewTicker(time.Second * 5)
-	timeout := time.After(timeoutFileCreation)
-	for {
-		select {
-		case <-t.C:
-			_, err := os.Stat(repomd)
-			if err == nil {
-				return nil
-			}
-		case <-timeout:
-			return fmt.Errorf("the repo creation failed for RPM")
-		}
-	}
-}
-
 func uploadFileArtifact(conf config, schema uploadArtifactSchema, upload Upload, arch string) (err error) {
 	srcPath, destPath := replaceSrcDestTemplates(
 		schema.Src,
@@ -485,6 +537,11 @@ func uploadFileArtifact(conf config, schema uploadArtifactSchema, upload Upload,
 
 func copyFile(srcPath string, destPath string) (err error) {
 
+	// We do not want to override already pushed packages
+	if _, err = os.Stat(destPath); err == nil {
+		return
+	}
+
 	destDirectory := filepath.Dir(destPath)
 
 	if _, err = os.Stat(destDirectory); os.IsNotExist(err) {
@@ -507,17 +564,6 @@ func copyFile(srcPath string, destPath string) (err error) {
 	}
 
 	l.Println("[✔] Copy " + srcPath + " into " + destPath)
-	return nil
-}
-
-func uploadArtifacts(conf config, schema uploadArtifactsSchema) error {
-	for _, artifactSchema := range schema {
-
-		err := uploadArtifact(conf, artifactSchema)
-		if err != nil {
-			return err
-		}
-	}
 	return nil
 }
 
@@ -546,30 +592,4 @@ func generateDownloadUrl(template, repoName, tag, srcFile string) (url string) {
 	url = strings.Replace(url, placeholderForSrc, srcFile, -1)
 
 	return
-}
-
-func downloadFile(url, destPath string) error {
-
-	response, err := http.Get(url)
-	if err != nil {
-		return err
-	}
-	defer response.Body.Close()
-
-	if response.StatusCode != 200 {
-		return fmt.Errorf("error on download %s with status code %v", url, response.StatusCode)
-	}
-
-	file, err := os.Create(destPath)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-
-	_, err = io.Copy(file, response.Body)
-	if err != nil {
-		return err
-	}
-
-	return nil
 }
