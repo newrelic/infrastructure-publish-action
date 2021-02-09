@@ -323,23 +323,23 @@ func uploadApt(conf config, srcTemplate string, upload Upload, arch string) erro
 
 		// Mirror repo start
 
-		l.Printf("[ ] Mirror create APT repo for %s/%s", srcPath, osVersion, arch)
+		l.Printf("[ ] Mirror create APT repo for %s/%s/%s", srcPath, osVersion, arch)
 		if err := execLogOutput(l, "aptly", "mirror", "create", "-keyring", conf.gpgKeyRing, "mirror-", osVersion, "http://download.newrelic.com/infrastructure_agent/linux/apt", osVersion, "main"); err != nil {
 			return err
 		}
-		l.Printf("[✔] Mirror create succesfully APT repo for %s/%s", srcPath, osVersion, arch)
+		l.Printf("[✔] Mirror create succesfully APT repo for %s/%s/%s", srcPath, osVersion, arch)
 
-		l.Printf("[ ] Mirror update APT repo for %s/%s", srcPath, osVersion, arch)
+		l.Printf("[ ] Mirror update APT repo for %s/%s/%s", srcPath, osVersion, arch)
 		if err := execLogOutput(l, "aptly", "mirror", "update", "-keyring", conf.gpgKeyRing, "mirror-", osVersion); err != nil {
 			return err
 		}
-		l.Printf("[✔] Mirror update succesfully APT repo for %s/%s", srcPath, osVersion, arch)
+		l.Printf("[✔] Mirror update succesfully APT repo for %s/%s/%s", srcPath, osVersion, arch)
 
-		l.Printf("[ ] Mirror repo import APT repo for %s/%s", srcPath, osVersion, arch)
+		l.Printf("[ ] Mirror repo import APT repo for %s/%s/%s", srcPath, osVersion, arch)
 		if err := execLogOutput(l, "aptly", "repo", "import", "mirror-", osVersion, osVersion, "Name"); err != nil {
 			return err
 		}
-		l.Printf("[✔] Mirror repo import succesfully APT repo for %s/%s", srcPath, osVersion, arch)
+		l.Printf("[✔] Mirror repo import succesfully APT repo for %s/%s/%s", srcPath, osVersion, arch)
 
 		// Mirror repo end
 
