@@ -1,26 +1,40 @@
+// Copyright 2021 New Relic Corporation. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
 package main
 
 import (
-	"github.com/stretchr/testify/assert"
+	"bytes"
+	"io"
+	"io/ioutil"
+	"log"
 	"os"
 	"path"
+	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 var (
-	schema = ` 
+	schemaValidMultipleEntries = ` 
 - src: "foo.tar.gz"
-  dest: "/tmp"
+  uploads:
+    - type: file
+      dest: /tmp
   arch:
     - amd64
     - 386
 - src: "{integration_name}_linux_{version}_{arch}.tar.gz"
-  dest: "infrastructure_agent/binaries/linux/{arch}/"
+  uploads:
+    - type: file
+      dest: "infrastructure_agent/binaries/linux/{arch}/"
   arch:
     - ppc`
 
 	schemaNoSrc = `
-- dest: /tmp
+- uploads:
+    - type: file
+      dest: /tmp
   arch:
    - amd64
 `
@@ -31,7 +45,13 @@ var (
 `
 	schemaNoArch = `
 - src: foo.tar.gz
-  dest: /tmp
+  uploads:
+    - type: file
+      dest: /tmp
+`
+	schemaNotValid = `
+- src: foo.tar.gz
+  uploads: /tmp
 `
 )
 
@@ -42,18 +62,35 @@ func TestParseConfig(t *testing.T) {
 		schema string
 		output []uploadArtifactSchema
 	}{
-		"multiple entries": {schema, []uploadArtifactSchema{
-			{"foo.tar.gz", "/tmp", []string{"amd64", "386"}},
-			{"{integration_name}_linux_{version}_{arch}.tar.gz", "infrastructure_agent/binaries/linux/{arch}/", []string{"ppc"}},
+		"multiple entries": {schemaValidMultipleEntries, []uploadArtifactSchema{
+			{"foo.tar.gz", []string{"amd64", "386"}, []Upload{
+				{
+					Type: "file",
+					Dest: "/tmp",
+				},
+			}},
+			{"{integration_name}_linux_{version}_{arch}.tar.gz", []string{"ppc"}, []Upload{
+				{
+					Type: "file",
+					Dest: "infrastructure_agent/binaries/linux/{arch}/",
+				},
+			}},
 		}},
 		"src is omitted": {schemaNoSrc, []uploadArtifactSchema{
-			{"", "/tmp", []string{"amd64"}},
-		}},
-		"dest is omitted": {schemaNoDest, []uploadArtifactSchema{
-			{"foo.tar.gz", "", []string{"amd64"}},
+			{"", []string{"amd64"}, []Upload{
+				{
+					Type: "file",
+					Dest: "/tmp",
+				},
+			}},
 		}},
 		"arch is omitted": {schemaNoArch, []uploadArtifactSchema{
-			{"foo.tar.gz", "/tmp", []string{""}},
+			{"foo.tar.gz", []string{""}, []Upload{
+				{
+					Type: "file",
+					Dest: "/tmp",
+				},
+			}},
 		}},
 	}
 	for name, tt := range tests {
@@ -63,6 +100,24 @@ func TestParseConfig(t *testing.T) {
 			schema, err := parseUploadSchema([]byte(tt.schema))
 			assert.NoError(t, err)
 			assert.EqualValues(t, tt.output, schema)
+		})
+	}
+}
+
+// parse the configuration fails
+func TestParseConfigError(t *testing.T) {
+	t.Parallel()
+	tests := map[string]string{
+		"dest is omitted":      schemaNoDest,
+		"dest is not an array": schemaNotValid,
+	}
+	for name, tt := range tests {
+		tt := tt
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			schema, err := parseUploadSchema([]byte(tt))
+			assert.Error(t, err)
+			assert.Nil(t, schema)
 		})
 	}
 }
@@ -78,50 +133,56 @@ func TestReplacePlaceholders(t *testing.T) {
 		arch         string
 		srcOutput    string
 		destOutput   string
+		destPrefix   string
 	}{
 		"dst no file replacement": {
 			"{app_name}-{arch}-{version}",
-			"/tmp/{arch}/{app_name}/{version}/file",
+			"/{dest_prefix}/{arch}/{app_name}/{version}/file",
 			"newrelic/nri-foobar",
 			"nri-foobar",
 			"1.2.3",
 			"amd64",
 			"nri-foobar-amd64-1.2.3",
-			"/tmp/amd64/nri-foobar/1.2.3/file"},
+			"/tmp/amd64/nri-foobar/1.2.3/file",
+			"tmp",
+		},
 		"dst src replacement": {
 			"{app_name}-{arch}-{version}",
-			"/tmp/{arch}/{app_name}/{version}/{src}",
+			"/{dest_prefix}/{arch}/{app_name}/{version}/{src}",
 			"newrelic/nri-foobar",
 			"nri-foobar",
 			"1.2.3",
 			"amd64",
 			"nri-foobar-amd64-1.2.3",
-			"/tmp/amd64/nri-foobar/1.2.3/nri-foobar-amd64-1.2.3"},
+			"/tmp/amd64/nri-foobar/1.2.3/nri-foobar-amd64-1.2.3",
+			"tmp"},
 		"dst multiple replacements": {
 			"{app_name}-{arch}-{version}",
-			"/tmp/{arch}/{app_name}/{version}/{app_name}-{arch}-{version}",
+			"/{dest_prefix}/{arch}/{app_name}/{version}/{app_name}-{arch}-{version}",
 			"newrelic/nri-foobar",
 			"nri-foobar",
 			"1.2.3",
 			"amd64",
 			"nri-foobar-amd64-1.2.3",
-			"/tmp/amd64/nri-foobar/1.2.3/nri-foobar-amd64-1.2.3"},
+			"/tmp/amd64/nri-foobar/1.2.3/nri-foobar-amd64-1.2.3",
+			"tmp"},
 		"src multiple replacements": {
 			"{app_name}-{arch}-{version}-{app_name}-{arch}-{version}",
-			"/tmp/{arch}/{app_name}/{version}/file",
+			"/{dest_prefix}/{arch}/{app_name}/{version}/file",
 			"newrelic/nri-foobar",
 			"nri-foobar",
 			"1.2.3",
 			"amd64",
 			"nri-foobar-amd64-1.2.3-nri-foobar-amd64-1.2.3",
-			"/tmp/amd64/nri-foobar/1.2.3/file"},
+			"/tmp/amd64/nri-foobar/1.2.3/file",
+			"tmp"},
 	}
 	for name, tt := range tests {
 		tt := tt
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			tag := "v" + tt.version
-			src, dest := replaceSrcDestTemplates(tt.srcTemplate, tt.destTemplate, "newrelic/foobar", tt.appName, tt.arch, tag, tt.version)
+			src, dest := replaceSrcDestTemplates(tt.srcTemplate, tt.destTemplate, "newrelic/foobar", tt.appName, tt.arch, tag, tt.version, tt.destPrefix, "")
 			assert.EqualValues(t, tt.srcOutput, src)
 			assert.EqualValues(t, tt.destOutput, dest)
 		})
@@ -145,8 +206,18 @@ func writeDummyFile(path string) error {
 
 func TestUploadArtifacts(t *testing.T) {
 	schema := []uploadArtifactSchema{
-		{"{app_name}-{arch}-{version}.txt", "{arch}/{app_name}/{src}", []string{"amd64", "386"}},
-		{"{app_name}-{arch}-{version}.txt", "{arch}/{app_name}/{src}", nil},
+		{"{app_name}-{arch}-{version}.txt", []string{"amd64", "386"}, []Upload{
+			{
+				Type: "file",
+				Dest: "{arch}/{app_name}/{src}",
+			},
+		}},
+		{"{app_name}-{arch}-{version}.txt", nil, []Upload{
+			{
+				Type: "file",
+				Dest: "{arch}/{app_name}/{src}",
+			},
+		}},
 	}
 
 	dest := t.TempDir()
@@ -173,4 +244,90 @@ func TestUploadArtifacts(t *testing.T) {
 
 	_, err = os.Stat(path.Join(dest, "386/nri-foobar/nri-foobar-386-2.0.0.txt"))
 	assert.NoError(t, err)
+}
+
+func TestSchema(t *testing.T) {
+	uploadSchemaContent, err := readFileContent("../schemas/nrjmx.yml")
+
+	uploadSchema, err := parseUploadSchema(uploadSchemaContent)
+
+	if err != nil {
+		log.Fatal(err)
+	}
+	log.Println(uploadSchema)
+}
+
+func Test_streamAsLog(t *testing.T) {
+	type args struct {
+		content string
+		prefix  string
+	}
+	tests := []struct {
+		name string
+		args args
+	}{
+		{"empty", args{"", ""}},
+		{"empty with prefix", args{"", "some-prefix"}},
+		{"content", args{"foo", ""}},
+		{"content with prefix", args{"foo", "a-prefix"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var output bytes.Buffer
+			l := log.New(&output, "", 0)
+
+			streamAsLog(l, reader(tt.args.content), tt.args.prefix)
+
+			assert.Equal(t, expectedLog(tt.args.prefix, tt.args.content), output.String())
+		})
+	}
+}
+
+func Test_execLogOutput_streamExecOutputEnabled(t *testing.T) {
+	streamExecOutput = true
+
+	tests := []struct {
+		name        string
+		cmdName     string
+		cmdArgs     []string
+		expectedLog string
+		wantErr     bool
+	}{
+		{"empty", "", []string{}, "", true},
+		{"echo stdout", "echo", []string{"foo"}, "stdout: foo", false},
+		// pipes are being escaped, but function is shared btw stdout and stderr, so testing stdout should be enough
+		//{"echo stderr", "echo", []string{"bar", ">>", "/dev/stderr"}, "stderr: bar", false},
+	}
+	var err error
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var output bytes.Buffer
+			l := log.New(&output, "", 0)
+
+			err = execLogOutput(l, tt.cmdName, tt.cmdArgs...)
+
+			if tt.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				gotLog := output.String()
+				assert.True(t, strings.Contains(gotLog, tt.expectedLog), ">> Logged lines:\n%s\n>> Don't contain: %s", gotLog, tt.expectedLog)
+			}
+		})
+	}
+}
+
+func expectedLog(prefix, content string) string {
+	if content == "" {
+		return content
+	}
+
+	if prefix != "" {
+		prefix += ": "
+	}
+	return prefix + content + "\n"
+}
+
+func reader(content string) io.ReadCloser {
+	return ioutil.NopCloser(bytes.NewReader([]byte(content)))
 }

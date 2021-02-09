@@ -1,23 +1,15 @@
 #!/bin/bash
-
-case $SCHEMA in
-  infra-agent)
-    ;;
-  ohi)
-    ;;
-  nrjmx)
-    ;;
-  *)
-    echo "error: \"${SCHEMA}\" is not valid schema"
-    exit 1
-    ;;
-esac
-
+set -e
 # build docker image form Dockerfile
-docker build -t newrelic/infrastructure-publish-action -f ./actions/publish/Dockerfile ./actions/publish
+echo "Build fresh docker image for newrelic/infrastructure-publish-action"
+# @TODO add --no-cache
+docker build  -t newrelic/infrastructure-publish-action -f ./Dockerfile .
 
 # run docker container to perform all actions inside
-docker run --rm --security-opt apparmor:unconfined \
+echo "Run docker container with action logic inside"
+docker run --rm -it \
+        --name=infrastructure-publish-action\
+        --security-opt apparmor:unconfined \
         --device /dev/fuse \
         --cap-add SYS_ADMIN \
         -e AWS_SECRET_ACCESS_KEY \
@@ -28,5 +20,11 @@ docker run --rm --security-opt apparmor:unconfined \
         -e TAG \
         -e ARTIFACTS_DEST_FOLDER=/mnt/s3 \
         -e ARTIFACTS_SRC_FOLDER=/home/gha/assets \
-        -e UPLOADSCHEMA_FILE_PATH=/home/gha/schemas/${SCHEMA}.yml \
+        -e SCHEMA \
+        -e SCHEMA_URL \
+        -e ENV \
+        -e GPG_PRIVATE_KEY_BASE64 \
+        -e GPG_PASSPHRASE \
+        -e GPG_KEY_NAME \
+        -e GPG_KEY_RING=/home/gha/keyring.gpg \
         newrelic/infrastructure-publish-action
