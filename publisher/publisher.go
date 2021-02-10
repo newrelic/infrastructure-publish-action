@@ -43,6 +43,7 @@ const (
 	typeYum            = "yum"
 	typeApt            = "apt"
 	repodataRpmPath    = "/repodata/repomd.xml"
+	signatureRpmPath   = "/repodata/repomd.xml.asc"
 	defaultAptlyFolder = "/root/.aptly"
 	aptPoolMain        = "pool/main/"
 	aptDists           = "dists/"
@@ -51,7 +52,7 @@ const (
 
 var (
 	l                = log.New(log.Writer(), "", 0)
-	streamExecOutput = false
+	streamExecOutput = true
 )
 
 type config struct {
@@ -294,6 +295,7 @@ func uploadRpm(conf config, srcTemplate string, upload Upload, arch string) (err
 		repoPath := path.Join(conf.artifactsDestFolder, destPath)
 		filePath := path.Join(repoPath, fileName)
 		repomd := path.Join(repoPath, repodataRpmPath)
+		signaturePath := path.Join(repoPath, signatureRpmPath)
 
 		err = copyFile(srcPath, filePath)
 		if err != nil {
@@ -304,20 +306,18 @@ func uploadRpm(conf config, srcTemplate string, upload Upload, arch string) (err
 
 			l.Printf("[ ] Didn't fine repo for %s, run repo init command", repoPath)
 
-			// TODO: set right permissions
-
 			if err := execLogOutput(l, "createrepo", repoPath); err != nil {
 				return err
 			}
 
 			l.Printf("[✔] Repo created: %s", repoPath)
+		} else {
+			_ = os.Remove(signaturePath)
 		}
 
 		if err := execLogOutput(l, "createrepo", "--update", "-s", "sha", repoPath); err != nil {
 			return err
 		}
-
-		l.Printf("Waiting for file creation")
 
 		_, err := os.Stat(repomd)
 		if err != nil {
