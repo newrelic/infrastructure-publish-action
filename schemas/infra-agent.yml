@@ -1,4 +1,6 @@
 ---
+
+# Windows
 - src: "newrelic-infra_linux_{version}.tar.gz"
   uploads:
     - type: file
@@ -38,3 +40,16 @@
   uploads:
     - type: file
       dest: "{dest_prefix}binaries/windows/amd64/{src}"
+
+# Debian
+- src: "newrelic-infra_{sys_manager}_{version}_{arch}.deb"
+  arch:
+    - 386
+    - amd64
+  sys_manager:
+    - systemd
+    - upstart
+    - sysv
+  uploads:
+    - type: file
+      dest: "{dest_prefix}linux/apt/"
