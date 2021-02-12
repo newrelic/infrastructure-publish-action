@@ -41,7 +41,7 @@
     - type: file
       dest: "{dest_prefix}binaries/windows/amd64/{src}"
 
-# Debian
+# Apt
 - src: "newrelic-infra_{sys_manager}_{version}_{arch}.deb"
   arch:
     - 386
@@ -53,3 +53,21 @@
   uploads:
     - type: file
       dest: "{dest_prefix}linux/apt/"
+
+# Yum
+- src: "newrelic-infra-{version}-1.{os}.{arch}.rpm"
+  arch:
+    - 386
+    - amd64
+  os:
+    - el6
+    - el7
+    - el8
+    - sles11.4
+    - sles12.1
+    - sles12.2
+    - sles12.3
+    - sles12.4
+  uploads:
+    - type: file
+      dest: "{dest_prefix}linux/yum/"

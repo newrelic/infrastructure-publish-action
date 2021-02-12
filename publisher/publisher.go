@@ -30,6 +30,7 @@ const (
 	placeholderForAppName    = "{app_name}"
 	placeholderForArch       = "{arch}"
 	placeholderForSysManager = "{sys_manager}"
+	placeholderForOS         = "{os}"
 	placeholderForTag        = "{tag}"
 	placeholderForVersion    = "{version}"
 	placeholderForSrc        = "{src}"
@@ -75,6 +76,7 @@ type uploadArtifactSchema struct {
 	Src        string   `yaml:"src"`
 	Arch       []string `yaml:"arch"`
 	SysManager []string `yaml:"sys_manager"`
+	OS         []string `yaml:"os"`
 	Uploads    []Upload `yaml:"uploads"`
 }
 
@@ -176,11 +178,11 @@ func parseUploadSchema(fileContent []byte) (uploadArtifactsSchema, error) {
 	return schema, nil
 }
 
-func downloadArtifact(conf config, src, arch, sysManager string) error {
+func downloadArtifact(conf config, src, arch, downloadOS, sysManager string) error {
 
 	l.Println("Starting downloading artifacts!")
 
-	srcFile := replacePlaceholders(src, conf.repoName, conf.appName, arch, conf.tag, conf.version, conf.destPrefix, "", sysManager)
+	srcFile := replacePlaceholders(src, conf.repoName, conf.appName, arch, conf.tag, conf.version, conf.destPrefix, downloadOS, "", sysManager)
 	url := generateDownloadUrl(urlTemplate, conf.repoName, conf.tag, srcFile)
 
 	destPath := path.Join(conf.artifactsSrcFolder, srcFile)
@@ -231,10 +233,12 @@ func downloadFile(url, destPath string) error {
 func downloadArtifacts(conf config, schema uploadArtifactsSchema) error {
 	for _, artifactSchema := range schema {
 		for _, arch := range artifactSchema.Arch {
-			for _, sysMngr := range artifactSchema.SysManager {
-				err := downloadArtifact(conf, artifactSchema.Src, arch, sysMngr)
-				if err != nil {
-					return err
+			for _, os := range artifactSchema.OS {
+				for _, sysMngr := range artifactSchema.SysManager {
+					err := downloadArtifact(conf, artifactSchema.Src, arch, os, sysMngr)
+					if err != nil {
+						return err
+					}
 				}
 			}
 		}
@@ -286,6 +290,7 @@ func uploadRpm(conf config, srcTemplate string, upload Upload, arch string) (err
 			conf.tag,
 			conf.version,
 			conf.destPrefix,
+			"",
 			osVersion)
 
 		srcPath := path.Join(conf.artifactsSrcFolder, fileName)
@@ -346,6 +351,7 @@ func uploadApt(conf config, srcTemplate string, upload Upload, arch string) (err
 			conf.tag,
 			conf.version,
 			conf.destPrefix,
+			"",
 			osVersion)
 
 		srcPath := path.Join(conf.artifactsSrcFolder, fileName)
@@ -519,6 +525,7 @@ func uploadFileArtifact(conf config, schema uploadArtifactSchema, upload Upload,
 		conf.tag,
 		conf.version,
 		conf.destPrefix,
+		"",
 		"")
 
 	srcPath = path.Join(conf.artifactsSrcFolder, srcPath)
@@ -564,29 +571,30 @@ func copyFile(srcPath string, destPath string) (err error) {
 	return nil
 }
 
-func replacePlaceholders(template, repoName, appName, arch, tag, version, destPrefix, osVersion, sysManager string) (str string) {
+func replacePlaceholders(template, repoName, appName, arch, tag, version, destPrefix, downloadOS, uploadOSVersion, sysManager string) (str string) {
 	str = strings.Replace(template, placeholderForRepoName, repoName, -1)
 	str = strings.Replace(str, placeholderForAppName, appName, -1)
 	str = strings.Replace(str, placeholderForArch, arch, -1)
 	str = strings.Replace(str, placeholderForSysManager, sysManager, -1)
+	str = strings.Replace(str, placeholderForOS, downloadOS, -1)
 	str = strings.Replace(str, placeholderForTag, tag, -1)
 	str = strings.Replace(str, placeholderForVersion, version, -1)
 	str = strings.Replace(str, placeholderForDestPrefix, destPrefix, -1)
-	str = strings.Replace(str, placeholderForOsVersion, osVersion, -1)
+	str = strings.Replace(str, placeholderForOsVersion, uploadOSVersion, -1)
 
 	return
 }
 
-func replaceSrcDestTemplates(srcFileTemplate, destPathTemplate, repoName, appName, arch, tag, version, destPrefix, osVersion string) (srcFile string, destPath string) {
-	srcFile = replacePlaceholders(srcFileTemplate, repoName, appName, arch, tag, version, destPrefix, osVersion, "")
-	destPath = replacePlaceholders(destPathTemplate, repoName, appName, arch, tag, version, destPrefix, osVersion, "")
+func replaceSrcDestTemplates(srcFileTemplate, destPathTemplate, repoName, appName, arch, tag, version, destPrefix, downloadOS, osVersion string) (srcFile string, destPath string) {
+	srcFile = replacePlaceholders(srcFileTemplate, repoName, appName, arch, tag, version, destPrefix, downloadOS, osVersion, "")
+	destPath = replacePlaceholders(destPathTemplate, repoName, appName, arch, tag, version, destPrefix, downloadOS, osVersion, "")
 	destPath = strings.Replace(destPath, placeholderForSrc, srcFile, -1)
 
 	return
 }
 
 func generateDownloadUrl(template, repoName, tag, srcFile string) (url string) {
-	url = replacePlaceholders(template, repoName, "", "", tag, "", "", "", "")
+	url = replacePlaceholders(template, repoName, "", "", tag, "", "", "", "", "")
 	url = strings.Replace(url, placeholderForSrc, srcFile, -1)
 
 	return

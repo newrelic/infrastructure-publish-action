@@ -64,13 +64,13 @@ func TestParseConfig(t *testing.T) {
 		output []uploadArtifactSchema
 	}{
 		"multiple entries": {schemaValidMultipleEntries, []uploadArtifactSchema{
-			{"foo.tar.gz", []string{"amd64", "386"}, nil,[]Upload{
+			{"foo.tar.gz", []string{"amd64", "386"}, nil,nil,[]Upload{
 				{
 					Type: "file",
 					Dest: "/tmp",
 				},
 			}},
-			{"{integration_name}_linux_{version}_{arch}.tar.gz", []string{"ppc"}, nil, []Upload{
+			{"{integration_name}_linux_{version}_{arch}.tar.gz", []string{"ppc"}, nil,nil, []Upload{
 				{
 					Type: "file",
 					Dest: "infrastructure_agent/binaries/linux/{arch}/",
@@ -78,7 +78,7 @@ func TestParseConfig(t *testing.T) {
 			}},
 		}},
 		"src is omitted": {schemaNoSrc, []uploadArtifactSchema{
-			{"", []string{"amd64"}, nil, []Upload{
+			{"", []string{"amd64"}, nil, nil,[]Upload{
 				{
 					Type: "file",
 					Dest: "/tmp",
@@ -86,7 +86,7 @@ func TestParseConfig(t *testing.T) {
 			}},
 		}},
 		"arch is omitted": {schemaNoArch, []uploadArtifactSchema{
-			{"foo.tar.gz", []string{""}, nil, []Upload{
+			{"foo.tar.gz", []string{""}, nil,nil, []Upload{
 				{
 					Type: "file",
 					Dest: "/tmp",
@@ -183,7 +183,7 @@ func TestReplacePlaceholders(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			tag := "v" + tt.version
-			src, dest := replaceSrcDestTemplates(tt.srcTemplate, tt.destTemplate, "newrelic/foobar", tt.appName, tt.arch, tag, tt.version, tt.destPrefix, "")
+			src, dest := replaceSrcDestTemplates(tt.srcTemplate, tt.destTemplate, "newrelic/foobar", tt.appName, tt.arch, tag, tt.version, tt.destPrefix, "", "")
 			assert.EqualValues(t, tt.srcOutput, src)
 			assert.EqualValues(t, tt.destOutput, dest)
 		})
@@ -207,13 +207,13 @@ func writeDummyFile(path string) error {
 
 func TestUploadArtifacts(t *testing.T) {
 	schema := []uploadArtifactSchema{
-		{"{app_name}-{arch}-{version}.txt", []string{"amd64", "386"}, nil, []Upload{
+		{"{app_name}-{arch}-{version}.txt", []string{"amd64", "386"}, nil, nil,[]Upload{
 			{
 				Type: "file",
 				Dest: "{arch}/{app_name}/{src}",
 			},
 		}},
-		{"{app_name}-{arch}-{version}.txt", nil, nil, []Upload{
+		{"{app_name}-{arch}-{version}.txt", nil, nil, nil,[]Upload{
 			{
 				Type: "file",
 				Dest: "{arch}/{app_name}/{src}",
