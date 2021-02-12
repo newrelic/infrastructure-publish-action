@@ -249,13 +249,11 @@ func TestUploadArtifacts(t *testing.T) {
 
 func TestSchema(t *testing.T) {
 	uploadSchemaContent, err := readFileContent("../schemas/nrjmx.yml")
+	assert.NoError(t, err)
 
 	uploadSchema, err := parseUploadSchema(uploadSchemaContent)
-
-	if err != nil {
-		log.Fatal(err)
-	}
-	log.Println(uploadSchema)
+	assert.NoError(t, err)
+	t.Log(uploadSchema)
 }
 
 func Test_streamAsLog(t *testing.T) {
