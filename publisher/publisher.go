@@ -232,6 +232,14 @@ func downloadFile(url, destPath string) error {
 
 func downloadArtifacts(conf config, schema uploadArtifactsSchema) error {
 	for _, artifactSchema := range schema {
+		// sanitize optional args as nil values will skip download
+		if artifactSchema.OS == nil {
+			artifactSchema.OS = []string{""}
+		}
+		if artifactSchema.SysManager == nil {
+			artifactSchema.SysManager = []string{""}
+		}
+
 		for _, arch := range artifactSchema.Arch {
 			for _, os := range artifactSchema.OS {
 				for _, sysMngr := range artifactSchema.SysManager {
