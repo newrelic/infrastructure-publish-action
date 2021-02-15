@@ -1,28 +1,28 @@
 ---
-#- src: "{app_name}_linux_{version}_{arch}.tar.gz"
-#  uploads:
-#    - type: file
-#      dest: "{dest_prefix}binaries/linux/{arch}/{src}"
-#  arch:
-#    - amd64
-#    - noarch
-#
-#- src: "{app_name}_windows_{version}_{arch}.zip"
-#  uploads:
-#    - type: file
-#      dest: "{dest_prefix}binaries/windows/{arch}/{src}"
-#  arch:
-#    - amd64
-#
-#
-#- src: "{app_name}-{arch}.{version}.msi"
-#  uploads:
-#    - type: file
-#      dest: "{dest_prefix}windows/integrations/{app_name}/{src}"
-#    - type: file
-#      dest: "{dest_prefix}windows/integrations/{app_name}/{app_name}-{arch}.msi"
-#  arch:
-#    - amd64
+- src: "{app_name}_linux_{version}_{arch}.tar.gz"
+  uploads:
+    - type: file
+      dest: "{dest_prefix}binaries/linux/{arch}/{src}"
+  arch:
+    - amd64
+    - noarch
+
+- src: "{app_name}_windows_{version}_{arch}.zip"
+  uploads:
+    - type: file
+      dest: "{dest_prefix}binaries/windows/{arch}/{src}"
+  arch:
+    - amd64
+
+
+- src: "{app_name}-{arch}.{version}.msi"
+  uploads:
+    - type: file
+      dest: "{dest_prefix}windows/integrations/{app_name}/{src}"
+    - type: file
+      dest: "{dest_prefix}windows/integrations/{app_name}/{app_name}-{arch}.msi"
+  arch:
+    - amd64
 
 - src: "{app_name}_{version}-1_{arch}.deb"
   arch:
@@ -42,36 +42,22 @@
         - wheezy
         - xenial
 
-#- src: "{app_name}-{version}-1.{arch}.rpm"
-#  arch:
-#    - x86_64
-#  uploads:
-#    - type: yum
-#      dest: "{dest_prefix}linux/yum/el/{os_version}/{arch}/"
-#      os_version:
-#        - 5
-#        - 6
-#        - 7
-#        - 8
-#
-#    - type: zypp
-#      dest: "{dest_prefix}linux/zypp/sles/{os_version}/{arch}/"
-#      os_version:
-#        - 11.4
-#        - 12.1
-#        - 12.2
-#        - 12.3
-#        - 12.4
+- src: "{app_name}-{version}-1.{arch}.rpm"
+  arch:
+    - x86_64
+  uploads:
+    - type: yum
+      dest: "{dest_prefix}linux/yum/el/{os_version}/{arch}/"
+      os_version:
+        - 6
+        - 7
+        - 8
 
-# jmx
-# repos
-# nrjmx_1.5.2-1_amd64.deb => {dest_prefix}linux/apt/pool/main/n/nrjmx/
-# nrjmx-1.5.2-1.x86_64.rpm => {dest_prefix}linux/yum/el/5/x86_64/
-# nrjmx-1.5.2-1.x86_64.rpm => {dest_prefix}linux/yum/el/6/x86_64/
-# nrjmx-1.5.2-1.x86_64.rpm => {dest_prefix}linux/yum/el/7/x86_64/
-# nrjmx-1.5.2-1.x86_64.rpm => {dest_prefix}linux/yum/el/8/x86_64/
-# nrjmx-1.6.2-1.x86_64.rpm => {dest_prefix}linux/zypp/sles/11.4/x86_64/
-# nrjmx-1.6.2-1.x86_64.rpm => {dest_prefix}linux/zypp/sles/12.1/x86_64/
-# nrjmx-1.6.2-1.x86_64.rpm => {dest_prefix}linux/zypp/sles/12.2/x86_64/
-# nrjmx-1.6.2-1.x86_64.rpm => {dest_prefix}linux/zypp/sles/12.3/x86_64/
-# nrjmx-1.6.2-1.x86_64.rpm => {dest_prefix}linux/zypp/sles/12.4/x86_64/
+    - type: zypp
+      dest: "{dest_prefix}linux/zypp/sles/{os_version}/{arch}/"
+      os_version:
+        - 11.4
+        - 12.1
+        - 12.2
+        - 12.3
+        - 12.4
