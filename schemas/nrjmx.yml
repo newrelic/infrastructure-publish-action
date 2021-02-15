@@ -1,28 +1,28 @@
 ---
-#- src: "{app_name}_linux_{version}_{arch}.tar.gz"
-#  uploads:
-#    - type: file
-#      dest: "{dest_prefix}binaries/linux/{arch}/{src}"
-#  arch:
-#    - amd64
-#    - noarch
-#
-#- src: "{app_name}_windows_{version}_{arch}.zip"
-#  uploads:
-#    - type: file
-#      dest: "{dest_prefix}binaries/windows/{arch}/{src}"
-#  arch:
-#    - amd64
-#
-#
-#- src: "{app_name}-{arch}.{version}.msi"
-#  uploads:
-#    - type: file
-#      dest: "{dest_prefix}windows/integrations/{app_name}/{src}"
-#    - type: file
-#      dest: "{dest_prefix}windows/integrations/{app_name}/{app_name}-{arch}.msi"
-#  arch:
-#    - amd64
+- src: "{app_name}_linux_{version}_{arch}.tar.gz"
+  uploads:
+    - type: file
+      dest: "{dest_prefix}binaries/linux/{arch}/{src}"
+  arch:
+    - amd64
+    - noarch
+
+- src: "{app_name}_windows_{version}_{arch}.zip"
+  uploads:
+    - type: file
+      dest: "{dest_prefix}binaries/windows/{arch}/{src}"
+  arch:
+    - amd64
+
+
+- src: "{app_name}-{arch}.{version}.msi"
+  uploads:
+    - type: file
+      dest: "{dest_prefix}windows/integrations/{app_name}/{src}"
+    - type: file
+      dest: "{dest_prefix}windows/integrations/{app_name}/{app_name}-{arch}.msi"
+  arch:
+    - amd64
 
 - src: "{app_name}_{version}-1_{arch}.deb"
   arch:
@@ -42,26 +42,26 @@
         - wheezy
         - xenial
 
-#- src: "{app_name}-{version}-1.{arch}.rpm"
-#  arch:
-#    - x86_64
-#  uploads:
-#    - type: yum
-#      dest: "{dest_prefix}linux/yum/el/{os_version}/{arch}/"
-#      os_version:
-#        - 5
-#        - 6
-#        - 7
-#        - 8
-#
-#    - type: zypp
-#      dest: "{dest_prefix}linux/zypp/sles/{os_version}/{arch}/"
-#      os_version:
-#        - 11.4
-#        - 12.1
-#        - 12.2
-#        - 12.3
-#        - 12.4
+- src: "{app_name}-{version}-1.{arch}.rpm"
+  arch:
+    - x86_64
+  uploads:
+    - type: yum
+      dest: "{dest_prefix}linux/yum/el/{os_version}/{arch}/"
+      os_version:
+        - 5
+        - 6
+        - 7
+        - 8
+
+    - type: zypp
+      dest: "{dest_prefix}linux/zypp/sles/{os_version}/{arch}/"
+      os_version:
+        - 11.4
+        - 12.1
+        - 12.2
+        - 12.3
+        - 12.4
 
 # jmx
 # repos
