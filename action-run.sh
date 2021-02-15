@@ -7,7 +7,7 @@ docker build  -t newrelic/infrastructure-publish-action -f $GITHUB_ACTION_PATH/D
 
 # run docker container to perform all actions inside
 echo "Run docker container with action logic inside"
-docker run --rm -it \
+docker run --rm \
         --name=infrastructure-publish-action\
         --security-opt apparmor:unconfined \
         --device /dev/fuse \
