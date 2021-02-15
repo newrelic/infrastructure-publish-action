@@ -40,7 +40,7 @@ inputs:
 runs:
   using: "composite"
   steps:
-    - run: ./action-run.sh
+    - run: $GITHUB_ACTION_PATH/action-run.sh
       shell: bash
       env:
         AWS_SECRET_ACCESS_KEY: ${{ inputs.aws_secret_access_key }}
