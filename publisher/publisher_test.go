@@ -12,6 +12,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -239,6 +240,63 @@ func TestUploadArtifacts(t *testing.T) {
 
 	err = uploadArtifacts(cfg, schema)
 	assert.NoError(t, err)
+
+	_, err = os.Stat(path.Join(dest, "amd64/nri-foobar/nri-foobar-amd64-2.0.0.txt"))
+	assert.NoError(t, err)
+
+	_, err = os.Stat(path.Join(dest, "386/nri-foobar/nri-foobar-386-2.0.0.txt"))
+	assert.NoError(t, err)
+}
+
+func TestUploadArtifacts_cantBeRunInParallel(t *testing.T) {
+	schema := []uploadArtifactSchema{
+		{"{app_name}-{arch}-{version}.txt", []string{"amd64", "386"}, []Upload{
+			{
+				Type: "file",
+				Dest: "{arch}/{app_name}/{src}",
+			},
+		}},
+		{"{app_name}-{arch}-{version}.txt", nil, []Upload{
+			{
+				Type: "file",
+				Dest: "{arch}/{app_name}/{src}",
+			},
+		}},
+	}
+
+	dest := t.TempDir()
+	src := t.TempDir()
+	cfg := config{
+		version:              "2.0.0",
+		artifactsDestFolder:  dest,
+		artifactsSrcFolder:   src,
+		uploadSchemaFilePath: "",
+		appName:              "nri-foobar",
+	}
+
+	err := writeDummyFile(path.Join(src, "nri-foobar-amd64-2.0.0.txt"))
+	assert.NoError(t, err)
+
+	err = writeDummyFile(path.Join(src, "nri-foobar-386-2.0.0.txt"))
+	assert.NoError(t, err)
+
+
+	wg := sync.WaitGroup{}
+	wg.Add(2)
+	var err1, err2 error
+	go func(){
+		err1 = uploadArtifacts(cfg, schema)
+		wg.Done()
+	}()
+	go func() {
+		time.Sleep(10 * time.Millisecond)
+		err2 = uploadArtifacts(cfg, schema)
+		wg.Done()
+	}()
+	assert.NoError(t, err1)
+	assert.Error(t, err2, "2nd upload should fail because, 1st one got the lock")
+
+	wg.Wait()
 
 	_, err = os.Stat(path.Join(dest, "amd64/nri-foobar/nri-foobar-amd64-2.0.0.txt"))
 	assert.NoError(t, err)

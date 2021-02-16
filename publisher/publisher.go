@@ -262,6 +262,8 @@ func uploadArtifact(conf config, schema uploadArtifactSchema, arch string, uploa
 }
 
 func uploadArtifacts(conf config, schema uploadArtifactsSchema) error {
+	// lock
+	// defer lock release
 	for _, artifactSchema := range schema {
 		for _, arch := range artifactSchema.Arch {
 			for _, upload := range artifactSchema.Uploads {
