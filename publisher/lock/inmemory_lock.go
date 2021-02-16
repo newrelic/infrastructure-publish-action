@@ -2,18 +2,27 @@
 // SPDX-License-Identifier: Apache-2.0
 package lock
 
-import "time"
+import (
+	"sync"
+	"time"
+)
 
 // InMemory lock for testing puposes.
 type InMemory struct {
 	locked bool
+	mutex sync.Mutex
 }
 
 func NewInMemory() *InMemory {
-	return &InMemory{}
+	return &InMemory{
+		mutex: sync.Mutex{},
+	}
 }
 
 func (l *InMemory) Lock() error {
+	l.mutex.Lock()
+	defer l.mutex.Unlock()
+
 	if l.locked {
 		return LockBusyErr
 	}
@@ -23,6 +32,9 @@ func (l *InMemory) Lock() error {
 }
 
 func (l *InMemory) Release() error {
+	l.mutex.Lock()
+	defer l.mutex.Unlock()
+
 	// fake some latency
 	time.Sleep(10 * time.Millisecond)
 

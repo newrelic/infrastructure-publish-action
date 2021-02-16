@@ -291,14 +291,14 @@ func TestUploadArtifacts_cantBeRunInParallel(t *testing.T) {
 		wg.Done()
 	}()
 	go func() {
-		time.Sleep(5 * time.Millisecond)
+		time.Sleep(1 * time.Millisecond)
 		err2 = uploadArtifacts(cfg, schema, l)
 		wg.Done()
 	}()
-	assert.NoError(t, err1)
-	assert.Error(t, err2, "2nd upload should fail because, 1st one got the lock")
 
 	wg.Wait()
+	assert.NoError(t, err1)
+	assert.Equal(t, lock.LockBusyErr, err2, "2nd upload should fail because, 1st one got the lock")
 
 	_, err = os.Stat(path.Join(dest, "amd64/nri-foobar/nri-foobar-amd64-2.0.0.txt"))
 	assert.NoError(t, err)
