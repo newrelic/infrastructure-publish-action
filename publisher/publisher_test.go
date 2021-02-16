@@ -14,6 +14,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/newrelic/infrastructure-publish-action/publisher/lock"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -238,7 +239,7 @@ func TestUploadArtifacts(t *testing.T) {
 	err = writeDummyFile(path.Join(src, "nri-foobar-386-2.0.0.txt"))
 	assert.NoError(t, err)
 
-	err = uploadArtifacts(cfg, schema)
+	err = uploadArtifacts(cfg, schema, lock.NewInMemory())
 	assert.NoError(t, err)
 
 	_, err = os.Stat(path.Join(dest, "amd64/nri-foobar/nri-foobar-amd64-2.0.0.txt"))
@@ -284,13 +285,14 @@ func TestUploadArtifacts_cantBeRunInParallel(t *testing.T) {
 	wg := sync.WaitGroup{}
 	wg.Add(2)
 	var err1, err2 error
+	l := lock.NewInMemory()
 	go func(){
-		err1 = uploadArtifacts(cfg, schema)
+		err1 = uploadArtifacts(cfg, schema, l)
 		wg.Done()
 	}()
 	go func() {
-		time.Sleep(10 * time.Millisecond)
-		err2 = uploadArtifacts(cfg, schema)
+		time.Sleep(5 * time.Millisecond)
+		err2 = uploadArtifacts(cfg, schema, l)
 		wg.Done()
 	}()
 	assert.NoError(t, err1)

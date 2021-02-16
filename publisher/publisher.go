@@ -19,6 +19,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/newrelic/infrastructure-publish-action/publisher/lock"
 	"github.com/spf13/viper"
 	"gopkg.in/yaml.v2"
 )
@@ -107,7 +108,7 @@ func main() {
 
 	l.Println("🎉 download phase complete")
 
-	err = uploadArtifacts(conf, uploadSchema)
+	err = uploadArtifacts(conf, uploadSchema, lock.NewInMemory())
 
 	if err != nil {
 		l.Fatal(err)
@@ -261,9 +262,20 @@ func uploadArtifact(conf config, schema uploadArtifactSchema, arch string, uploa
 	return nil
 }
 
-func uploadArtifacts(conf config, schema uploadArtifactsSchema) error {
-	// lock
-	// defer lock release
+func uploadArtifacts(conf config, schema uploadArtifactsSchema, l lock.BucketLock) (err error) {
+	if err = l.Lock(); err != nil {
+		return
+	}
+	defer func() {
+		errRelease := l.Release()
+		if err == nil {
+			err = errRelease
+		} else {
+			err = fmt.Errorf("got 2 errors: uploading: \"%v\", releasing lock: \"%v\"", err, errRelease)
+		}
+		return
+	}()
+
 	for _, artifactSchema := range schema {
 		for _, arch := range artifactSchema.Arch {
 			for _, upload := range artifactSchema.Uploads {
