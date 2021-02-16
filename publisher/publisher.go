@@ -66,7 +66,6 @@ type config struct {
 	aptlyFolder          string
 	uploadSchemaFilePath string
 	gpgPassphrase        string
-	gpgKeyName           string
 	gpgKeyRing           string
 }
 
@@ -145,7 +144,6 @@ func loadConfig() config {
 		aptlyFolder:          aptlyF,
 		uploadSchemaFilePath: viper.GetString("upload_schema_file_path"),
 		gpgPassphrase:        viper.GetString("gpg_passphrase"),
-		gpgKeyName:           viper.GetString("gpg_key_name"),
 		gpgKeyRing:           viper.GetString("gpg_key_ring"),
 	}
 }
@@ -376,7 +374,7 @@ func uploadApt(conf config, srcTemplate string, upload Upload, arch string) (err
 		l.Printf("[✔] Added succecfully package into deb repo for %s/%s", osVersion, arch)
 
 		l.Printf("[ ] Publish deb repo for %s/%s", osVersion, arch)
-		if err = execLogOutput(l, "aptly", "publish", "repo", "-keyring", conf.gpgKeyRing, "-gpg-key", conf.gpgKeyName, "-passphrase", conf.gpgPassphrase, "-batch", osVersion); err != nil {
+		if err = execLogOutput(l, "aptly", "publish", "repo", "-keyring", conf.gpgKeyRing, "-passphrase", conf.gpgPassphrase, "-batch", osVersion); err != nil {
 			return err
 		}
 		l.Printf("[✔] Published succesfully deb repo for %s/%s", osVersion, arch)
