@@ -46,6 +46,7 @@ const (
 	repodataRpmPath    = "/repodata/repomd.xml"
 	signatureRpmPath   = "/repodata/repomd.xml.asc"
 	defaultAptlyFolder = "/root/.aptly"
+	defaultLockgroup   = "lockgroup"
 	aptPoolMain        = "pool/main/"
 	aptDists           = "dists/"
 	commandTimeout     = time.Hour * 1
@@ -69,6 +70,13 @@ type config struct {
 	gpgPassphrase        string
 	gpgKeyName           string
 	gpgKeyRing           string
+	awsBucket            string
+	lockGroup            string
+	awsRegion            string
+}
+
+func (c *config) owner() string {
+	return fmt.Sprintf("%s_%s", c.appName, c.tag)
 }
 
 type uploadArtifactSchema struct {
@@ -90,6 +98,10 @@ func main() {
 	conf := loadConfig()
 	l.Println(fmt.Sprintf("config: %v", conf))
 
+	if conf.awsBucket == "" {
+		l.Fatal("'aws_s3_bucket_name' not defined")
+	}
+
 	uploadSchemaContent, err := readFileContent(conf.uploadSchemaFilePath)
 	if err != nil {
 		l.Fatal(err)
@@ -101,19 +113,20 @@ func main() {
 	}
 
 	err = downloadArtifacts(conf, uploadSchema)
-
 	if err != nil {
 		l.Fatal(err)
 	}
-
 	l.Println("🎉 download phase complete")
 
-	err = uploadArtifacts(conf, uploadSchema, lock.NewInMemory())
+	bucketLock, err := lock.NewS3(conf.awsBucket, conf.lockGroup, conf.owner(), conf.awsRegion)
+	if err != nil {
+		l.Fatal("cannot create lock: " + err.Error())
+	}
 
+	err = uploadArtifacts(conf, uploadSchema, bucketLock)
 	if err != nil {
 		l.Fatal(err)
 	}
-
 	l.Println("🎉 upload phase complete")
 }
 
@@ -130,11 +143,18 @@ func loadConfig() config {
 	viper.BindEnv("gpg_passphrase")
 	viper.BindEnv("gpg_key_name")
 	viper.BindEnv("gpg_key_ring")
+	viper.BindEnv("aws_s3_bucket_name")
 
 	aptlyF := viper.GetString("aptly_folder")
 	if aptlyF == "" {
 		aptlyF = defaultAptlyFolder
 	}
+
+	lockGroup := viper.GetString("lock_group")
+	if lockGroup == "" {
+		lockGroup = defaultLockgroup
+	}
+
 	return config{
 		destPrefix:           viper.GetString("dest_prefix"),
 		repoName:             viper.GetString("repo_name"),
@@ -148,6 +168,8 @@ func loadConfig() config {
 		gpgPassphrase:        viper.GetString("gpg_passphrase"),
 		gpgKeyName:           viper.GetString("gpg_key_name"),
 		gpgKeyRing:           viper.GetString("gpg_key_ring"),
+		awsBucket:            viper.GetString("aws_s3_bucket_name"),
+		lockGroup:            lockGroup,
 	}
 }
 
