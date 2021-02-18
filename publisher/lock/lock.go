@@ -5,11 +5,12 @@ package lock
 import "errors"
 
 var (
-	LockBusyErr = errors.New("bucket is locked")
+	LockBusyErr = errors.New("lock is busy")
 )
 
 type BucketLock interface {
+	// Lock tries acquiring lock or fails rigth away.
 	Lock() error
+	// Release tries releasing an owned lock or fails.
 	Release() error
 }
-
