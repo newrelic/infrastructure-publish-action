@@ -98,8 +98,15 @@ func main() {
 	conf := loadConfig()
 	l.Println(fmt.Sprintf("config: %v", conf))
 
+	// config validation
 	if conf.awsBucket == "" {
-		l.Fatal("'aws_s3_bucket_name' not defined")
+		l.Fatal("missing 'aws_s3_bucket_name' value")
+	}
+
+	// fail fast when lacking required AWS credentials
+	bucketLock, err := lock.NewS3(conf.awsBucket, conf.lockGroup, conf.owner(), conf.awsRegion)
+	if err != nil {
+		l.Fatal("cannot create lock: " + err.Error())
 	}
 
 	uploadSchemaContent, err := readFileContent(conf.uploadSchemaFilePath)
@@ -117,11 +124,6 @@ func main() {
 		l.Fatal(err)
 	}
 	l.Println("🎉 download phase complete")
-
-	bucketLock, err := lock.NewS3(conf.awsBucket, conf.lockGroup, conf.owner(), conf.awsRegion)
-	if err != nil {
-		l.Fatal("cannot create lock: " + err.Error())
-	}
 
 	err = uploadArtifacts(conf, uploadSchema, bucketLock)
 	if err != nil {
@@ -189,7 +191,7 @@ func parseUploadSchema(fileContent []byte) (uploadArtifactsSchema, error) {
 		return nil, err
 	}
 
-	for i, _ := range schema {
+	for i := range schema {
 		if schema[i].Arch == nil {
 			schema[i].Arch = []string{""}
 		}
@@ -284,12 +286,12 @@ func uploadArtifact(conf config, schema uploadArtifactSchema, arch string, uploa
 	return nil
 }
 
-func uploadArtifacts(conf config, schema uploadArtifactsSchema, l lock.BucketLock) (err error) {
-	if err = l.Lock(); err != nil {
+func uploadArtifacts(conf config, schema uploadArtifactsSchema, bucketLock lock.BucketLock) (err error) {
+	if err = bucketLock.Lock(); err != nil {
 		return
 	}
 	defer func() {
-		errRelease := l.Release()
+		errRelease := bucketLock.Release()
 		if err == nil {
 			err = errRelease
 		} else {
