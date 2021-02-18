@@ -3,14 +3,21 @@
 package lock
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"strings"
+	"log"
+	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
+)
+
+const (
+	defaultTTL = 1 * time.Hour
 )
 
 // S3 based lock.
@@ -20,8 +27,25 @@ type S3 struct {
 	bucket   string
 	tags     string
 	filePath string
+	ttl      time.Duration
 }
 
+// lockData represents contents of the JSON lock-file at S3.
+type lockData struct {
+	Owner     string    `json:"owner"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+// same owner means lock was already acquired by the client
+func (l *lockData) belongsTo(owner string) bool {
+	return l.Owner == owner
+}
+
+func (l *lockData) isExpired(ttl time.Duration, t time.Time) bool {
+	return l.CreatedAt.Add(ttl).Before(t)
+}
+
+// NewS3 creates a lock instance ready to be used validating required AWS credentials.
 func NewS3(bucket, filepath, owner, region string) (*S3, error) {
 	// AWS resource tags
 	owningTeam := "CAOS"
@@ -43,35 +67,47 @@ func NewS3(bucket, filepath, owner, region string) (*S3, error) {
 		bucket:   bucket,
 		filePath: filepath,
 		tags:     fmt.Sprintf("department=product&product=%s&project=%s&owning_team=%s&environment=%s", product, project, owningTeam, env),
+		ttl:      defaultTTL,
 	}, nil
 }
 
+// Lock S3 has no compare-and-swap so this is a
 func (l *S3) Lock() error {
-	if l.isLockBusy() {
+	if l.isBusyDeletingExpired() {
 		return LockBusyErr
 	}
 
+	data := lockData{
+		Owner: l.owner,
+		CreatedAt: time.Now(),
+	}
+	dataB, err := json.Marshal(data)
+	if err != nil {
+		return err
+	}
+
 	input := &s3.PutObjectInput{
-		Body:    aws.ReadSeekCloser(strings.NewReader(l.owner)),
+		Body:    aws.ReadSeekCloser(bytes.NewReader(dataB)),
 		Bucket:  aws.String(l.bucket),
 		Key:     aws.String(l.filePath),
 		Tagging: aws.String(l.tags),
 	}
 
-	_, err := l.client.PutObject(input)
+	_, err = l.client.PutObject(input)
 	if err != nil {
 		return err
 	}
 
-	if l.isLockBusy() {
+	if l.isBusyDeletingExpired() {
 		return LockBusyErr
 	}
 
 	return nil
 }
 
+// Release frees owned lock.
 func (l *S3) Release() error {
-	if l.isLockBusy() {
+	if l.isBusyDeletingExpired() {
 		return LockBusyErr
 	}
 
@@ -85,15 +121,18 @@ func (l *S3) Release() error {
 		return err
 	}
 
-	if l.isLockBusy() {
+	if l.isBusyDeletingExpired() {
 		return LockBusyErr
 	}
 
 	return nil
 }
 
-// isLockBusy verifies there is a lock not owned by this client.
-func (l *S3) isLockBusy() bool {
+// isBusyDeletingExpired verifies there is a not expired lock, not owned by this client.
+// It also deletes expired ones for the shake of management simplicacation.
+func (l *S3) isBusyDeletingExpired() (busy bool) {
+	busy = true
+
 	readObjIn := &s3.GetObjectInput{
 		Bucket: aws.String(l.bucket),
 		Key:    aws.String(l.filePath),
@@ -105,19 +144,38 @@ func (l *S3) isLockBusy() bool {
 		if aerr, ok := err.(awserr.Error); ok {
 			switch aerr.Code() {
 			case s3.ErrCodeNoSuchKey:
-				return false
+				busy = false
+				return
 			default:
 			}
 		}
-		return true
+		logErr(err)
+		return
 	}
 	defer resp.Body.Close()
 
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return true
+		logErr(err)
+		return
+	}
+	var data lockData
+	err = json.Unmarshal(body, &data)
+	if err != nil {
+		logErr(err)
+		return
 	}
 
-	// same owner means lock was already acquired by the client
-	return string(body) != l.owner
+	if data.isExpired(l.ttl, time.Now()) {
+		busy = false
+		return
+	}
+
+	busy = !data.belongsTo(l.owner)
+
+	return
+}
+
+func logErr(err error) {
+	log.Println(err)
 }
