@@ -71,7 +71,7 @@ func NewS3(bucket, filepath, owner, region string) (*S3, error) {
 	}, nil
 }
 
-// Lock S3 has no compare-and-swap so this is a
+// Lock S3 has no compare-and-swap so this is no bulletproof solution, but should be good enough.
 func (l *S3) Lock() error {
 	if l.isBusyDeletingExpired() {
 		return LockBusyErr
