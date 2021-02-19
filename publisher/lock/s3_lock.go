@@ -12,12 +12,22 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
+	"github.com/aws/aws-sdk-go/aws/credentials/stscreds"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
 )
 
 const (
 	defaultTTL = 1 * time.Hour
+)
+
+// We should parametrise these:
+var (
+	// resource tags
+	tagOwningTeam = "CAOS"
+	tagProduct    = "integrations"
+	tagProject    = "infrastructure-publish-action"
+	tagEnv        = "us-development"
 )
 
 // S3 based lock.
@@ -46,27 +56,24 @@ func (l *lockData) isExpired(ttl time.Duration, t time.Time) bool {
 }
 
 // NewS3 creates a lock instance ready to be used validating required AWS credentials.
-func NewS3(bucket, filepath, owner, region string) (*S3, error) {
-	// AWS resource tags
-	owningTeam := "CAOS"
-	product := "integrations"
-	project := "infrastructure-publish-action"
-	env := "us-development"
-
-	s, err := session.NewSession()
+func NewS3(bucket, roleARN, region, filepath, owner string) (*S3, error) {
+	sess, err := session.NewSession()
 	if err != nil {
 		return nil, err
 	}
 
-	// Create a S3 client with additional configuration
-	svc := s3.New(s, aws.NewConfig().WithRegion(region))
+	creds := stscreds.NewCredentials(sess, roleARN, func(p *stscreds.AssumeRoleProvider) {})
+
+	conf := aws.NewConfig().WithRegion(region).WithCredentials(creds)
+
+	client := s3.New(sess, conf)
 
 	return &S3{
-		client:   svc,
+		client:   client,
 		owner:    owner,
 		bucket:   bucket,
 		filePath: filepath,
-		tags:     fmt.Sprintf("department=product&product=%s&project=%s&owning_team=%s&environment=%s", product, project, owningTeam, env),
+		tags:     fmt.Sprintf("department=product&product=%s&project=%s&owning_team=%s&environment=%s", tagProduct, tagProject, tagOwningTeam, tagEnv),
 		ttl:      defaultTTL,
 	}, nil
 }
@@ -78,7 +85,7 @@ func (l *S3) Lock() error {
 	}
 
 	data := lockData{
-		Owner: l.owner,
+		Owner:     l.owner,
 		CreatedAt: time.Now(),
 	}
 	dataB, err := json.Marshal(data)
