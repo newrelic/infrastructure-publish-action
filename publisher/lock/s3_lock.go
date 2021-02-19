@@ -63,13 +63,13 @@ func NewS3(bucket, roleARN, region, filepath, owner string) (*S3, error) {
 	}
 
 	creds := stscreds.NewCredentials(sess, roleARN, func(p *stscreds.AssumeRoleProvider) {})
-
-	conf := aws.NewConfig().WithRegion(region).WithCredentials(creds)
-
-	client := s3.New(sess, conf)
+	conf := aws.Config{
+		Credentials: creds,
+		Region:      aws.String(region),
+	}
 
 	return &S3{
-		client:   client,
+		client:   s3.New(sess, &conf),
 		owner:    owner,
 		bucket:   bucket,
 		filePath: filepath,
