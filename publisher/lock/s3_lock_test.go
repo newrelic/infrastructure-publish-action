@@ -7,7 +7,7 @@ import (
 )
 
 const (
-	bucket = "caos-testing"
+	bucket = "onhost-ci-lock-testing"
 	region = "us-east-1"
 )
 
