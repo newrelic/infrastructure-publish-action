@@ -3,42 +3,36 @@
 package lock
 
 import (
-	"sync"
+	"sync/atomic"
 	"time"
 )
 
 // InMemory lock for testing puposes.
 type InMemory struct {
-	locked bool
-	mutex sync.Mutex
+	locked uint32
 }
 
 func NewInMemory() *InMemory {
 	return &InMemory{
-		mutex: sync.Mutex{},
+		locked: 0,
 	}
 }
 
 func (l *InMemory) Lock() error {
-	l.mutex.Lock()
-	defer l.mutex.Unlock()
-
-	if l.locked {
+	adquired := atomic.CompareAndSwapUint32(&l.locked, 0, 1)
+	if !adquired {
 		return LockBusyErr
 	}
 
-	l.locked = true
 	return nil
 }
 
 func (l *InMemory) Release() error {
-	l.mutex.Lock()
-	defer l.mutex.Unlock()
+	atomic.SwapUint32(&l.locked, 0)
 
 	// fake some latency
-	time.Sleep(10 * time.Millisecond)
+	time.Sleep(100 * time.Millisecond)
 
-	l.locked = false
 	return nil
 }
 
