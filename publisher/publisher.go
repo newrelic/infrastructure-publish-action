@@ -71,7 +71,7 @@ type config struct {
 	gpgPassphrase        string
 	gpgKeyName           string
 	gpgKeyRing           string
-	awsBucket            string
+	awsLockBucket        string
 	lockGroup            string
 	awsRegion            string
 	awsRoleARN           string
@@ -101,8 +101,8 @@ func main() {
 	l.Println(fmt.Sprintf("config: %v", conf))
 
 	// config validation
-	if conf.awsBucket == "" {
-		l.Fatal("missing 'aws_s3_bucket_name' value")
+	if conf.awsLockBucket == "" {
+		l.Fatal("missing 'aws_s3_lock_bucket_name' value")
 	}
 	if conf.awsRoleARN == "" {
 		l.Fatal("missing 'aws_role_arn' value")
@@ -115,7 +115,7 @@ func main() {
 	}
 
 	// fail fast when lacking required AWS credentials
-	bucketLock, err := lock.NewS3(conf.awsBucket, conf.awsRoleARN, conf.awsRegion, conf.lockGroup, conf.owner())
+	bucketLock, err := lock.NewS3(conf.awsLockBucket, conf.awsRoleARN, conf.awsRegion, conf.lockGroup, conf.owner())
 	if err != nil {
 		l.Fatal("cannot create lock: " + err.Error())
 	}
@@ -158,6 +158,7 @@ func loadConfig() config {
 	viper.BindEnv("gpg_key_name")
 	viper.BindEnv("gpg_key_ring")
 	viper.BindEnv("aws_s3_bucket_name")
+	viper.BindEnv("aws_s3_lock_bucket_name")
 	viper.BindEnv("aws_role_arn")
 	viper.BindEnv("aws_region")
 
@@ -186,7 +187,7 @@ func loadConfig() config {
 		gpgKeyName:           viper.GetString("gpg_key_name"),
 		gpgKeyRing:           viper.GetString("gpg_key_ring"),
 		lockGroup:            lockGroup,
-		awsBucket:            viper.GetString("aws_s3_bucket_name"),
+		awsLockBucket:        viper.GetString("aws_s3_lock_bucket_name"),
 		awsRoleARN:           viper.GetString("aws_role_arn"),
 		awsRegion:            viper.GetString("aws_region"),
 	}
