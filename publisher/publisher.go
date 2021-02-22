@@ -102,7 +102,7 @@ func main() {
 
 	// config validation
 	if conf.awsLockBucket == "" {
-		l.Fatal("missing 'aws_s3_bucket_name' value")
+		l.Fatal("missing 'aws_s3_lock_bucket_name' value")
 	}
 	if conf.awsRoleARN == "" {
 		l.Fatal("missing 'aws_role_arn' value")
@@ -158,7 +158,7 @@ func loadConfig() config {
 	viper.BindEnv("gpg_key_name")
 	viper.BindEnv("gpg_key_ring")
 	viper.BindEnv("aws_s3_bucket_name")
-	viper.BindEnv("aws_s3_bucket_name_lock")
+	viper.BindEnv("aws_s3_lock_bucket_name")
 	viper.BindEnv("aws_role_arn")
 	viper.BindEnv("aws_region")
 
@@ -187,7 +187,7 @@ func loadConfig() config {
 		gpgKeyName:           viper.GetString("gpg_key_name"),
 		gpgKeyRing:           viper.GetString("gpg_key_ring"),
 		lockGroup:            lockGroup,
-		awsLockBucket:        viper.GetString("aws_s3_bucket_name_lock"),
+		awsLockBucket:        viper.GetString("aws_s3_lock_bucket_name"),
 		awsRoleARN:           viper.GetString("aws_role_arn"),
 		awsRegion:            viper.GetString("aws_region"),
 	}
