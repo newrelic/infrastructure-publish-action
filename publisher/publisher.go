@@ -78,12 +78,7 @@ type config struct {
 }
 
 func (c *config) owner() string {
-	runIDSuffix := ""
-	if c.runID != "" {
-		runIDSuffix = fmt.Sprintf("_%s", c.runID)
-	}
-
-	return fmt.Sprintf("%s_%s%s", c.appName, c.tag, runIDSuffix)
+	return fmt.Sprintf("%s_%s_%s", c.appName, c.tag, c.runID)
 }
 
 type uploadArtifactSchema struct {
@@ -114,6 +109,9 @@ func main() {
 	}
 	if conf.awsRegion == "" {
 		l.Fatal("missing 'aws_region' value")
+	}
+	if conf.runID == "" {
+		l.Fatal("missing 'run_id' value")
 	}
 
 	// fail fast when lacking required AWS credentials
