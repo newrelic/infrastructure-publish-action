@@ -62,6 +62,7 @@ type config struct {
 	repoName             string
 	appName              string
 	tag                  string
+	runID                string
 	version              string
 	artifactsDestFolder  string
 	artifactsSrcFolder   string
@@ -77,7 +78,12 @@ type config struct {
 }
 
 func (c *config) owner() string {
-	return fmt.Sprintf("%s_%s", c.appName, c.tag)
+	runIDSuffix := ""
+	if c.runID != "" {
+		runIDSuffix = fmt.Sprintf("_%s", c.runID)
+	}
+
+	return fmt.Sprintf("%s_%s%s", c.appName, c.tag, runIDSuffix)
 }
 
 type uploadArtifactSchema struct {
@@ -144,6 +150,7 @@ func loadConfig() config {
 	viper.BindEnv("repo_name")
 	viper.BindEnv("app_name")
 	viper.BindEnv("tag")
+	viper.BindEnv("run_id")
 	viper.BindEnv("artifacts_dest_folder")
 	viper.BindEnv("artifacts_src_folder")
 	viper.BindEnv("aptly_folder")
@@ -171,6 +178,7 @@ func loadConfig() config {
 		repoName:             viper.GetString("repo_name"),
 		appName:              viper.GetString("app_name"),
 		tag:                  viper.GetString("tag"),
+		runID:                viper.GetString("run_id"),
 		version:              strings.Replace(viper.GetString("tag"), "v", "", -1),
 		artifactsDestFolder:  viper.GetString("artifacts_dest_folder"),
 		artifactsSrcFolder:   viper.GetString("artifacts_src_folder"),
