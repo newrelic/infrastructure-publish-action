@@ -18,7 +18,7 @@ import (
 )
 
 const (
-	defaultTTL = 1 * time.Hour
+	defaultTTL = 1000 * time.Hour // disable to manage leftover lockfiles manually for now
 )
 
 // We should parametrise these:
