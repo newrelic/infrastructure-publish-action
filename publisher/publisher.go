@@ -62,6 +62,7 @@ type config struct {
 	repoName             string
 	appName              string
 	tag                  string
+	runID                string
 	version              string
 	artifactsDestFolder  string
 	artifactsSrcFolder   string
@@ -70,14 +71,14 @@ type config struct {
 	gpgPassphrase        string
 	gpgKeyName           string
 	gpgKeyRing           string
-	awsBucket            string
+	awsLockBucket        string
 	lockGroup            string
 	awsRegion            string
 	awsRoleARN           string
 }
 
 func (c *config) owner() string {
-	return fmt.Sprintf("%s_%s", c.appName, c.tag)
+	return fmt.Sprintf("%s_%s_%s", c.appName, c.tag, c.runID)
 }
 
 type uploadArtifactSchema struct {
@@ -100,8 +101,8 @@ func main() {
 	l.Println(fmt.Sprintf("config: %v", conf))
 
 	// config validation
-	if conf.awsBucket == "" {
-		l.Fatal("missing 'aws_s3_bucket_name' value")
+	if conf.awsLockBucket == "" {
+		l.Fatal("missing 'aws_s3_lock_bucket_name' value")
 	}
 	if conf.awsRoleARN == "" {
 		l.Fatal("missing 'aws_role_arn' value")
@@ -109,9 +110,12 @@ func main() {
 	if conf.awsRegion == "" {
 		l.Fatal("missing 'aws_region' value")
 	}
+	if conf.runID == "" {
+		l.Fatal("missing 'run_id' value")
+	}
 
 	// fail fast when lacking required AWS credentials
-	bucketLock, err := lock.NewS3(conf.awsBucket, conf.awsRoleARN, conf.awsRegion, conf.lockGroup, conf.owner())
+	bucketLock, err := lock.NewS3(conf.awsLockBucket, conf.awsRoleARN, conf.awsRegion, conf.lockGroup, conf.owner())
 	if err != nil {
 		l.Fatal("cannot create lock: " + err.Error())
 	}
@@ -144,6 +148,7 @@ func loadConfig() config {
 	viper.BindEnv("repo_name")
 	viper.BindEnv("app_name")
 	viper.BindEnv("tag")
+	viper.BindEnv("run_id")
 	viper.BindEnv("artifacts_dest_folder")
 	viper.BindEnv("artifacts_src_folder")
 	viper.BindEnv("aptly_folder")
@@ -153,6 +158,7 @@ func loadConfig() config {
 	viper.BindEnv("gpg_key_name")
 	viper.BindEnv("gpg_key_ring")
 	viper.BindEnv("aws_s3_bucket_name")
+	viper.BindEnv("aws_s3_lock_bucket_name")
 	viper.BindEnv("aws_role_arn")
 	viper.BindEnv("aws_region")
 
@@ -171,6 +177,7 @@ func loadConfig() config {
 		repoName:             viper.GetString("repo_name"),
 		appName:              viper.GetString("app_name"),
 		tag:                  viper.GetString("tag"),
+		runID:                viper.GetString("run_id"),
 		version:              strings.Replace(viper.GetString("tag"), "v", "", -1),
 		artifactsDestFolder:  viper.GetString("artifacts_dest_folder"),
 		artifactsSrcFolder:   viper.GetString("artifacts_src_folder"),
@@ -180,7 +187,7 @@ func loadConfig() config {
 		gpgKeyName:           viper.GetString("gpg_key_name"),
 		gpgKeyRing:           viper.GetString("gpg_key_ring"),
 		lockGroup:            lockGroup,
-		awsBucket:            viper.GetString("aws_s3_bucket_name"),
+		awsLockBucket:        viper.GetString("aws_s3_lock_bucket_name"),
 		awsRoleARN:           viper.GetString("aws_role_arn"),
 		awsRegion:            viper.GetString("aws_region"),
 	}
