@@ -5,7 +5,7 @@ package lock
 import "errors"
 
 var (
-	LockBusyErr = errors.New("lock is busy")
+	ErrLockBusy = errors.New("lock is busy")
 )
 
 type BucketLock interface {

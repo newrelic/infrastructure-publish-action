@@ -39,7 +39,7 @@ func TestS3_Lock_onLocked(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.NoError(t, l1.Lock())
-	assert.Equal(t, LockBusyErr, l2.Lock())
+	assert.Equal(t, ErrLockBusy, l2.Lock())
 
 	defer l1.Release()
 	defer l2.Release()

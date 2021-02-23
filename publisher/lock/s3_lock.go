@@ -81,7 +81,7 @@ func NewS3(bucket, roleARN, region, filepath, owner string) (*S3, error) {
 // Lock S3 has no compare-and-swap so this is no bulletproof solution, but should be good enough.
 func (l *S3) Lock() error {
 	if l.isBusyDeletingExpired() {
-		return LockBusyErr
+		return ErrLockBusy
 	}
 
 	data := lockData{
@@ -106,7 +106,7 @@ func (l *S3) Lock() error {
 	}
 
 	if l.isBusyDeletingExpired() {
-		return LockBusyErr
+		return ErrLockBusy
 	}
 
 	return nil
@@ -115,7 +115,7 @@ func (l *S3) Lock() error {
 // Release frees owned lock.
 func (l *S3) Release() error {
 	if l.isBusyDeletingExpired() {
-		return LockBusyErr
+		return ErrLockBusy
 	}
 
 	delObjIn := &s3.DeleteObjectInput{
@@ -129,7 +129,7 @@ func (l *S3) Release() error {
 	}
 
 	if l.isBusyDeletingExpired() {
-		return LockBusyErr
+		return ErrLockBusy
 	}
 
 	return nil

@@ -21,7 +21,7 @@ func NewInMemory() *InMemory {
 func (l *InMemory) Lock() error {
 	adquired := atomic.CompareAndSwapUint32(&l.locked, 0, 1)
 	if !adquired {
-		return LockBusyErr
+		return ErrLockBusy
 	}
 
 	return nil

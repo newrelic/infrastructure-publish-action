@@ -300,7 +300,7 @@ func TestUploadArtifacts_cantBeRunInParallel(t *testing.T) {
 	close(ready)
 	wg.Wait()
 	assert.NoError(t, err1)
-	assert.Equal(t, lock.LockBusyErr, err2, "2nd upload should fail because, 1st one got the lock")
+	assert.Equal(t, lock.ErrLockBusy, err2, "2nd upload should fail because, 1st one got the lock")
 
 	_, err = os.Stat(path.Join(dest, "amd64/nri-foobar/nri-foobar-amd64-2.0.0.txt"))
 	assert.NoError(t, err)
