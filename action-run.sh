@@ -13,7 +13,7 @@ docker run --rm \
         --device /dev/fuse \
         --cap-add SYS_ADMIN \
         -e AWS_SECRET_ACCESS_KEY \
-        -e AWS_ACCESS_KEY \
+        -e AWS_ACCESS_KEY_ID \
         -e AWS_S3_BUCKET_NAME \
         -e REPO_NAME \
         -e APP_NAME \

@@ -21,7 +21,7 @@ The example demonstrates how to add a job to your existing workflow to upload In
 GitHub secrets to be set:
 
      AWS_SECRET_ACCESS_KEY - Specifies the secret key associated with the access key.
-     AWS_ACCESS_KEY - Personal AWS access key.
+     AWS_ACCESS_KEY_ID - Personal AWS access key.
      AWS_S3_BUCKET - Name of the AWS S3 bucket.
 
 ### Example Usage
@@ -53,7 +53,7 @@ GitHub secrets to be set:
             uses: ./actions/publish
             with:
               aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-              aws_access_key: ${{ secrets.AWS_ACCESS_KEY }}
+              aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
               aws_s3_bucket_name: ${{ secrets.AWS_S3_BUCKET }}
               tag: "v1.0.0"
               app_name: "my-app"
