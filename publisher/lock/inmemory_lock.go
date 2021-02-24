@@ -28,11 +28,10 @@ func (l *InMemory) Lock() error {
 }
 
 func (l *InMemory) Release() error {
-	atomic.SwapUint32(&l.locked, 0)
-
 	// fake some latency
 	time.Sleep(100 * time.Millisecond)
 
+	atomic.SwapUint32(&l.locked, 0)
+
 	return nil
 }
-
