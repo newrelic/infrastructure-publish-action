@@ -4,8 +4,8 @@ inputs:
   aws_secret_access_key:
     description: AWS secret access key
     required: true
-  aws_access_key:
-    description: AWS access key
+  aws_access_key_id:
+    description: AWS access key id
     required: true
   aws_s3_bucket_name:
     description: Name of the S3 bucket
@@ -46,17 +46,14 @@ inputs:
   gpg_private_key_base64:
     description: Encoded gpg key
     required: true
-  gpg_key_name:
-    description: Name of gpg key
-    required: true
 runs:
   using: "composite"
   steps:
-    - run: $GITHUB_ACTION_PATH/action-run.sh
+    - run: ${{ github.action_path }}/action-run.sh
       shell: bash
       env:
         AWS_SECRET_ACCESS_KEY: ${{ inputs.aws_secret_access_key }}
-        AWS_ACCESS_KEY: ${{ inputs.aws_access_key }}
+        AWS_ACCESS_KEY_ID: ${{ inputs.aws_access_key_id }}
         AWS_S3_BUCKET_NAME: ${{ inputs.aws_s3_bucket_name }}
         GPG_PASSPHRASE: ${{ inputs.gpg_passphrase }}
         GPG_PRIVATE_KEY_BASE64: ${{ inputs.gpg_private_key_base64}}
@@ -66,4 +63,3 @@ runs:
         ENV: ${{ inputs.env }}
         SCHEMA: ${{ inputs.schema }}
         SCHEMA_URL: ${{ inputs.schema_url }}
-        GPG_KEY_NAME: ${{ inputs.gpg_key_name }}

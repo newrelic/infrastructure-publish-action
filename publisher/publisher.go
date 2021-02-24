@@ -69,7 +69,6 @@ type config struct {
 	aptlyFolder          string
 	uploadSchemaFilePath string
 	gpgPassphrase        string
-	gpgKeyName           string
 	gpgKeyRing           string
 	awsLockBucket        string
 	lockGroup            string
@@ -184,7 +183,6 @@ func loadConfig() config {
 		aptlyFolder:          aptlyF,
 		uploadSchemaFilePath: viper.GetString("upload_schema_file_path"),
 		gpgPassphrase:        viper.GetString("gpg_passphrase"),
-		gpgKeyName:           viper.GetString("gpg_key_name"),
 		gpgKeyRing:           viper.GetString("gpg_key_ring"),
 		lockGroup:            lockGroup,
 		awsLockBucket:        viper.GetString("aws_s3_lock_bucket_name"),
@@ -362,7 +360,7 @@ func uploadRpm(conf config, srcTemplate string, upload Upload, arch string) (err
 
 			l.Printf("[ ] Didn't fine repo for %s, run repo init command", repoPath)
 
-			if err := execLogOutput(l, "createrepo", repoPath); err != nil {
+			if err := execLogOutput(l, "createrepo", repoPath, "-o", os.TempDir(),); err != nil {
 				return err
 			}
 
@@ -371,11 +369,32 @@ func uploadRpm(conf config, srcTemplate string, upload Upload, arch string) (err
 			_ = os.Remove(signaturePath)
 		}
 
-		if err := execLogOutput(l, "createrepo", "--update", "-s", "sha", repoPath); err != nil {
+		// "cache" the repodata so it doesnt have to process all again
+		if err = execLogOutput(l, "cp", "-rf", repoPath+"/repodata/", os.TempDir()+"/repodata/"); err != nil {
+		    return err
+		}
+
+		if err = execLogOutput(l, "createrepo", "--update", "-s", "sha", repoPath, "-o", os.TempDir()); err != nil {
 			return err
 		}
 
-		_, err := os.Stat(repomd)
+		// remove the 'old' repodata
+		if err = execLogOutput(l, "rm", "-rf", repoPath+"/repodata/"); err != nil {
+		    return err
+		}
+		
+		// copy from temp repodata to repo repodata
+		if err = execLogOutput(l, "cp", "-rf", os.TempDir()+"/repodata/", repoPath); err != nil {
+			return err
+		}
+		
+		// remove temp repodata so the next repo doesn't get confused
+		if err = execLogOutput(l, "rm", "-rf", os.TempDir()+"/repodata/"); err != nil {
+		    return err
+		}
+
+		_, err = os.Stat(repomd)
+
 		if err != nil {
 			return fmt.Errorf("error while creating repository %s for source %s and destination %s", err.Error(), srcPath, destPath)
 		}
@@ -429,16 +448,20 @@ func uploadApt(conf config, srcTemplate string, upload Upload, arch string) (err
 		if err = execLogOutput(l, "aptly", "repo", "add", "-force-replace=true", osVersion, srcPath); err != nil {
 			return err
 		}
-		l.Printf("[✔] Added succecfully package into deb repo for %s/%s", osVersion, arch)
+		l.Printf("[✔] Added successfully package into deb repo for %s/%s", osVersion, arch)
 
 		l.Printf("[ ] Publish deb repo for %s/%s", osVersion, arch)
-		if err = execLogOutput(l, "aptly", "publish", "repo", "-keyring", conf.gpgKeyRing, "-gpg-key", conf.gpgKeyName, "-passphrase", conf.gpgPassphrase, "-batch", osVersion); err != nil {
+		if err = execLogOutput(l, "aptly", "publish", "repo", "-keyring", conf.gpgKeyRing, "-passphrase", conf.gpgPassphrase, "-batch", osVersion); err != nil {
 			return err
 		}
 		l.Printf("[✔] Published succesfully deb repo for %s/%s", osVersion, arch)
 
 		// Copying the binary
-		if err = copyFile(srcPath, filePath); err != nil {
+		//if err = copyFile(srcPath, filePath); err != nil {
+		//	return err
+		//}
+		// copy from temp repodata to repo repodata
+		if err = execLogOutput(l, "cp", "-f", srcPath, filePath); err != nil {
 			return err
 		}
 
@@ -463,7 +486,7 @@ func syncAPTMetadata(conf config, destPath string, osVersion string, arch string
 	if err = execLogOutput(l, "cp", "-rf", conf.aptlyFolder+"/public/"+aptDists+osVersion, destPath); err != nil {
 		return err
 	}
-	l.Printf("[✔] Sync local repo was succesfull for %s/%s into s3", osVersion, arch)
+	l.Printf("[✔] Sync local repo was successful for %s/%s into s3", osVersion, arch)
 
 	return err
 }
@@ -595,6 +618,7 @@ func copyFile(srcPath string, destPath string) (err error) {
 
 	// We do not want to override already pushed packages
 	if _, err = os.Stat(destPath); err == nil {
+		l.Println(fmt.Sprintf("Skipping copying file '%s': already exists at:  %s", srcPath, destPath))
 		return
 	}
 
