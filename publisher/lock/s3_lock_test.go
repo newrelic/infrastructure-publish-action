@@ -11,7 +11,7 @@ import (
 
 // AWS testing config
 const (
-	roleARN = "arn:aws:iam::017663287629:role/caos"
+	roleARN = "arn:aws:iam::017663287629:role/caos_testing"
 	bucket  = "onhost-ci-lock-testing"
 	region  = "us-east-1"
 )
