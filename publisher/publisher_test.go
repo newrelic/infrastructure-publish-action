@@ -250,8 +250,6 @@ func TestUploadArtifacts(t *testing.T) {
 }
 
 func TestUploadArtifacts_cantBeRunInParallel(t *testing.T) {
-	t.Skip("flaky on CI")
-
 	schema := []uploadArtifactSchema{
 		{"{app_name}-{arch}-{version}.txt", []string{"amd64"}, []Upload{
 			{
