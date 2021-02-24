@@ -30,6 +30,5 @@ docker run --rm \
         -e ENV \
         -e GPG_PRIVATE_KEY_BASE64 \
         -e GPG_PASSPHRASE \
-        -e GPG_KEY_NAME \
         -e GPG_KEY_RING=/home/gha/keyring.gpg \
         newrelic/infrastructure-publish-action
