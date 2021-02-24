@@ -1,11 +1,26 @@
 name: 'Publish to S3'
 description: 'Publish artifacts to S3 bucket'
 inputs:
+  disable_lock:
+    description: Disabled locking, for stuff that won't need one, like Windows MSIs.
+    required: false
+  run_id:
+    description: Action run identifier. To be provisioned from env-var `GITHUB_RUN_ID`.
+    required: false
+  aws_s3_lock_bucket_name:
+    description: Name of the S3 bucket for lockfiles
+    required: false
+  aws_region:
+    description: AWS region for the buckets.
+    required: false
+  aws_role_arn:
+    description: ARN for the IAM role to be used for fetching AWS STS credentials.
+    required: false
   aws_secret_access_key:
     description: AWS secret access key
     required: true
-  aws_access_key:
-    description: AWS access key
+  aws_access_key_id:
+    description: AWS access key id
     required: true
   aws_s3_bucket_name:
     description: Name of the S3 bucket
@@ -41,7 +56,7 @@ runs:
       shell: bash
       env:
         AWS_SECRET_ACCESS_KEY: ${{ inputs.aws_secret_access_key }}
-        AWS_ACCESS_KEY: ${{ inputs.aws_access_key }}
+        AWS_ACCESS_KEY_ID: ${{ inputs.aws_access_key_id }}
         AWS_S3_BUCKET_NAME: ${{ inputs.aws_s3_bucket_name }}
         GPG_PASSPHRASE: ${{ inputs.gpg_passphrase }}
         GPG_PRIVATE_KEY_BASE64: ${{ inputs.gpg_private_key_base64}}

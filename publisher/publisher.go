@@ -19,6 +19,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/newrelic/infrastructure-publish-action/publisher/lock"
 	"github.com/spf13/viper"
 	"gopkg.in/yaml.v2"
 )
@@ -45,6 +46,7 @@ const (
 	repodataRpmPath    = "/repodata/repomd.xml"
 	signatureRpmPath   = "/repodata/repomd.xml.asc"
 	defaultAptlyFolder = "/root/.aptly"
+	defaultLockgroup   = "lockgroup"
 	aptPoolMain        = "pool/main/"
 	aptDists           = "dists/"
 	commandTimeout     = time.Hour * 1
@@ -60,6 +62,7 @@ type config struct {
 	repoName             string
 	appName              string
 	tag                  string
+	runID                string
 	version              string
 	artifactsDestFolder  string
 	artifactsSrcFolder   string
@@ -67,6 +70,15 @@ type config struct {
 	uploadSchemaFilePath string
 	gpgPassphrase        string
 	gpgKeyRing           string
+	awsLockBucket        string
+	lockGroup            string
+	awsRegion            string
+	awsRoleARN           string
+	disableLock          bool
+}
+
+func (c *config) owner() string {
+	return fmt.Sprintf("%s_%s_%s", c.appName, c.tag, c.runID)
 }
 
 type uploadArtifactSchema struct {
@@ -86,7 +98,30 @@ type uploadArtifactsSchema []uploadArtifactSchema
 
 func main() {
 	conf := loadConfig()
-	l.Println(fmt.Sprintf("config: %v", conf))
+
+	var bucketLock lock.BucketLock
+	var err error
+	if conf.disableLock {
+		bucketLock, err = lock.NewNoop()
+	} else {
+		if conf.awsRegion == "" {
+			l.Fatal("missing 'aws_region' value")
+		}
+		if conf.awsLockBucket == "" {
+			l.Fatal("missing 'aws_s3_lock_bucket_name' value")
+		}
+		if conf.awsRoleARN == "" {
+			l.Fatal("missing 'aws_role_arn' value")
+		}
+		if conf.runID == "" {
+			l.Fatal("missing 'run_id' value")
+		}
+		bucketLock, err = lock.NewS3(conf.awsLockBucket, conf.awsRoleARN, conf.awsRegion, conf.lockGroup, conf.owner())
+	}
+	// fail fast when lacking required AWS credentials
+	if err != nil {
+		l.Fatal("cannot create lock: " + err.Error())
+	}
 
 	uploadSchemaContent, err := readFileContent(conf.uploadSchemaFilePath)
 	if err != nil {
@@ -99,19 +134,15 @@ func main() {
 	}
 
 	err = downloadArtifacts(conf, uploadSchema)
-
 	if err != nil {
 		l.Fatal(err)
 	}
-
 	l.Println("🎉 download phase complete")
 
-	err = uploadArtifacts(conf, uploadSchema)
-
+	err = uploadArtifacts(conf, uploadSchema, bucketLock)
 	if err != nil {
 		l.Fatal(err)
 	}
-
 	l.Println("🎉 upload phase complete")
 }
 
@@ -120,6 +151,7 @@ func loadConfig() config {
 	viper.BindEnv("repo_name")
 	viper.BindEnv("app_name")
 	viper.BindEnv("tag")
+	viper.BindEnv("run_id")
 	viper.BindEnv("artifacts_dest_folder")
 	viper.BindEnv("artifacts_src_folder")
 	viper.BindEnv("aptly_folder")
@@ -128,16 +160,28 @@ func loadConfig() config {
 	viper.BindEnv("gpg_passphrase")
 	viper.BindEnv("gpg_key_name")
 	viper.BindEnv("gpg_key_ring")
+	viper.BindEnv("aws_s3_bucket_name")
+	viper.BindEnv("aws_s3_lock_bucket_name")
+	viper.BindEnv("aws_role_arn")
+	viper.BindEnv("aws_region")
+	viper.BindEnv("disable_lock")
 
 	aptlyF := viper.GetString("aptly_folder")
 	if aptlyF == "" {
 		aptlyF = defaultAptlyFolder
 	}
+
+	lockGroup := viper.GetString("lock_group")
+	if lockGroup == "" {
+		lockGroup = defaultLockgroup
+	}
+
 	return config{
 		destPrefix:           viper.GetString("dest_prefix"),
 		repoName:             viper.GetString("repo_name"),
 		appName:              viper.GetString("app_name"),
 		tag:                  viper.GetString("tag"),
+		runID:                viper.GetString("run_id"),
 		version:              strings.Replace(viper.GetString("tag"), "v", "", -1),
 		artifactsDestFolder:  viper.GetString("artifacts_dest_folder"),
 		artifactsSrcFolder:   viper.GetString("artifacts_src_folder"),
@@ -145,6 +189,11 @@ func loadConfig() config {
 		uploadSchemaFilePath: viper.GetString("upload_schema_file_path"),
 		gpgPassphrase:        viper.GetString("gpg_passphrase"),
 		gpgKeyRing:           viper.GetString("gpg_key_ring"),
+		lockGroup:            lockGroup,
+		awsLockBucket:        viper.GetString("aws_s3_lock_bucket_name"),
+		awsRoleARN:           viper.GetString("aws_role_arn"),
+		awsRegion:            viper.GetString("aws_region"),
+		disableLock:          viper.GetBool("disable_lock"),
 	}
 }
 
@@ -164,7 +213,7 @@ func parseUploadSchema(fileContent []byte) (uploadArtifactsSchema, error) {
 		return nil, err
 	}
 
-	for i, _ := range schema {
+	for i := range schema {
 		if schema[i].Arch == nil {
 			schema[i].Arch = []string{""}
 		}
@@ -259,7 +308,20 @@ func uploadArtifact(conf config, schema uploadArtifactSchema, arch string, uploa
 	return nil
 }
 
-func uploadArtifacts(conf config, schema uploadArtifactsSchema) error {
+func uploadArtifacts(conf config, schema uploadArtifactsSchema, bucketLock lock.BucketLock) (err error) {
+	if err = bucketLock.Lock(); err != nil {
+		return
+	}
+	defer func() {
+		errRelease := bucketLock.Release()
+		if err == nil {
+			err = errRelease
+		} else {
+			err = fmt.Errorf("got 2 errors: uploading: \"%v\", releasing lock: \"%v\"", err, errRelease)
+		}
+		return
+	}()
+
 	for _, artifactSchema := range schema {
 		for _, arch := range artifactSchema.Arch {
 			for _, upload := range artifactSchema.Uploads {
@@ -304,7 +366,7 @@ func uploadRpm(conf config, srcTemplate string, upload Upload, arch string) (err
 
 			l.Printf("[ ] Didn't fine repo for %s, run repo init command", repoPath)
 
-			if err := execLogOutput(l, "createrepo", repoPath, "-o", os.TempDir(),); err != nil {
+			if err := execLogOutput(l, "createrepo", repoPath, "-o", os.TempDir()); err != nil {
 				return err
 			}
 
@@ -315,7 +377,7 @@ func uploadRpm(conf config, srcTemplate string, upload Upload, arch string) (err
 
 		// "cache" the repodata so it doesnt have to process all again
 		if err = execLogOutput(l, "cp", "-rf", repoPath+"/repodata/", os.TempDir()+"/repodata/"); err != nil {
-		    return err
+			return err
 		}
 
 		if err = execLogOutput(l, "createrepo", "--update", "-s", "sha", repoPath, "-o", os.TempDir()); err != nil {
@@ -324,17 +386,17 @@ func uploadRpm(conf config, srcTemplate string, upload Upload, arch string) (err
 
 		// remove the 'old' repodata
 		if err = execLogOutput(l, "rm", "-rf", repoPath+"/repodata/"); err != nil {
-		    return err
+			return err
 		}
-		
+
 		// copy from temp repodata to repo repodata
 		if err = execLogOutput(l, "cp", "-rf", os.TempDir()+"/repodata/", repoPath); err != nil {
 			return err
 		}
-		
+
 		// remove temp repodata so the next repo doesn't get confused
 		if err = execLogOutput(l, "rm", "-rf", os.TempDir()+"/repodata/"); err != nil {
-		    return err
+			return err
 		}
 
 		_, err = os.Stat(repomd)
