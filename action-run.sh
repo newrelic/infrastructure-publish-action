@@ -12,12 +12,17 @@ docker run --rm \
         --security-opt apparmor:unconfined \
         --device /dev/fuse \
         --cap-add SYS_ADMIN \
-        -e AWS_SECRET_ACCESS_KEY \
+        -e AWS_REGION \
         -e AWS_ACCESS_KEY_ID \
+        -e AWS_SECRET_ACCESS_KEY \
+        -e AWS_ROLE_SESSION_NAME \
+        -e AWS_ROLE_ARN \
         -e AWS_S3_BUCKET_NAME \
+        -e AWS_S3_LOCK_BUCKET_NAME \
         -e REPO_NAME \
         -e APP_NAME \
         -e TAG \
+        -e RUN_ID \
         -e ARTIFACTS_DEST_FOLDER=/mnt/s3 \
         -e ARTIFACTS_SRC_FOLDER=/home/gha/assets \
         -e SCHEMA \
