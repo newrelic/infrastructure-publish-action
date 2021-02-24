@@ -1,6 +1,21 @@
 name: 'Publish to S3'
 description: 'Publish artifacts to S3 bucket'
 inputs:
+  disable_lock:
+    description: Disabled locking, for stuff that won't need one, like Windows MSIs.
+    required: false
+  run_id:
+    description: Action run identifier. To be provisioned from env-var `GITHUB_RUN_ID`.
+    required: false
+  aws_s3_lock_bucket_name:
+    description: Name of the S3 bucket for lockfiles
+    required: false
+  aws_region:
+    description: AWS region for the buckets.
+    required: false
+  aws_role_arn:
+    description: ARN for the IAM role to be used for fetching AWS STS credentials.
+    required: false
   aws_secret_access_key:
     description: AWS secret access key
     required: true
@@ -10,15 +25,6 @@ inputs:
   aws_s3_bucket_name:
     description: Name of the S3 bucket
     required: true
-  aws_s3_lock_bucket_name:
-    description: Name of the S3 bucket for lockfiles
-    required: true
-  aws_role_arn:
-    description: ARN for the IAM role to be used for fetching AWS STS credentials.
-    required: true
-  aws_region:
-    description: AWS region for the buckets.
-    required: true
   repo_name:
     description: Combination of organization and repository (i.e. newrelic/nri-redis)
     required: true
@@ -27,9 +33,6 @@ inputs:
     required: true
   tag:
     description: Tag pointing to the release
-    required: true
-  run_id:
-    description: Action run identifier. To be provisioned from env-var `GITHUB_RUN_ID`.
     required: true
   schema:
     description: Name of the schema describing the packages to be published (i.e. infra-agent, ohi, nrjmx, custom - requires schemaUrl)
