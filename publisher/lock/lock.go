@@ -14,3 +14,13 @@ type BucketLock interface {
 	// Release tries releasing an owned lock or fails.
 	Release() error
 }
+
+type noop struct{}
+
+// Noop returns a NO-OP lock, to be used when releasing stuff that won't need locking.
+func NewNoop() (BucketLock, error) {
+	return &noop{}, nil
+}
+
+func (l *noop) Lock() error    { return nil }
+func (l *noop) Release() error { return nil }

@@ -74,6 +74,7 @@ type config struct {
 	lockGroup            string
 	awsRegion            string
 	awsRoleARN           string
+	disableLock          bool
 }
 
 func (c *config) owner() string {
@@ -97,24 +98,27 @@ type uploadArtifactsSchema []uploadArtifactSchema
 
 func main() {
 	conf := loadConfig()
-	l.Println(fmt.Sprintf("config: %v", conf))
 
-	// config validation
-	if conf.awsLockBucket == "" {
-		l.Fatal("missing 'aws_s3_lock_bucket_name' value")
+	var bucketLock lock.BucketLock
+	var err error
+	if conf.disableLock {
+		bucketLock, err = lock.NewNoop()
+	} else {
+		if conf.awsRegion == "" {
+			l.Fatal("missing 'aws_region' value")
+		}
+		if conf.awsLockBucket == "" {
+			l.Fatal("missing 'aws_s3_lock_bucket_name' value")
+		}
+		if conf.awsRoleARN == "" {
+			l.Fatal("missing 'aws_role_arn' value")
+		}
+		if conf.runID == "" {
+			l.Fatal("missing 'run_id' value")
+		}
+		bucketLock, err = lock.NewS3(conf.awsLockBucket, conf.awsRoleARN, conf.awsRegion, conf.lockGroup, conf.owner())
 	}
-	if conf.awsRoleARN == "" {
-		l.Fatal("missing 'aws_role_arn' value")
-	}
-	if conf.awsRegion == "" {
-		l.Fatal("missing 'aws_region' value")
-	}
-	if conf.runID == "" {
-		l.Fatal("missing 'run_id' value")
-	}
-
 	// fail fast when lacking required AWS credentials
-	bucketLock, err := lock.NewS3(conf.awsLockBucket, conf.awsRoleARN, conf.awsRegion, conf.lockGroup, conf.owner())
 	if err != nil {
 		l.Fatal("cannot create lock: " + err.Error())
 	}
@@ -160,6 +164,7 @@ func loadConfig() config {
 	viper.BindEnv("aws_s3_lock_bucket_name")
 	viper.BindEnv("aws_role_arn")
 	viper.BindEnv("aws_region")
+	viper.BindEnv("disable_lock")
 
 	aptlyF := viper.GetString("aptly_folder")
 	if aptlyF == "" {
@@ -188,6 +193,7 @@ func loadConfig() config {
 		awsLockBucket:        viper.GetString("aws_s3_lock_bucket_name"),
 		awsRoleARN:           viper.GetString("aws_role_arn"),
 		awsRegion:            viper.GetString("aws_region"),
+		disableLock:          viper.GetBool("disable_lock"),
 	}
 }
 
@@ -360,7 +366,7 @@ func uploadRpm(conf config, srcTemplate string, upload Upload, arch string) (err
 
 			l.Printf("[ ] Didn't fine repo for %s, run repo init command", repoPath)
 
-			if err := execLogOutput(l, "createrepo", repoPath, "-o", os.TempDir(),); err != nil {
+			if err := execLogOutput(l, "createrepo", repoPath, "-o", os.TempDir()); err != nil {
 				return err
 			}
 
@@ -371,7 +377,7 @@ func uploadRpm(conf config, srcTemplate string, upload Upload, arch string) (err
 
 		// "cache" the repodata so it doesnt have to process all again
 		if err = execLogOutput(l, "cp", "-rf", repoPath+"/repodata/", os.TempDir()+"/repodata/"); err != nil {
-		    return err
+			return err
 		}
 
 		if err = execLogOutput(l, "createrepo", "--update", "-s", "sha", repoPath, "-o", os.TempDir()); err != nil {
@@ -380,17 +386,17 @@ func uploadRpm(conf config, srcTemplate string, upload Upload, arch string) (err
 
 		// remove the 'old' repodata
 		if err = execLogOutput(l, "rm", "-rf", repoPath+"/repodata/"); err != nil {
-		    return err
+			return err
 		}
-		
+
 		// copy from temp repodata to repo repodata
 		if err = execLogOutput(l, "cp", "-rf", os.TempDir()+"/repodata/", repoPath); err != nil {
 			return err
 		}
-		
+
 		// remove temp repodata so the next repo doesn't get confused
 		if err = execLogOutput(l, "rm", "-rf", os.TempDir()+"/repodata/"); err != nil {
-		    return err
+			return err
 		}
 
 		_, err = os.Stat(repomd)
