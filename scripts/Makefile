@@ -25,9 +25,6 @@ endif
 ifndef AWS_ROLE_ARN
 	$(error AWS_ROLE_ARN is undefined)
 endif
-ifndef AWS_ROLE_SESSION_NAME
-	$(error AWS_ROLE_SESSION_NAME is undefined)
-endif
 ifndef ARTIFACTS_DEST_FOLDER
 	$(error ARTIFACTS_DEST_FOLDER is undefined)
 endif
