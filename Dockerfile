@@ -12,7 +12,7 @@ RUN apt-get update && apt-get install -y \
     gnupg2 \
     bzip2 \
     createrepo \
-    s3fs
+    unzip
 
 # Sadly installing aptly with apt lead you to a old version not supporting gpg2
 WORKDIR /tmp
@@ -23,6 +23,10 @@ RUN mv ./aptly_1.4.0_linux_amd64/aptly /usr/bin/aptly
 
 RUN wget https://github.com/kahing/goofys/releases/download/v0.24.0/goofys -O /usr/bin/goofys
 RUN chmod +x /usr/bin/goofys
+
+RUN curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+RUN unzip awscliv2.zip
+RUN ./aws/install
 
 # Prepare action
 WORKDIR /home/gha/publisher
