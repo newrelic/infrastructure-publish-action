@@ -66,4 +66,8 @@ runs:
         ENV: ${{ inputs.env }}
         SCHEMA: ${{ inputs.schema }}
         SCHEMA_URL: ${{ inputs.schema_url }}
+        RUN_ID: ${{ inputs.run_id }}
+        AWS_S3_LOCK_BUCKET_NAME: ${{ inputs.aws_s3_lock_bucket_name }}
+        AWS_REGION: ${{ inputs.aws_region }}
+        AWS_ROLE_ARN: ${{ inputs.aws_role_arn }}
         DISABLE_LOCK: ${{ inputs.disable_lock }}
