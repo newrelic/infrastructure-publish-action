@@ -19,11 +19,11 @@ docker run --rm \
         -e AWS_ROLE_ARN \
         -e AWS_S3_BUCKET_NAME \
         -e AWS_S3_LOCK_BUCKET_NAME \
+        -e AWS_S3_MOUNT_DIRECTORY \
         -e REPO_NAME \
         -e APP_NAME \
         -e TAG \
         -e RUN_ID \
-        -e ARTIFACTS_DEST_FOLDER=/mnt/s3 \
         -e ARTIFACTS_SRC_FOLDER=/home/gha/assets \
         -e SCHEMA \
         -e SCHEMA_URL \
