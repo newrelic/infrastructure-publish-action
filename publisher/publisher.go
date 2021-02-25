@@ -158,7 +158,6 @@ func loadConfig() config {
 	viper.BindEnv("upload_schema_file_path")
 	viper.BindEnv("dest_prefix")
 	viper.BindEnv("gpg_passphrase")
-	viper.BindEnv("gpg_key_name")
 	viper.BindEnv("gpg_key_ring")
 	viper.BindEnv("aws_s3_bucket_name")
 	viper.BindEnv("aws_s3_lock_bucket_name")

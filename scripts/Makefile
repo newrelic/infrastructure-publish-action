@@ -13,9 +13,6 @@ endif
 ifndef GPG_PASSPHRASE
 	$(error GPG_PASSPHRASE is undefined)
 endif
-ifndef GPG_KEY_NAME
-	$(error GPG_KEY_NAME is undefined)
-endif
 ifndef AWS_SECRET_ACCESS_KEY
 	$(error AWS_SECRET_ACCESS_KEY is undefined)
 endif
