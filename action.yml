@@ -55,6 +55,7 @@ runs:
     - run: ${{ github.action_path }}/action-run.sh
       shell: bash
       env:
+        AWS_ROLE_ARN: ${{ inputs.aws_role_arn }}
         AWS_SECRET_ACCESS_KEY: ${{ inputs.aws_secret_access_key }}
         AWS_ACCESS_KEY_ID: ${{ inputs.aws_access_key_id }}
         AWS_S3_BUCKET_NAME: ${{ inputs.aws_s3_bucket_name }}
