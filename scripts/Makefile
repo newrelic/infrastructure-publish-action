@@ -3,6 +3,7 @@ WORKDIR := /home/gha
 
 default: check-env prepare-schema dest-prefix mount-s3 mount-s3-check prepare-schema import-GPG-key publish-artifacts unmount-s3
 
+
 check-env:
 ifndef GPG_PRIVATE_KEY_BASE64
 	$(error GPG_PRIVATE_KEY_BASE64 is undefined)
@@ -27,6 +28,9 @@ ifndef AWS_ROLE_ARN
 endif
 ifndef ARTIFACTS_DEST_FOLDER
 	$(error ARTIFACTS_DEST_FOLDER is undefined)
+endif
+ifndef AWS_S3_MOUNT_DIRECTORY
+	$(error AWS_S3_MOUNT_DIRECTORY is undefined)
 endif
 
 prepare-schema: check-env
