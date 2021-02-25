@@ -4,6 +4,7 @@ inputs:
   disable_lock:
     description: Disabled locking, for stuff that won't need one, like Windows MSIs.
     required: false
+    default: "false"
   run_id:
     description: Action run identifier. To be provisioned from env-var `GITHUB_RUN_ID`.
     required: false
@@ -50,25 +51,23 @@ inputs:
     description: Encoded gpg key
     required: true
 runs:
-  using: "composite"
-  steps:
-    - run: ${{ github.action_path }}/action-run.sh
-      shell: bash
-      env:
-        AWS_ROLE_ARN: ${{ inputs.aws_role_arn }}
-        AWS_SECRET_ACCESS_KEY: ${{ inputs.aws_secret_access_key }}
-        AWS_ACCESS_KEY_ID: ${{ inputs.aws_access_key_id }}
-        AWS_S3_BUCKET_NAME: ${{ inputs.aws_s3_bucket_name }}
-        GPG_PASSPHRASE: ${{ inputs.gpg_passphrase }}
-        GPG_PRIVATE_KEY_BASE64: ${{ inputs.gpg_private_key_base64}}
-        REPO_NAME: ${{ inputs.repo_name }}
-        APP_NAME: ${{ inputs.app_name }}
-        TAG: ${{ inputs.tag }}
-        ENV: ${{ inputs.env }}
-        SCHEMA: ${{ inputs.schema }}
-        SCHEMA_URL: ${{ inputs.schema_url }}
-        RUN_ID: ${{ inputs.run_id }}
-        AWS_S3_LOCK_BUCKET_NAME: ${{ inputs.aws_s3_lock_bucket_name }}
-        AWS_REGION: ${{ inputs.aws_region }}
-        AWS_ROLE_ARN: ${{ inputs.aws_role_arn }}
-        DISABLE_LOCK: ${{ inputs.disable_lock }}
+  using: "docker"
+  image: "Dockerfile"
+  args:
+    - "${{ inputs.disable_lock }}"
+    - "${{ inputs.run_id }}"
+    - "${{ inputs.aws_s3_lock_bucket_name }}"
+    - "${{ inputs.aws_region }}"
+    - "${{ inputs.aws_role_arn }}"
+    - "${{ inputs.aws_secret_access_key }}"
+    - "${{ inputs.aws_access_key_id }}"
+    - "${{ inputs.aws_s3_bucket_name }}"
+    - "${{ inputs.repo_name }}"
+    - "${{ inputs.app_name }}"
+    - "${{ inputs.tag }}"
+    - "${{ inputs.schema }}"
+    - "${{ inputs.schema_url }}"
+    - "${{ inputs.env }}"
+    - "${{ inputs.gpg_passphrase }}"
+    - "${{ inputs.gpg_private_key_base64}}"
+

@@ -35,5 +35,9 @@ ADD schemas ./schemas
 ADD scripts/Makefile .
 RUN mkdir ./assets
 
+COPY action-run.sh /action-run.sh
+RUN chmod +x /action-run.sh
+
 # Run action
-CMD ["make", "--jobs=1"]
+#CMD ["make", "--jobs=1"]
+ENTRYPOINT [ "/action-run.sh" ]
