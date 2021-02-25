@@ -1,5 +1,4 @@
 SHELL := /bin/bash
-WORKDIR := /home/gha
 
 default: check-env prepare-schema dest-prefix mount-s3 mount-s3-check prepare-schema import-GPG-key publish-artifacts unmount-s3
 
