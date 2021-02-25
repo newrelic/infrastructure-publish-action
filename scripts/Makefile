@@ -77,7 +77,7 @@ mount-s3-check: mount-s3
 publish-artifacts: import-GPG-key mount-s3-check
 	@echo "Publish artifacts"
 	# AWS_ACCESS_KEY_ID is required for goofys.
-	@UPLOAD_SCHEMA_FILE_PATH=$(UPLOAD_SCHEMA_FILE_PATH) DEST_PREFIX=$(DEST_PREFIX) AWS_ACCESS_KEY_ID=$(AWS_ACCESS_KEY_ID) /bin/publisher
+	@UPLOAD_SCHEMA_FILE_PATH=$(UPLOAD_SCHEMA_FILE_PATH) DEST_PREFIX=$(DEST_PREFIX) /bin/publisher
 
 unmount-s3: publish-artifacts
 	@echo "Unmounting S3"
