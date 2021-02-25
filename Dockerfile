@@ -35,7 +35,5 @@ ADD schemas ./schemas
 ADD scripts/Makefile .
 RUN mkdir ./assets
 
-ENV AWS_S3_MOUNT_DIRECTORY $AWS_S3_MOUNT_DIRECTORY
-
 # Run action
 CMD ["make", "--jobs=1"]
