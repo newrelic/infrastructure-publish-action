@@ -21,7 +21,7 @@ docker run --rm \
         -e AWS_S3_LOCK_BUCKET_NAME \
         -e AWS_S3_MOUNT_DIRECTORY=/mnt/s3 \
         -e ARTIFACTS_SRC_FOLDER=/home/gha/assets \
-        -e ARTIFACTS_DEST_FOLDER=$AWS_S3_MOUNT_DIRECTORY
+        -e ARTIFACTS_DEST_FOLDER=/mnt/s3 \
         -e REPO_NAME \
         -e APP_NAME \
         -e TAG \
