@@ -15,7 +15,7 @@ inputs:
     required: false
   aws_role_arn:
     description: ARN for the IAM role to be used for fetching AWS STS credentials.
-    required: false
+    required: true
   aws_secret_access_key:
     description: AWS secret access key
     required: true
