@@ -5,7 +5,7 @@ set -e
 # Ex: aws_region -> INPUT_AWS_REGION
 
 # declare non-configurable env vars
-WORKDIR := /home/gha
+WORKDIR=/home/gha
 AWS_S3_MOUNT_DIRECTORY=/mnt/s3
 ARTIFACTS_SRC_FOLDER=$WORKDIR/assets
 ARTIFACTS_DEST_FOLDER=$AWS_S3_MOUNT_DIRECTORY
