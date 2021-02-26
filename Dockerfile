@@ -12,7 +12,8 @@ RUN apt-get update && apt-get install -y \
     gnupg2 \
     bzip2 \
     createrepo \
-    unzip
+    unzip \
+    jq
 
 # Sadly installing aptly with apt lead you to a old version not supporting gpg2
 WORKDIR /tmp
