@@ -61,7 +61,7 @@ endif
 
 mount-s3:
 	@echo "Assuming IAM role for service account..."
-	@source <(AWS_PAGER="" aws sts assume-role --output json --role-arn $(AWS_ROLE_ARN) --role-session-name $(AWS_ROLE_SESSION_NAME)  | jq -r  '.Credentials | @sh "export AWS_SESSION_TOKEN=\(.SessionToken)\nexport AWS_ACCESS_KEY_ID=\(.AccessKeyId)\nexport AWS_SECRET_ACCESS_KEY=\(.SecretAccessKey) "')
+	@source <(AWS_PAGER="" aws sts assume-role --output json --role-arn "$AWS_ROLE_ARN" --role-session-name "$AWS_ROLE_SESSION_NAME"  | jq -r  '.Credentials | @sh "export AWS_SESSION_TOKEN=\(.SessionToken)\nexport AWS_ACCESS_KEY_ID=\(.AccessKeyId)\nexport AWS_SECRET_ACCESS_KEY=\(.SecretAccessKey) "')
 	#$(eval creds := $(shell AWS_PAGER="" aws sts assume-role \
 	#		--output text \
 	#		--role-arn $(AWS_ROLE_ARN) \
