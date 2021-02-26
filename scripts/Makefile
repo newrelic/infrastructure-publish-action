@@ -22,6 +22,9 @@ endif
 ifndef AWS_S3_BUCKET_NAME
 	$(error AWS_S3_BUCKET_NAME is undefined)
 endif
+ifndef AWS_REGION
+	$(error AWS_REGION is undefined)
+endif
 ifndef AWS_ROLE_ARN
 	$(error AWS_ROLE_ARN is undefined)
 endif
@@ -64,6 +67,7 @@ mount-s3:
 			--role-session-name $(AWS_ROLE_SESSION_NAME) \
 		| tail -1 \
 		| awk ' { print "AWS_PAGER=\"\" " \
+						"AWS_REGION=\"" $(AWS_REGION) "\" \
 						"AWS_ACCESS_KEY_ID=\"" $$2 "\" " \
 						"AWS_SECRET_ACCESS_KEY=\"" $$4 "\" " \
 						"AWS_SESSION_TOKEN=\"" $$5 "\" "}'))
