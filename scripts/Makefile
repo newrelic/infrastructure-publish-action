@@ -61,21 +61,21 @@ endif
 
 mount-s3:
 	@echo "Assuming IAM role for service account..."
-	$(eval creds := $(shell AWS_PAGER="" aws sts assume-role \
-			--output text \
-			--role-arn $(AWS_ROLE_ARN) \
-			--role-session-name $(AWS_ROLE_SESSION_NAME) \
-		| tail -1 \
-		| awk ' { print "AWS_PAGER=\"\" " \
-						"AWS_REGION=\"" $(AWS_REGION) "\" \
-						"AWS_ACCESS_KEY_ID=\"" $$2 "\" " \
-						"AWS_SECRET_ACCESS_KEY=\"" $$4 "\" " \
-						"AWS_SESSION_TOKEN=\"" $$5 "\" "}'))
+	@source <(AWS_PAGER="" aws sts assume-role --output json --role-arn $(AWS_ROLE_ARN) --role-session-name $(AWS_ROLE_SESSION_NAME)  | jq -r  '.Credentials | @sh "export AWS_SESSION_TOKEN=\(.SessionToken)\nexport AWS_ACCESS_KEY_ID=\(.AccessKeyId)\nexport AWS_SECRET_ACCESS_KEY=\(.SecretAccessKey) "')
+	#$(eval creds := $(shell AWS_PAGER="" aws sts assume-role \
+	#		--output text \
+	#		--role-arn $(AWS_ROLE_ARN) \
+	#		--role-session-name $(AWS_ROLE_SESSION_NAME) \
+	#	| tail -1 \
+	#	| awk ' { print "AWS_PAGER=\"\" " \
+	#					"AWS_REGION=\"" $(AWS_REGION) "\" \
+	#					"AWS_ACCESS_KEY_ID=\"" $$2 "\" " \
+	#					"AWS_SECRET_ACCESS_KEY=\"" $$4 "\" " \
+	#					"AWS_SESSION_TOKEN=\"" $$5 "\" "}'))
 	@echo "Debug region: $(AWS_REGION)"
 	@echo "Debug id: $(AWS_ACCESS_KEY_ID)"
-	@echo "Debug creds: $(creds)"
 	@echo "Mounting S3 bucket $(AWS_S3_BUCKET_NAME) into $(AWS_S3_MOUNT_DIRECTORY)..."
-	$(creds) goofys $(AWS_S3_BUCKET_NAME) $(AWS_S3_MOUNT_DIRECTORY)
+	goofys $(AWS_S3_BUCKET_NAME) $(AWS_S3_MOUNT_DIRECTORY)
 
 mount-s3-check: mount-s3
 	@echo "Confirm s3 mount..."
