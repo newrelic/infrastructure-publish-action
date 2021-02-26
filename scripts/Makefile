@@ -59,7 +59,7 @@ endif
 mount-s3:
 	@echo "Mounting S3 bucket $(AWS_S3_BUCKET_NAME) into $(AWS_S3_MOUNT_DIRECTORY)"
 	@echo "Assuming IAM role for service account..."
-	$(eval creds := $(shell aws sts assume-role \
+	$(eval creds := $(shell AWS_PAGER="" aws sts assume-role \
 			--output text \
 			--role-arn $(AWS_ROLE_ARN) \
 			--role-session-name $(AWS_ROLE_SESSION_NAME) \
