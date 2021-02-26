@@ -30,7 +30,7 @@ ifndef ARTIFACTS_DEST_FOLDER
 endif
 
 prepare-schema: check-env
-	@echo "prepare schema file for: $(SCHEMA)"
+	@echo "Prepare schema file for: $(SCHEMA)"
 ifeq ($(SCHEMA), ohi)
 	$(eval UPLOAD_SCHEMA_FILE_PATH := "$(WORKDIR)/schemas/ohi.yml")
 endif
@@ -43,12 +43,12 @@ endif
 ifeq ($(SCHEMA), custom)
 	$(eval UPLOAD_SCHEMA_FILE_PATH := "$(WORKDIR)/schemas/custom.yml")
 	@wget "$(SCHEMA_URL)" -O  $(UPLOAD_SCHEMA_FILE_PATH)
-	@echo "Print downloaded schema:"
+	@echo "Downloaded schema:"
 	@cat ${UPLOAD_SCHEMA_FILE_PATH}
 endif
 
 dest-prefix: prepare-schema
-	@echo "prepare destination prefix"
+	@echo "Prepare destination prefix..."
 ifeq ($(ENV), pre-release)
 	$(eval DEST_PREFIX := "infrastructure_agent/test/")
 endif
@@ -76,11 +76,10 @@ mount-s3-check: mount-s3
 
 publish-artifacts: import-GPG-key mount-s3-check
 	@echo "Publish artifacts"
-	# AWS_ACCESS_KEY_ID is required for goofys.
-	@UPLOAD_SCHEMA_FILE_PATH=$(UPLOAD_SCHEMA_FILE_PATH) DEST_PREFIX=$(DEST_PREFIX) AWS_ACCESS_KEY_ID=$(AWS_ACCESS_KEY_ID) /bin/publisher
+	@UPLOAD_SCHEMA_FILE_PATH=$(UPLOAD_SCHEMA_FILE_PATH) DEST_PREFIX=$(DEST_PREFIX) /bin/publisher
 
 unmount-s3: publish-artifacts
-	@echo "Unmounting S3"
+	@echo "Unmounting S3..."
 	@umount $(AWS_S3_MOUNT_DIRECTORY)
 
 import-GPG-key:
