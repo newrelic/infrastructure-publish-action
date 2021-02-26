@@ -73,7 +73,7 @@ mount-s3:
 						"AWS_SESSION_TOKEN=\"" $$5 "\" "}'))
 	@echo "Debug region: $(AWS_REGION)"
 	@echo "Debug id: $(AWS_ACCESS_KEY_ID)"
-	@echo "Debug creds: $(creds)
+	@echo "Debug creds: $(creds)"
 	@echo "Mounting S3 bucket $(AWS_S3_BUCKET_NAME) into $(AWS_S3_MOUNT_DIRECTORY)..."
 	$(creds) goofys $(AWS_S3_BUCKET_NAME) $(AWS_S3_MOUNT_DIRECTORY)
 
