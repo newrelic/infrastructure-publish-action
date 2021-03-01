@@ -631,7 +631,7 @@ func copyFile(srcPath string, destPath string, overwrite bool) (err error) {
 	
 	l.Println("[ ] Copy " + srcPath + " into " + destPath)
 	
-	if err = execLogOutput(l, "cp", "-f", srcPath, filePath); err != nil {
+	if err = execLogOutput(l, "cp", "-f", srcPath, destPath); err != nil {
 		return err
 	}
 
