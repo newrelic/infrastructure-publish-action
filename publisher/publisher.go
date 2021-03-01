@@ -356,7 +356,7 @@ func uploadRpm(conf config, srcTemplate string, upload Upload, arch string) (err
 		repomd := path.Join(repoPath, repodataRpmPath)
 		signaturePath := path.Join(repoPath, signatureRpmPath)
 
-		err = copyFile(srcPath, filePath)
+		err = copyFile(srcPath, filePath, false)
 		if err != nil {
 			return err
 		}
@@ -461,13 +461,12 @@ func uploadApt(conf config, srcTemplate string, upload Upload, arch string) (err
 		}
 		l.Printf("[✔] Published succesfully deb repo for %s/%s", osVersion, arch)
 
-		// make sure the destination folder exists (it should, but new repos might not)
-		ensurePath(filePath)
 		// copy debian package to destination repo folder
-		if err = execLogOutput(l, "cp", "-f", srcPath, filePath); err != nil {
+		err = copyFile(srcPath, filePath, true)
+		if err != nil {
 			return err
 		}
-
+		
 		if err = syncAPTMetadata(conf, destPath, osVersion, arch); err != nil {
 			return err
 		}
@@ -609,7 +608,7 @@ func uploadFileArtifact(conf config, schema uploadArtifactSchema, upload Upload,
 	srcPath = path.Join(conf.artifactsSrcFolder, srcPath)
 	destPath = path.Join(conf.artifactsDestFolder, destPath)
 
-	err = copyFile(srcPath, destPath)
+	err = copyFile(srcPath, destPath, false)
 	if err != nil {
 		return err
 	}
@@ -617,32 +616,22 @@ func uploadFileArtifact(conf config, schema uploadArtifactSchema, upload Upload,
 	return nil
 }
 
-func copyFile(srcPath string, destPath string) (err error) {
+func copyFile(srcPath string, destPath string, overwrite bool) (err error) {
 
 	// We do not want to override already pushed packages
-	if _, err = os.Stat(destPath); err == nil {
+	
+	if _, err = os.Stat(destPath); err == nil && overwrite == false {
 		l.Println(fmt.Sprintf("Skipping copying file '%s': already exists at:  %s", srcPath, destPath))
 		return
 	}
 
-	destDirectory := filepath.Dir(destPath)
-
-	if _, err = os.Stat(destDirectory); os.IsNotExist(err) {
-		// set right permissions
-		err = os.MkdirAll(destDirectory, 0744)
-		if err != nil {
-			return err
-		}
-	}
-
-	l.Println("[ ] Copy " + srcPath + " into " + destPath)
-	input, err := ioutil.ReadFile(srcPath)
-	if err != nil {
+	if err = ensurePath(destPath); err != nil {
 		return err
 	}
-
-	err = ioutil.WriteFile(destPath, input, 0744)
-	if err != nil {
+	
+	l.Println("[ ] Copy " + srcPath + " into " + destPath)
+	
+	if err = execLogOutput(l, "cp", "-f", srcPath, filePath); err != nil {
 		return err
 	}
 
@@ -653,6 +642,11 @@ func copyFile(srcPath string, destPath string) (err error) {
 func ensurePath(path string) error {
 	dir, _ := filepath.Split(path)
 	if dir != "" {
+		// is dir and dir already exists, skip creating it
+		if _, err := os.Stat(dir); os.IsNotExist(err) {
+			return nil
+		}
+
 		if err := execLogOutput(l, "mkdir", "-p", dir); err != nil {
 			return err
 		}
