@@ -363,7 +363,7 @@ func uploadRpm(conf config, srcTemplate string, upload Upload, arch string) (err
 
 		if _, err = os.Stat(repomd); os.IsNotExist(err) {
 
-			l.Printf("[ ] Didn't fine repo for %s, run repo init command", repoPath)
+			l.Printf("[ ] Didn't find repo for %s, run repo init command", repoPath)
 
 			if err := execLogOutput(l, "createrepo", repoPath, "-o", os.TempDir()); err != nil {
 				return err
@@ -461,11 +461,9 @@ func uploadApt(conf config, srcTemplate string, upload Upload, arch string) (err
 		}
 		l.Printf("[✔] Published succesfully deb repo for %s/%s", osVersion, arch)
 
-		// Copying the binary
-		//if err = copyFile(srcPath, filePath); err != nil {
-		//	return err
-		//}
-		// copy from temp repodata to repo repodata
+		// make sure the destination folder exists (it should, but new repos might not)
+		ensurePath(filePath)
+		// copy debian package to destination repo folder
 		if err = execLogOutput(l, "cp", "-f", srcPath, filePath); err != nil {
 			return err
 		}
@@ -650,6 +648,15 @@ func copyFile(srcPath string, destPath string) (err error) {
 
 	l.Println("[✔] Copy " + srcPath + " into " + destPath)
 	return nil
+}
+
+func ensurePath(path string) error {
+	dir, file := filepath.Split(path)
+	if dir != "" {
+		if err = execLogOutput(l, "mkdir", "-p", dir); err != nil {
+			return err
+		}
+	}
 }
 
 func replacePlaceholders(template, repoName, appName, arch, tag, version, destPrefix, osVersion string) (str string) {
