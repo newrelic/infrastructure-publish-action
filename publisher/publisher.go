@@ -643,7 +643,7 @@ func ensurePath(path string) error {
 	dir, _ := filepath.Split(path)
 	if dir != "" {
 		// is dir and dir already exists, skip creating it
-		if _, err := os.Stat(dir); os.IsNotExist(err) {
+		if _, err := os.Stat(dir); !os.IsNotExist(err) {
 			return nil
 		}
 
