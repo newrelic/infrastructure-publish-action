@@ -374,9 +374,11 @@ func uploadRpm(conf config, srcTemplate string, upload Upload, arch string) (err
 			_ = os.Remove(signaturePath)
 		}
 
-		// "cache" the repodata so it doesnt have to process all again
-		if err = execLogOutput(l, "cp", "-rf", repoPath+"/repodata/", os.TempDir()+"/repodata/"); err != nil {
-			return err
+		// if repodata exists, "cache" it so it doesnt have to process all again
+		if _, err = os.Stat(repoPath+"/repodata/"); err == nil {
+			if err = execLogOutput(l, "cp", "-rf", repoPath+"/repodata/", os.TempDir()+"/repodata/"); err != nil {
+				return err
+			}
 		}
 
 		if err = execLogOutput(l, "createrepo", "--update", "-s", "sha", repoPath, "-o", os.TempDir()); err != nil {
