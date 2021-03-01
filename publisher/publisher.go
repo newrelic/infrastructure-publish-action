@@ -356,7 +356,7 @@ func uploadRpm(conf config, srcTemplate string, upload Upload, arch string) (err
 		repomd := path.Join(repoPath, repodataRpmPath)
 		signaturePath := path.Join(repoPath, signatureRpmPath)
 
-		err = copyFile(srcPath, filePath, false)
+		err = copyFile(srcPath, filePath, true)
 		if err != nil {
 			return err
 		}
