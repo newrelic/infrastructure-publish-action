@@ -653,7 +653,7 @@ func copyFile(srcPath string, destPath string) (err error) {
 func ensurePath(path string) error {
 	dir, file := filepath.Split(path)
 	if dir != "" {
-		if err = execLogOutput(l, "mkdir", "-p", dir); err != nil {
+		if err := execLogOutput(l, "mkdir", "-p", dir); err != nil {
 			return err
 		}
 	}
