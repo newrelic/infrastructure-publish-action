@@ -657,6 +657,7 @@ func ensurePath(path string) error {
 			return err
 		}
 	}
+	return nil
 }
 
 func replacePlaceholders(template, repoName, appName, arch, tag, version, destPrefix, osVersion string) (str string) {
