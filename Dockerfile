@@ -16,16 +16,16 @@ RUN apt-get update && apt-get install -y \
 
 # Sadly installing aptly with apt lead you to a old version not supporting gpg2
 WORKDIR /tmp
-RUN wget https://github.com/aptly-dev/aptly/releases/download/v1.4.0/aptly_1.4.0_linux_amd64.tar.gz
+RUN wget -q https://github.com/aptly-dev/aptly/releases/download/v1.4.0/aptly_1.4.0_linux_amd64.tar.gz
 RUN tar xzf aptly_1.4.0_linux_amd64.tar.gz
 RUN mv ./aptly_1.4.0_linux_amd64/aptly /usr/bin/aptly
 
 
-RUN wget https://github.com/kahing/goofys/releases/download/v0.24.0/goofys -O /usr/bin/goofys
+RUN wget -q https://github.com/kahing/goofys/releases/download/v0.24.0/goofys -O /usr/bin/goofys
 RUN chmod +x /usr/bin/goofys
 
-RUN curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
-RUN unzip awscliv2.zip
+RUN curl -s "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+RUN unzip -q awscliv2.zip
 RUN ./aws/install
 
 # Prepare action
