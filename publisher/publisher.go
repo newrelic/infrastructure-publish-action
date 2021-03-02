@@ -303,6 +303,10 @@ func (d *downloader) downloadArtifacts(conf config, schema uploadArtifactsSchema
 		}
 	}
 
+	if len(osVersions) == 0{
+		osVersions = []string{""}
+	}
+
 	for _, artifactSchema := range schema {
 		for _, osVersion := range osVersions {
 			for _, arch := range artifactSchema.Arch {
