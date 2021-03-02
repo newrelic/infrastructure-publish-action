@@ -7,6 +7,8 @@ import (
 	"io"
 	"io/ioutil"
 	"log"
+	"net/http"
+	"net/url"
 	"os"
 	"path"
 	"strings"
@@ -57,6 +59,24 @@ var (
   uploads: /tmp
 `
 )
+
+type urlRecorderHTTPClient struct {
+	urls []url.URL
+}
+
+func newURLRecorderHTTPClient() *urlRecorderHTTPClient {
+	return &urlRecorderHTTPClient{
+		urls: []url.URL{},
+	}
+}
+
+func (c *urlRecorderHTTPClient) Do(req *http.Request) (*http.Response, error) {
+	c.urls = append(c.urls, *req.URL)
+
+	return &http.Response{
+		StatusCode: http.StatusOK,
+	}, nil
+}
 
 // parse the configuration
 func TestParseConfig(t *testing.T) {
@@ -205,6 +225,34 @@ func writeDummyFile(path string) error {
 	}
 
 	return nil
+}
+
+func TestDownloadArtifacts(t *testing.T) {
+	schema := []uploadArtifactSchema{
+		{
+			Src:  "{app_name}-{arch}-{version}.txt",
+			Arch: []string{"amd64", "386"},
+			Uploads: []Upload{
+				{
+					Type:      "file",
+					Dest:      "{arch}/{app_name}/{src}",
+					OsVersion: []string{"os1", "os2"},
+				},
+			},
+		},
+	}
+
+	cfg := config{
+		version: "2.0.0",
+		appName: "nri-foobar",
+	}
+
+	urlRecClient := newURLRecorderHTTPClient()
+	err := newDownloader(urlRecClient).downloadArtifacts(cfg, schema)
+	assert.NoError(t, err)
+
+	// TODO
+	assert.Equal(t, []url.URL{}, urlRecClient.urls)
 }
 
 func TestUploadArtifacts(t *testing.T) {

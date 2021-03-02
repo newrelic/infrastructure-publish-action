@@ -133,7 +133,8 @@ func main() {
 		l.Fatal(err)
 	}
 
-	err = downloadArtifacts(conf, uploadSchema)
+	d := newDownloader(http.DefaultClient)
+	err = d.downloadArtifacts(conf, uploadSchema)
 	if err != nil {
 		l.Fatal(err)
 	}
@@ -224,7 +225,7 @@ func parseUploadSchema(fileContent []byte) (uploadArtifactsSchema, error) {
 	return schema, nil
 }
 
-func downloadArtifact(conf config, src, arch, osVersion string) error {
+func (d *downloader) downloadArtifact(conf config, src, arch, osVersion string) error {
 
 	l.Println("Starting downloading artifacts!")
 
@@ -235,7 +236,7 @@ func downloadArtifact(conf config, src, arch, osVersion string) error {
 
 	l.Println(fmt.Sprintf("[ ] Download %s into %s", url, destPath))
 
-	err := downloadFile(url, destPath)
+	err := d.downloadFile(url, destPath)
 	if err != nil {
 		return err
 	}
@@ -250,9 +251,13 @@ func downloadArtifact(conf config, src, arch, osVersion string) error {
 	return nil
 }
 
-func downloadFile(url, destPath string) error {
+func (d *downloader) downloadFile(url, destPath string) error {
+	req,err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return err
+	}
 
-	response, err := http.Get(url)
+	response, err := d.httpClient.Do(req)
 	if err != nil {
 		return err
 	}
@@ -276,7 +281,21 @@ func downloadFile(url, destPath string) error {
 	return nil
 }
 
-func downloadArtifacts(conf config, schema uploadArtifactsSchema) error {
+type HTTPClient interface {
+	Do(req *http.Request) (*http.Response, error)
+}
+
+type downloader struct {
+	httpClient HTTPClient
+}
+
+func newDownloader(client HTTPClient) *downloader {
+	return &downloader{
+		httpClient: client,
+	}
+}
+
+func (d *downloader) downloadArtifacts(conf config, schema uploadArtifactsSchema) error {
 	var osVersions []string
 	for _, artifactSchema := range schema {
 		for _, up := range artifactSchema.Uploads {
@@ -287,7 +306,7 @@ func downloadArtifacts(conf config, schema uploadArtifactsSchema) error {
 	for _, artifactSchema := range schema {
 		for _, osVersion := range osVersions {
 			for _, arch := range artifactSchema.Arch {
-				err := downloadArtifact(conf, artifactSchema.Src, arch, osVersion)
+				err := d.downloadArtifact(conf, artifactSchema.Src, arch, osVersion)
 				if err != nil {
 					return err
 				}
