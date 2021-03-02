@@ -224,11 +224,11 @@ func parseUploadSchema(fileContent []byte) (uploadArtifactsSchema, error) {
 	return schema, nil
 }
 
-func downloadArtifact(conf config, src, arch string) error {
+func downloadArtifact(conf config, src, arch, osVersion string) error {
 
 	l.Println("Starting downloading artifacts!")
 
-	srcFile := replacePlaceholders(src, conf.repoName, conf.appName, arch, conf.tag, conf.version, conf.destPrefix, "")
+	srcFile := replacePlaceholders(src, conf.repoName, conf.appName, arch, conf.tag, conf.version, conf.destPrefix, osVersion)
 	url := generateDownloadUrl(urlTemplate, conf.repoName, conf.tag, srcFile)
 
 	destPath := path.Join(conf.artifactsSrcFolder, srcFile)
@@ -277,11 +277,20 @@ func downloadFile(url, destPath string) error {
 }
 
 func downloadArtifacts(conf config, schema uploadArtifactsSchema) error {
+	var osVersions []string
 	for _, artifactSchema := range schema {
-		for _, arch := range artifactSchema.Arch {
-			err := downloadArtifact(conf, artifactSchema.Src, arch)
-			if err != nil {
-				return err
+		for _, up := range artifactSchema.Uploads {
+			osVersions = append(osVersions, up.OsVersion...)
+		}
+	}
+
+	for _, artifactSchema := range schema {
+		for _, osVersion := range osVersions {
+			for _, arch := range artifactSchema.Arch {
+				err := downloadArtifact(conf, artifactSchema.Src, arch, osVersion)
+				if err != nil {
+					return err
+				}
 			}
 		}
 	}
