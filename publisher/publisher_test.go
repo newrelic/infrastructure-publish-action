@@ -8,7 +8,6 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
-	"net/url"
 	"os"
 	"path"
 	"strings"
@@ -61,20 +60,21 @@ var (
 )
 
 type urlRecorderHTTPClient struct {
-	urls []url.URL
+	urls []string
 }
 
 func newURLRecorderHTTPClient() *urlRecorderHTTPClient {
 	return &urlRecorderHTTPClient{
-		urls: []url.URL{},
+		urls: []string{},
 	}
 }
 
 func (c *urlRecorderHTTPClient) Do(req *http.Request) (*http.Response, error) {
-	c.urls = append(c.urls, *req.URL)
+	c.urls = append(c.urls, req.URL.Path)
 
 	return &http.Response{
 		StatusCode: http.StatusOK,
+		Body: ioutil.NopCloser(bytes.NewReader([]byte{})),
 	}, nil
 }
 
@@ -230,8 +230,8 @@ func writeDummyFile(path string) error {
 func TestDownloadArtifacts(t *testing.T) {
 	schema := []uploadArtifactSchema{
 		{
-			Src:  "{app_name}-{arch}-{version}.txt",
-			Arch: []string{"amd64", "386"},
+			Src:  "{app_name}-{arch}-{version}-{os_version}.txt",
+			Arch: []string{"amd64"},
 			Uploads: []Upload{
 				{
 					Type:      "file",
@@ -251,8 +251,8 @@ func TestDownloadArtifacts(t *testing.T) {
 	err := newDownloader(urlRecClient).downloadArtifacts(cfg, schema)
 	assert.NoError(t, err)
 
-	// TODO
-	assert.Equal(t, []url.URL{}, urlRecClient.urls)
+	expectedURLs := []string{"//releases/download//nri-foobar-amd64-2.0.0-os1.txt", "//releases/download//nri-foobar-amd64-2.0.0-os2.txt"}
+	assert.Equal(t, expectedURLs, urlRecClient.urls)
 }
 
 func TestUploadArtifacts(t *testing.T) {
