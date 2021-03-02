@@ -214,6 +214,11 @@ func parseUploadSchema(fileContent []byte) (uploadArtifactsSchema, error) {
 	}
 
 	for i := range schema {
+		for j, u := range schema[i].Uploads {
+			if u.OsVersion == nil {
+				schema[i].Uploads[j].OsVersion = []string{""}
+			}
+		}
 		if schema[i].Arch == nil {
 			schema[i].Arch = []string{""}
 		}
@@ -252,7 +257,7 @@ func (d *downloader) downloadArtifact(conf config, src, arch, osVersion string) 
 }
 
 func (d *downloader) downloadFile(url, destPath string) error {
-	req,err := http.NewRequest(http.MethodGet, url, nil)
+	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
 		return err
 	}
