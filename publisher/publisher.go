@@ -296,18 +296,16 @@ func newDownloader(client HTTPClient) *downloader {
 }
 
 func (d *downloader) downloadArtifacts(conf config, schema uploadArtifactsSchema) error {
-	var osVersions []string
 	for _, artifactSchema := range schema {
+		var osVersions []string
 		for _, up := range artifactSchema.Uploads {
 			osVersions = append(osVersions, up.OsVersion...)
 		}
-	}
 
-	if len(osVersions) == 0{
-		osVersions = []string{""}
-	}
+		if len(osVersions) == 0{
+			osVersions = []string{""}
+		}
 
-	for _, artifactSchema := range schema {
 		for _, osVersion := range osVersions {
 			for _, arch := range artifactSchema.Arch {
 				err := d.downloadArtifact(conf, artifactSchema.Src, arch, osVersion)
