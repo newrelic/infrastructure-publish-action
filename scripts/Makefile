@@ -74,7 +74,8 @@ mount-s3:
 	@echo "Mounting S3 bucket $(AWS_S3_BUCKET_NAME) into $(AWS_S3_MOUNT_DIRECTORY)..."
 	@$(creds) goofys $(AWS_S3_BUCKET_NAME) $(AWS_S3_MOUNT_DIRECTORY)
 	@ls -la $(AWS_S3_MOUNT_DIRECTORY)
-	@touch $(AWS_S3_MOUNT_DIRECTORY)/deleteme
+	@touch /tmp/deleteme
+	@cp /tmp/deleteme $(AWS_S3_MOUNT_DIRECTORY)/deleteme
 
 mount-s3-check: mount-s3
 	@echo "Confirm s3 mount..."
