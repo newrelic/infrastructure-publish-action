@@ -6,7 +6,7 @@ ARG AWS_S3_MOUNT_DIRECTORY=/mnt/s3
 
 # Tools
 # validate s3fs-fuse with the sec team
-RUN apt-get update && apt-get install -y \
+RUN apt-get -qq update && apt-get install -y \
     make \
     curl \
     gnupg2 \
