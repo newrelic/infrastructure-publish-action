@@ -3,7 +3,7 @@ set -e
 # build docker image form Dockerfile
 echo "Build fresh docker image for newrelic/infrastructure-publish-action"
 # @TODO add --no-cache
-docker build  -t newrelic/infrastructure-publish-action -f $GITHUB_ACTION_PATH/Dockerfile $GITHUB_ACTION_PATH
+docker build  -t newrelic/infrastructure-publish-action -f ./Dockerfile .
 
 # run docker container to perform all actions inside
 echo "Run docker container with action logic inside"
