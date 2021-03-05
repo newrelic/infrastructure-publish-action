@@ -13,6 +13,7 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path"
 	"path/filepath"
 	"strings"
@@ -96,7 +97,16 @@ type Upload struct {
 
 type uploadArtifactsSchema []uploadArtifactSchema
 
+// TODO context cancellation
 func main() {
+	// ctrl+c
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt)
+	go func(){
+		<-c
+		os.Exit(1)
+	}()
+
 	conf := loadConfig()
 
 	var bucketLock lock.BucketLock
