@@ -13,7 +13,6 @@ RUN apt-get -qq update && apt-get -qq install -y \
     bzip2 \
     createrepo \
     unzip \
-    golang \
     s3fs
 
 #RUN wget -q https://github.com/kahing/goofys/releases/download/v0.24.0/goofys -O /usr/bin/goofys
