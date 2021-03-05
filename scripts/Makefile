@@ -61,17 +61,15 @@ endif
 
 mount-s3:
 	@echo "Assuming IAM role for service account..."
-	./assume_role.sh
-	cat ~/.aws/config
-	cat ~/.aws/credentials
+	./mount-s3.sh
         
-	@echo "Mounting S3 bucket $(AWS_S3_BUCKET_NAME) into $(AWS_S3_MOUNT_DIRECTORY)..."
+	#@echo "Mounting S3 bucket $(AWS_S3_BUCKET_NAME) into $(AWS_S3_MOUNT_DIRECTORY)..."
 	#goofys -f --profile temp --debug_s3 $(AWS_S3_BUCKET_NAME) $(AWS_S3_MOUNT_DIRECTORY)
 
 mount-s3-check: mount-s3
 	@echo "Confirm s3 mount..."
-	#@mount |grep $(AWS_S3_MOUNT_DIRECTORY)
-	cd $(AWS_S3_MOUNT_DIRECTORY) && touch delete-me && rm delete-me
+	@mount |grep $(AWS_S3_MOUNT_DIRECTORY)
+	
 
 publish-artifacts: import-GPG-key mount-s3-check
 	@echo "Publish artifacts"

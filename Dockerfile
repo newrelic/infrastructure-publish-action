@@ -38,7 +38,7 @@ WORKDIR /home/gha
 ADD schemas ./schemas
 ADD scripts/Makefile .
 ADD scripts/mount-s3.sh .
-RUN chmod +x ./mount-sh.sh
+RUN chmod +x ./mount-s3.sh
 RUN mkdir ./assets
 RUN mkdir $AWS_S3_MOUNT_DIRECTORY
 ENV AWS_S3_MOUNT_DIRECTORY $AWS_S3_MOUNT_DIRECTORY

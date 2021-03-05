@@ -11,6 +11,8 @@ KST=($(aws sts assume-role --role-arn "$AWS_ROLE_ARN" --role-session-name "$AWS_
 #aws configure set aws_secret_access_key "${KST[1]}" --profile temp
 #aws configure set aws_session_token "${KST[2]}" --profile temp
 
+# update envs vars with assumed-role values
+
 export AWS_ACCESS_KEY_ID="${KST[0]}"
 export AWS_SECRET_ACCESS_KEY="${KST[1]}"
 export AWS_SESSION_TOKEN="${KST[2]}"
