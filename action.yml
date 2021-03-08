@@ -4,6 +4,7 @@ inputs:
   disable_lock:
     description: Disabled locking, for stuff that won't need one, like Windows MSIs.
     required: false
+    default: "false"
   run_id:
     description: Action run identifier. To be provisioned from env-var `GITHUB_RUN_ID`.
     required: false
