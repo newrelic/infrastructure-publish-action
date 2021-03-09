@@ -1,7 +1,7 @@
 SHELL := /bin/bash
 WORKDIR := /home/gha
 
-default: check-env prepare-schema dest-prefix mount-s3 mount-s3-check prepare-schema import-GPG-key publish-artifacts unmount-s3
+default: check-env prepare-schema mount-s3 mount-s3-check prepare-schema import-GPG-key publish-artifacts unmount-s3
 
 check-env:
 ifndef GPG_PRIVATE_KEY_BASE64
@@ -50,30 +50,17 @@ ifeq ($(SCHEMA), custom)
 	@cat ${UPLOAD_SCHEMA_FILE_PATH}
 endif
 
-dest-prefix: prepare-schema
-	@echo "Prepare destination prefix..."
-ifeq ($(ENV), pre-release)
-	$(eval DEST_PREFIX := "infrastructure_agent/test/")
-endif
-ifeq ($(ENV), release)
-	$(eval DEST_PREFIX := "infrastructure_agent/")
-endif
-
 mount-s3:
 	@echo "Assuming IAM role for service account..."
 	./mount-s3.sh
-        
-	#@echo "Mounting S3 bucket $(AWS_S3_BUCKET_NAME) into $(AWS_S3_MOUNT_DIRECTORY)..."
-	#goofys -f --profile temp --debug_s3 $(AWS_S3_BUCKET_NAME) $(AWS_S3_MOUNT_DIRECTORY)
 
 mount-s3-check: mount-s3
 	@echo "Confirm s3 mount..."
 	@mount |grep $(AWS_S3_MOUNT_DIRECTORY)
-	
 
 publish-artifacts: import-GPG-key mount-s3-check
 	@echo "Publish artifacts"
-	@UPLOAD_SCHEMA_FILE_PATH=$(UPLOAD_SCHEMA_FILE_PATH) DEST_PREFIX=$(DEST_PREFIX) /bin/publisher
+	@UPLOAD_SCHEMA_FILE_PATH=$(UPLOAD_SCHEMA_FILE_PATH) DEST_PREFIX="infrastructure_agent/" /bin/publisher
 
 unmount-s3: publish-artifacts
 	@echo "Unmounting S3..."
@@ -82,4 +69,4 @@ unmount-s3: publish-artifacts
 import-GPG-key:
 	@printf %s $(GPG_PRIVATE_KEY_BASE64) | base64 --decode | gpg --batch --import --no-default-keyring --keyring $(GPG_KEY_RING) -
 
-.PHONY: mount-s3 mount-s3-check publish-artifacts prepare-schema dest-prefix unmount-s3 import-GPG-key
+.PHONY: mount-s3 mount-s3-check publish-artifacts prepare-schema unmount-s3 import-GPG-key
