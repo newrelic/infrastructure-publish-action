@@ -27,7 +27,6 @@ docker run --rm \
         -e ARTIFACTS_SRC_FOLDER=/home/gha/assets \
         -e SCHEMA \
         -e SCHEMA_URL \
-        -e ENV \
         -e GPG_PRIVATE_KEY_BASE64 \
         -e GPG_PASSPHRASE \
         -e DISABLE_LOCK \
