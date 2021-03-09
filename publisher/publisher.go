@@ -486,7 +486,7 @@ func uploadApt(conf config, srcTemplate string, upload Upload, arch string) (err
 		l.Printf("[✔] Added successfully package into deb repo for %s/%s", osVersion, arch)
 
 		l.Printf("[ ] Publish deb repo for %s/%s", osVersion, arch)
-		if err = execLogOutput(l, "aptly", "publish", "repo", "-keyring", conf.gpgKeyRing, "-passphrase", conf.gpgPassphrase, "-batch", osVersion); err != nil {
+		if err = execLogOutput(l, "aptly", "publish", "repo", "-keyring", conf.gpgKeyRing, "-passphrase", conf.gpgPassphrase, "-batch", osVersion, "-origin='New Relic'"); err != nil {
 			return err
 		}
 		l.Printf("[✔] Published succesfully deb repo for %s/%s", osVersion, arch)
