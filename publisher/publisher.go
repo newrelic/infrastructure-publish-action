@@ -518,7 +518,6 @@ func syncAPTMetadata(conf config, destPath string, osVersion string, arch string
 		}
 	}
 	l.Printf("[ ] Sync local repo for %s/%s into s3", osVersion, arch)
-	time.Sleep(24*time.Hour)
 	if err = execLogOutput(l, "cp", "-rf", conf.aptlyFolder+"/public/"+aptDists+osVersion, destPath); err != nil {
 		return err
 	}
