@@ -486,7 +486,7 @@ func uploadApt(conf config, srcTemplate string, upload Upload, arch string) (err
 		l.Printf("[✔] Added successfully package into deb repo for %s/%s", osVersion, arch)
 
 		l.Printf("[ ] Publish deb repo for %s/%s", osVersion, arch)
-		if err = execLogOutput(l, "aptly", "publish", "repo", "-keyring", conf.gpgKeyRing, "-passphrase", conf.gpgPassphrase, "-batch", osVersion, "-origin='New Relic'"); err != nil {
+		if err = execLogOutput(l, "aptly", "publish", "repo", "-origin=\"New Relic\"", "-keyring", conf.gpgKeyRing, "-passphrase", conf.gpgPassphrase, "-batch", osVersion); err != nil {
 			return err
 		}
 		l.Printf("[✔] Published succesfully deb repo for %s/%s", osVersion, arch)
@@ -518,6 +518,7 @@ func syncAPTMetadata(conf config, destPath string, osVersion string, arch string
 		}
 	}
 	l.Printf("[ ] Sync local repo for %s/%s into s3", osVersion, arch)
+	time.Sleep(24*time.Hour)
 	if err = execLogOutput(l, "cp", "-rf", conf.aptlyFolder+"/public/"+aptDists+osVersion, destPath); err != nil {
 		return err
 	}

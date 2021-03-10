@@ -11,16 +11,9 @@ aws configure set aws_access_key_id "${KST[0]}" --profile temp
 aws configure set aws_secret_access_key "${KST[1]}" --profile temp
 aws configure set aws_session_token "${KST[2]}" --profile temp
 
-cat ~/.aws/config
-cat ~/.aws/credentials
-
-#export AWS_ACCESS_KEY_ID="${KST[0]}"
-#export AWS_SECRET_ACCESS_KEY="${KST[1]}"
-#export AWS_SESSION_TOKEN="${KST[2]}"
 unset AWS_ACCESS_KEY_ID
 unset AWS_SECRET_ACCESS_KEY
 unset AWS_SESSION_TOKEN
 
 echo "Mounting S3 bucket $AWS_S3_BUCKET_NAME) into $AWS_S3_MOUNT_DIRECTORY..."
 goofys --profile temp $AWS_S3_BUCKET_NAME $AWS_S3_MOUNT_DIRECTORY
-
