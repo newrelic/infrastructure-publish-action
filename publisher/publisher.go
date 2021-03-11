@@ -528,7 +528,7 @@ func syncAPTMetadata(conf config, destPath string, osVersion string, arch string
 
 func mirrorAPTRepo(conf config, repoUrl string, srcPath string, osVersion string, arch string) (err error) {
 
-	// Creating test Url, example http://newrelic-test-20200121.s3-website.eu-west-3.amazonaws.com/infrastructure_agent/test/linux/apt/dists/xenial/Release
+	// Creating test Url, example http://bucket.fqdn/infrastructure_agent/linux/apt/dists/xenial/Release
 	u, err := url.Parse(repoUrl + "/" + aptDists + osVersion + "/Release")
 	if err != nil {
 		return err
