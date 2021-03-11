@@ -252,7 +252,7 @@ func (d *downloader) downloadArtifact(conf config, src, arch, osVersion string) 
 }
 
 func (d *downloader) downloadFile(url, destPath string) error {
-	req,err := http.NewRequest(http.MethodGet, url, nil)
+	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
 		return err
 	}
@@ -302,7 +302,7 @@ func (d *downloader) downloadArtifacts(conf config, schema uploadArtifactsSchema
 			osVersions = append(osVersions, up.OsVersion...)
 		}
 
-		if len(osVersions) == 0{
+		if len(osVersions) == 0 {
 			osVersions = []string{""}
 		}
 
@@ -345,7 +345,7 @@ func uploadArtifacts(conf config, schema uploadArtifactsSchema, bucketLock lock.
 		errRelease := bucketLock.Release()
 		if err == nil {
 			err = errRelease
-		} else {
+		} else if errRelease != nil {
 			err = fmt.Errorf("got 2 errors: uploading: \"%v\", releasing lock: \"%v\"", err, errRelease)
 		}
 		return
