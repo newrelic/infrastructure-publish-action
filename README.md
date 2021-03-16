@@ -5,12 +5,24 @@
 A GitHub Action to publish artifacts from GitHub release assets into an S3 bucket.
 
 ## Inputs
-| Key                     | Description |
-| ---------------         | ----------- |
-| `repo_name`             | Github repository name, combination of organization and repository. |
-| `app_name`              | Name of the package. |
-| `tag`                   | Tag version from GitHub release. |
-| `schema`                | Describes the packages to be published: infra-agent, ohi, or nrjmx. |
+| Key                        | Description |
+| ---------------            | ----------- |
+| `disable_lock`             | Disabled locking, for stuff that won't need one, like Windows MSIs. |
+| `run_id`                   | Action run identifier. To be provisioned from env-var `GITHUB_RUN_ID`. |
+| `aws_s3_lock_bucket_name`  | Name of the S3 bucket for lockfiles. |
+| `aws_role_session_name`    | Name of the S3 role session name. |
+| `aws_region`               | AWS region for the buckets. |
+| `aws_role_arn`             | ARN for the IAM role to be used for fetching AWS STS credentials. |
+| `aws_secret_access_key`    | AWS secret access key. |
+| `aws_access_key_id`        | AWS access key id. |
+| `aws_s3_bucket_name`       | Name of the S3 bucket. |
+| `repo_name`                | Github repository name, combination of organization and repository. |
+| `app_name`                 | Name of the package. |
+| `tag`                      | Tag version from GitHub release. |
+| `schema`                   | Describes the packages to be published: infra-agent, ohi, or nrjmx. |
+| `schema_url`               | Url to custom schema file. |
+| `gpg_passphrase`           | Passphrase for the gpg key. |
+| `gpg_private_key_base64`   | Encoded gpg key. |
 
 All keys are required.
 
@@ -26,44 +38,66 @@ GitHub secrets to be set:
 
 ### Example Usage
 
-    name: Publish
+```yaml
+name: Publish
 
-    on:
-      push:
-        branches:
-          - s3_publish_packages
+on:
+  release:
+    types:
+      - released
+    tags:
+      - '*'
 
-    env:
-      DOCKER_HUB_ID: ${{ secrets.OHAI_DOCKER_HUB_ID }}
-      DOCKER_HUB_PASSWORD: ${{ secrets.OHAI_DOCKER_HUB_PASSWORD }}
+env:
+  GPG_PASSPHRASE: ${{ secrets.OHAI_GPG_PASSPHRASE }}
+  GPG_PRIVATE_KEY_BASE64: ${{ secrets.OHAI_GPG_PRIVATE_KEY_BASE64 }}
+  TAG: ${{ github.event.release.tag_name }}
+  DOCKER_HUB_ID: ${{ secrets.OHAI_DOCKER_HUB_ID }}
+  DOCKER_HUB_PASSWORD: ${{ secrets.OHAI_DOCKER_HUB_PASSWORD }}
+  AWS_S3_BUCKET_NAME: "nr-downloads-main"
+  AWS_S3_LOCK_BUCKET_NAME: "onhost-ci-lock"
+  AWS_REGION: "us-east-1"
 
-    jobs:
+jobs:
+  publishing-to-s3-linux:
+    name: Publish linux artifacts into s3 bucket
+    runs-on: ubuntu-20.04
 
-      publish:
-        name: Publish artifacts to s3
-        runs-on: ubuntu-20.04
-        steps:
-          - uses: actions/checkout@v2
-          - name: Login to DockerHub
-            uses: docker/login-action@v1
-            with:
-              username: ${{ env.DOCKER_HUB_ID }}
-              password: ${{ env.DOCKER_HUB_PASSWORD }}
-          - name: Publish to S3 action
-            uses: ./actions/publish
-            with:
-              aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-              aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-              aws_s3_bucket_name: ${{ secrets.AWS_S3_BUCKET }}
-              tag: "v1.0.0"
-              app_name: "my-app"
-              repo_name: "my-org/my-app"
-              schema: "ohi"
-
+    steps:
+      - name: Login to DockerHub
+        uses: docker/login-action@v1
+        with:
+          username: ${{ env.DOCKER_HUB_ID }}
+          password: ${{ env.DOCKER_HUB_PASSWORD }}
+      - name: Publish to S3 action
+        uses: newrelic/infrastructure-publish-action@main
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID_PROD }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY_PROD }}
+          AWS_ROLE_ARN: ${{ secrets.AWS_ROLE_ARN_PROD }}
+        with:
+          tag: ${{env.TAG}}
+          app_name: "newrelic-infra"
+          repo_name: "newrelic/infrastructure-agent"
+          env: release
+          schema: "custom"
+          schema_url: "https://raw.githubusercontent.com/newrelic/infrastructure-agent/master/build/upload-schema-linux.yml"
+          aws_access_key_id: ${{ env.AWS_ACCESS_KEY_ID }}
+          aws_secret_access_key: ${{ env.AWS_SECRET_ACCESS_KEY }}
+          aws_s3_bucket_name: ${{ env.AWS_S3_BUCKET_NAME }}
+          aws_s3_lock_bucket_name: ${{ env.AWS_S3_LOCK_BUCKET_NAME }}
+          run_id: ${{ github.run_id }}
+          aws_region: ${{ env.AWS_REGION }}
+          aws_role_arn: ${{ env.AWS_ROLE_ARN }}
+          # used for signing package stuff
+          gpg_passphrase: ${{ env.GPG_PASSPHRASE }}
+          gpg_private_key_base64: ${{ env.GPG_PRIVATE_KEY_BASE64 }}
+```
 
 ## Consistency
 
-As GitHub Actions can run many workflows in parallel, once a publish-action is called it execute a lock mechanism in S3 to avoid conflicts.
+As GitHub Actions can run many workflows in parallel, once a publish-action is called it execute a lock mechanism in S3 to avoid conflicts. 
+In the current implementation only one publish action with the same lock will be executed, all other concurrent jobs will be terminated by the lock file check.
 
 ## Support
 
