@@ -91,6 +91,7 @@ type Upload struct {
 	Type      string   `yaml:"type"` // verify type in allowed list file, apt, yum, zypp
 	SrcRepo   string   `yaml:"src_repo"`
 	Dest      string   `yaml:"dest"`
+	Override  bool     `yaml:"override"`
 	OsVersion []string `yaml:"os_version"`
 }
 
@@ -386,7 +387,7 @@ func uploadRpm(conf config, srcTemplate string, upload Upload, arch string) (err
 		repomd := path.Join(repoPath, repodataRpmPath)
 		signaturePath := path.Join(repoPath, signatureRpmPath)
 
-		err = copyFile(srcPath, filePath)
+		err = copyFile(srcPath, filePath, upload.Override)
 		if err != nil {
 			return err
 		}
@@ -641,7 +642,7 @@ func uploadFileArtifact(conf config, schema uploadArtifactSchema, upload Upload,
 	srcPath = path.Join(conf.artifactsSrcFolder, srcPath)
 	destPath = path.Join(conf.artifactsDestFolder, destPath)
 
-	err = copyFile(srcPath, destPath)
+	err = copyFile(srcPath, destPath, upload.Override)
 	if err != nil {
 		return err
 	}
@@ -649,10 +650,10 @@ func uploadFileArtifact(conf config, schema uploadArtifactSchema, upload Upload,
 	return nil
 }
 
-func copyFile(srcPath string, destPath string) (err error) {
+func copyFile(srcPath string, destPath string, override bool) (err error) {
 
 	// We do not want to override already pushed packages
-	if _, err = os.Stat(destPath); err == nil {
+	if _, err = os.Stat(destPath); !override && err == nil {
 		l.Println(fmt.Sprintf("Skipping copying file '%s': already exists at:  %s", srcPath, destPath))
 		return
 	}
