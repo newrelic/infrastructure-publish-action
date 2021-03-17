@@ -50,6 +50,12 @@ inputs:
   gpg_private_key_base64:
     description: Encoded gpg key
     required: true
+  fastly_key:
+    description: Fastly key
+    required: false
+  fastly_service_id:
+    description: Fastly service ID
+    required: false
 runs:
   using: "composite"
   steps:
@@ -72,3 +78,5 @@ runs:
         AWS_ROLE_ARN: ${{ inputs.aws_role_arn }}
         DISABLE_LOCK: ${{ inputs.disable_lock }}
         AWS_ROLE_SESSION_NAME: ${{ inputs.aws_role_session_name }}
+        FASTLY_KEY: ${{ inputs.fastly_key }}
+        FASTLY_SERVICE_ID: ${{ inputs.fastly_service_id }}

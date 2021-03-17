@@ -1,7 +1,7 @@
 SHELL := /bin/bash
 WORKDIR := /home/gha
 
-default: check-env prepare-schema mount-s3 mount-s3-check prepare-schema import-GPG-key publish-artifacts unmount-s3
+default: check-env prepare-schema mount-s3 mount-s3-check prepare-schema import-GPG-key publish-artifacts unmount-s3 clear-fastly-cache
 
 check-env:
 ifndef GPG_PRIVATE_KEY_BASE64
@@ -69,4 +69,9 @@ unmount-s3: publish-artifacts
 import-GPG-key:
 	@printf %s $(GPG_PRIVATE_KEY_BASE64) | base64 --decode | gpg --batch --import --no-default-keyring --keyring $(GPG_KEY_RING) -
 
-.PHONY: mount-s3 mount-s3-check publish-artifacts prepare-schema unmount-s3 import-GPG-key
+clear-fastly-cache: unmount-s3
+ifdef FASTLY_KEY
+	@/usr/bin/curl -i -X POST -H Fastly-Key:$(FASTLY_KEY) https://api.fastly.com/service/$(FASTLY_SERVICE_ID)/purge_all
+endif
+
+.PHONY: mount-s3 mount-s3-check publish-artifacts prepare-schema unmount-s3 import-GPG-key clear-fastly-cache
