@@ -15,7 +15,6 @@
       dest: "{dest_prefix}binaries/windows/{arch}/{src}"
   arch:
     - amd64
-    - 386
 
 # Windows installers are .exe and have the '-installer' string in the name for integrations bundling nrjmx.
 - src: "{app_name}-amd64-installer.{version}.exe"
@@ -25,14 +24,6 @@
     - type: file
       override: true
       dest: "{dest_prefix}windows/integrations/{app_name}/{app_name}-amd64-installer.exe"
-
-- src: "{app_name}-386-installer.{version}.exe"
-  uploads:
-    - type: file
-      dest: "{dest_prefix}windows/386/integrations/{app_name}/{src}"
-    - type: file
-      override: true
-      dest: "{dest_prefix}windows/386/integrations/{app_name}/{app_name}-386-installer.exe"
 
 - src: "{app_name}_{version}-1_{arch}.deb"
   arch:
