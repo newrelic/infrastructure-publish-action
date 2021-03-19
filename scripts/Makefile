@@ -34,20 +34,17 @@ endif
 
 prepare-schema: check-env
 	@echo "Prepare schema file for: $(SCHEMA)"
-ifeq ($(SCHEMA), ohi)
-	$(eval UPLOAD_SCHEMA_FILE_PATH := "$(WORKDIR)/schemas/ohi.yml")
-endif
-ifeq ($(SCHEMA), nrjmx)
-	$(eval UPLOAD_SCHEMA_FILE_PATH := "$(WORKDIR)/schemas/nrjmx.yml")
-endif
-ifeq ($(SCHEMA), infra-agent)
-	$(eval UPLOAD_SCHEMA_FILE_PATH := "$(WORKDIR)/schemas/infra-agent.yml")
-endif
 ifeq ($(SCHEMA), custom)
 	$(eval UPLOAD_SCHEMA_FILE_PATH := "$(WORKDIR)/schemas/custom.yml")
 	@wget "$(SCHEMA_URL)" -O  $(UPLOAD_SCHEMA_FILE_PATH)
 	@echo "Downloaded schema:"
 	@cat ${UPLOAD_SCHEMA_FILE_PATH}
+else
+	@if [[ ! -e "$(WORKDIR)/schemas/$(SCHEMA).yml" ]]; then \
+		echo "Cannot find $(SCHEMA).yml file in $(WORKDIR)/schemas/"; \
+		exit 1; \
+	fi
+	$(eval UPLOAD_SCHEMA_FILE_PATH := "$(WORKDIR)/schemas/$(SCHEMA).yml")
 endif
 
 mount-s3:
