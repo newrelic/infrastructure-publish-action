@@ -133,6 +133,8 @@ func main() {
 			conf.lockGroup,
 			conf.owner(),
 			maxRetries,
+			lock.DefaultRetryBackoff,
+			lock.DefaultTTL,
 		)
 		var err error
 		bucketLock, err = lock.NewS3(cfg)

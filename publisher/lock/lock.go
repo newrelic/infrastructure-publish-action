@@ -2,7 +2,15 @@
 // SPDX-License-Identifier: Apache-2.0
 package lock
 
-import "errors"
+import (
+	"errors"
+	"time"
+)
+
+const (
+	DefaultTTL          = 1000 * time.Hour // disabled to manage leftover lockfiles manually for now
+	DefaultRetryBackoff = time.Minute
+)
 
 var (
 	ErrLockBusy = errors.New("lock is busy")

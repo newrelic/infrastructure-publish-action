@@ -17,11 +17,6 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3"
 )
 
-const (
-	defaultTTL          = 1000 * time.Hour // disable to manage leftover lockfiles manually for now
-	defaultRetryBackoff = time.Minute
-)
-
 // We should parametrise these:
 var (
 	// resource tags
@@ -69,15 +64,15 @@ func (l *lockData) isExpired(ttl time.Duration, t time.Time) bool {
 	return l.CreatedAt.Add(ttl).Before(t)
 }
 
-func NewS3Config(bucketName, roleARN, awsRegion, lockGroup, owner string, maxRetries uint) S3Config {
+func NewS3Config(bucketName, roleARN, awsRegion, lockGroup, owner string, maxRetries uint, retryBackoff, ttl time.Duration) S3Config {
 	return S3Config{
 		Bucket:       bucketName,
 		RoleARN:      roleARN,
 		Region:       awsRegion,
 		Filepath:     lockGroup,
 		Owner:        owner,
-		TTL:          defaultTTL,
-		RetryBackoff: defaultRetryBackoff,
+		TTL:          ttl,
+		RetryBackoff: retryBackoff,
 		MaxRetries:   maxRetries,
 	}
 }
