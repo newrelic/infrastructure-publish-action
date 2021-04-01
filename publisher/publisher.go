@@ -105,9 +105,8 @@ func main() {
 	}
 
 	var bucketLock lock.BucketLock
-	var err error
 	if conf.lock.IsDisabled() {
-		bucketLock, err = lock.NewNoop()
+		bucketLock = lock.NewNoop()
 	} else {
 		if conf.awsRegion == "" {
 			l.Fatal("missing 'aws_region' value")
@@ -122,11 +121,12 @@ func main() {
 			l.Fatal("missing 'run_id' value")
 		}
 
+		var err error
 		bucketLock, err = lock.NewS3(conf.awsLockBucket, conf.awsRoleARN, conf.awsRegion, conf.lockGroup, conf.owner())
-	}
-	// fail fast when lacking required AWS credentials
-	if err != nil {
-		l.Fatal("cannot create lock: " + err.Error())
+		// fail fast when lacking required AWS credentials
+		if err != nil {
+			l.Fatal("cannot create lock on s3: " + err.Error())
+		}
 	}
 
 	uploadSchemaContent, err := readFileContent(conf.uploadSchemaFilePath)

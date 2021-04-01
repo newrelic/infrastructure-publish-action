@@ -53,8 +53,8 @@ func (m Mode) IsFailOnBusy() bool {
 type noop struct{}
 
 // Noop returns a NO-OP lock, to be used when releasing stuff that won't need locking.
-func NewNoop() (BucketLock, error) {
-	return &noop{}, nil
+func NewNoop() BucketLock {
+	return &noop{}
 }
 
 func (l *noop) Lock() error    { return nil }
