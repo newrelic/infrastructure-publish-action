@@ -59,7 +59,7 @@ var (
 )
 
 type config struct {
-	lockMode             lock.Mode // modes: "disabled", "retry_when_busy" (default), "fail_when_busy"
+	lockMode             lock.Mode // modes: "disabled" (default), "retry_when_busy", "fail_when_busy"
 	destPrefix           string
 	repoName             string
 	appName              string
