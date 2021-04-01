@@ -57,32 +57,32 @@ func TestS3_Release(t *testing.T) {
 // Complex dist-sys time race here.
 // We should decouple components to better test this, but we are rushing so take a seat.
 func TestS3_retry(t *testing.T) {
-	// GIVEN two lock grabbers, second one being a retrier
+	// GIVEN a 1st lock grabber
 	l1, err := NewS3(newTestConf(t.Name(), "owner-1"))
 	require.NoError(t, err)
-	// unlucky retrier
+	// AND a 2nd one being a retry grabber
 	c2 := newTestConf(t.Name(), "owner-2")
 	c2.MaxRetries = 1
 	c2.RetryBackoff = 500 * time.Millisecond // big boat indeed, ops are addressing an external API
 	l2, err := NewS3(c2)
 	require.NoError(t, err)
 
-	// AND first one grabs the lock
+	// WHEN 1st grabs the lock
 	assert.NoError(t, l1.Lock())
 
-	// WHEN second tries to grab the lock
+	// AND 2nd tries to grab the same
 	l2Return := make(chan error, 1)
 	go func() {
 		l2Return <- l2.Lock()
 	}()
 
-	// AND fist grabber release before 2nd retry backoff expires
+	// AND 1st releases before 2nd retry-backoff expires
 	go func() {
 		<-time.After(c2.RetryBackoff / 2)
 		l1.Release()
 	}()
 
-	// THEN second backoff retry expires and grabs the lock
+	// THEN as 2nd backoff-retry expires it grabs the lock
 	select {
 	case err = <-l2Return:
 		assert.NoError(t, err, "second lock behaves as no retry")
