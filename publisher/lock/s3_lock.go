@@ -32,12 +32,13 @@ var (
 
 // S3 based lock.
 type S3 struct {
-	client   *s3.S3
-	owner    string
-	bucket   string
-	tags     string
-	filePath string
-	ttl      time.Duration
+	client     *s3.S3
+	owner      string
+	bucket     string
+	tags       string
+	filePath   string
+	ttl        time.Duration
+	maxRetries uint
 }
 
 // lockData represents contents of the JSON lock-file at S3.
@@ -56,7 +57,7 @@ func (l *lockData) isExpired(ttl time.Duration, t time.Time) bool {
 }
 
 // NewS3 creates a lock instance ready to be used validating required AWS credentials.
-func NewS3(bucket, roleARN, region, filepath, owner string, maxRetries int) (*S3, error) {
+func NewS3(bucket, roleARN, region, filepath, owner string, maxRetries uint) (*S3, error) {
 	sess, err := session.NewSession()
 	if err != nil {
 		return nil, err
@@ -69,12 +70,13 @@ func NewS3(bucket, roleARN, region, filepath, owner string, maxRetries int) (*S3
 	}
 
 	return &S3{
-		client:   s3.New(sess, &conf),
-		owner:    owner,
-		bucket:   bucket,
-		filePath: filepath,
-		tags:     fmt.Sprintf("department=product&product=%s&project=%s&owning_team=%s&environment=%s", tagProduct, tagProject, tagOwningTeam, tagEnv),
-		ttl:      defaultTTL,
+		client:     s3.New(sess, &conf),
+		owner:      owner,
+		bucket:     bucket,
+		filePath:   filepath,
+		tags:       fmt.Sprintf("department=product&product=%s&project=%s&owning_team=%s&environment=%s", tagProduct, tagProject, tagOwningTeam, tagEnv),
+		ttl:        defaultTTL,
+		maxRetries: maxRetries,
 	}, nil
 }
 

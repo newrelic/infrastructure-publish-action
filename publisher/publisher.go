@@ -122,11 +122,11 @@ func main() {
 			l.Fatal("missing 'run_id' value")
 		}
 
-		var err error
-		maxRetries := 0
+		var maxRetries uint
 		if conf.lock.IsRetryOnBusy() {
 			maxRetries = defaultLockRetries
 		}
+		var err error
 		bucketLock, err = lock.NewS3(conf.awsLockBucket, conf.awsRoleARN, conf.awsRegion, conf.lockGroup, conf.owner(), maxRetries)
 		// fail fast when lacking required AWS credentials
 		if err != nil {
