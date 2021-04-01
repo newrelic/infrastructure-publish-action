@@ -46,6 +46,7 @@ const (
 	repodataRpmPath    = "/repodata/repomd.xml"
 	signatureRpmPath   = "/repodata/repomd.xml.asc"
 	defaultAptlyFolder = "/root/.aptly"
+	defaultLockRetries = 10
 	defaultLockgroup   = "lockgroup"
 	aptPoolMain        = "pool/main/"
 	aptDists           = "dists/"
@@ -122,7 +123,11 @@ func main() {
 		}
 
 		var err error
-		bucketLock, err = lock.NewS3(conf.awsLockBucket, conf.awsRoleARN, conf.awsRegion, conf.lockGroup, conf.owner())
+		maxRetries := 0
+		if conf.lock.IsRetryOnBusy() {
+			maxRetries = defaultLockRetries
+		}
+		bucketLock, err = lock.NewS3(conf.awsLockBucket, conf.awsRoleARN, conf.awsRegion, conf.lockGroup, conf.owner(), maxRetries)
 		// fail fast when lacking required AWS credentials
 		if err != nil {
 			l.Fatal("cannot create lock on s3: " + err.Error())

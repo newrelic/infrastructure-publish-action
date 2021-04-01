@@ -56,7 +56,7 @@ func (l *lockData) isExpired(ttl time.Duration, t time.Time) bool {
 }
 
 // NewS3 creates a lock instance ready to be used validating required AWS credentials.
-func NewS3(bucket, roleARN, region, filepath, owner string) (*S3, error) {
+func NewS3(bucket, roleARN, region, filepath, owner string, maxRetries int) (*S3, error) {
 	sess, err := session.NewSession()
 	if err != nil {
 		return nil, err
