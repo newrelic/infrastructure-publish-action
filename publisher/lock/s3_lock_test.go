@@ -18,14 +18,14 @@ const (
 )
 
 func TestNewS3(t *testing.T) {
-	l, err := NewS3(newTestConf(t.Name(), "owner"))
+	l, err := NewS3(newTestConf(t.Name(), "owner"), t.Logf)
 	require.NoError(t, err)
 
 	assert.NotEmpty(t, l)
 }
 
 func TestS3_Lock(t *testing.T) {
-	l, err := NewS3(newTestConf(t.Name(), "owner"))
+	l, err := NewS3(newTestConf(t.Name(), "owner"), t.Logf)
 	require.NoError(t, err)
 
 	assert.NoError(t, l.Lock())
@@ -33,10 +33,10 @@ func TestS3_Lock(t *testing.T) {
 }
 
 func TestS3_Lock_onLocked(t *testing.T) {
-	l1, err := NewS3(newTestConf(t.Name(), "owner-1"))
+	l1, err := NewS3(newTestConf(t.Name(), "owner-1"), t.Logf)
 	require.NoError(t, err)
 
-	l2, err := NewS3(newTestConf(t.Name(), "owner-2"))
+	l2, err := NewS3(newTestConf(t.Name(), "owner-2"), t.Logf)
 	require.NoError(t, err)
 
 	assert.NoError(t, l1.Lock())
@@ -47,7 +47,7 @@ func TestS3_Lock_onLocked(t *testing.T) {
 }
 
 func TestS3_Release(t *testing.T) {
-	l, err := NewS3(newTestConf(t.Name(), "owner"))
+	l, err := NewS3(newTestConf(t.Name(), "owner"), t.Logf)
 	require.NoError(t, err)
 
 	assert.NoError(t, l.Lock())
@@ -58,13 +58,13 @@ func TestS3_Release(t *testing.T) {
 // We should decouple components to better test this, but we are rushing so take a seat.
 func TestS3_retry(t *testing.T) {
 	// GIVEN a 1st lock grabber
-	l1, err := NewS3(newTestConf(t.Name(), "owner-1"))
+	l1, err := NewS3(newTestConf(t.Name(), "owner-1"), t.Logf)
 	require.NoError(t, err)
 	// AND a 2nd one being a retry grabber
 	c2 := newTestConf(t.Name(), "owner-2")
 	c2.MaxRetries = 1
-	c2.RetryBackoff = 1000 * time.Millisecond // big boat indeed, ops are addressing an external API
-	l2, err := NewS3(c2)
+	c2.RetryBackoff = 1000 * time.Millisecond // big boat indeed, ops are using an external API
+	l2, err := NewS3(c2, t.Logf)
 	require.NoError(t, err)
 
 	// WHEN 1st grabs the lock

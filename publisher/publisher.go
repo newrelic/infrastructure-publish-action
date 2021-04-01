@@ -137,7 +137,7 @@ func main() {
 			lock.DefaultTTL,
 		)
 		var err error
-		bucketLock, err = lock.NewS3(cfg)
+		bucketLock, err = lock.NewS3(cfg, l.Printf)
 		// fail fast when lacking required AWS credentials
 		if err != nil {
 			l.Fatal("cannot create lock on s3: " + err.Error())

@@ -41,6 +41,7 @@ type S3Config struct {
 // S3 based lock.
 type S3 struct {
 	client       *s3.S3
+	logF         Logf
 	owner        string
 	bucket       string
 	tags         string
@@ -49,6 +50,9 @@ type S3 struct {
 	retryBackoff time.Duration
 	ttl          time.Duration
 }
+
+// Logf logger to provide feedback on retries.
+type Logf func (format string, args ...interface{})
 
 // lockData represents contents of the JSON lock-file at S3.
 type lockData struct {
@@ -79,7 +83,7 @@ func NewS3Config(bucketName, roleARN, awsRegion, lockGroup, owner string, maxRet
 }
 
 // NewS3 creates a lock instance ready to be used validating required AWS credentials.
-func NewS3(c S3Config) (*S3, error) {
+func NewS3(c S3Config, logfn Logf) (*S3, error) {
 	sess, err := session.NewSession()
 	if err != nil {
 		return nil, err
@@ -93,6 +97,7 @@ func NewS3(c S3Config) (*S3, error) {
 
 	return &S3{
 		client:       s3.New(sess, &awsCfg),
+		logF:         logfn,
 		owner:        c.Owner,
 		bucket:       c.Bucket,
 		filePath:     c.Filepath,
@@ -106,12 +111,12 @@ func NewS3(c S3Config) (*S3, error) {
 // Lock S3 has no compare-and-swap so this is no bulletproof solution, but should be good enough.
 func (l *S3) Lock() error {
 	var tries uint
-	retry:
+retry:
 	if (l.maxRetries - tries) > 0 {
 		tries++
-		log.Printf("%s attempt %d", l.owner, tries) //  TODO inject logger
+		l.logF("%s attempt %d", l.owner, tries)
 		if l.isBusyDeletingExpired() {
-			log.Printf("%s failed, waiting %s", l.owner, l.retryBackoff.String()) //  TODO inject logger
+			l.logF("%s failed, waiting %s", l.owner, l.retryBackoff.String())
 			time.Sleep(l.retryBackoff)
 			goto retry
 		}
