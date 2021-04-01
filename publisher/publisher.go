@@ -126,8 +126,16 @@ func main() {
 		if conf.lock.IsRetryOnBusy() {
 			maxRetries = defaultLockRetries
 		}
+		cfg := lock.NewS3Config(
+			conf.awsLockBucket,
+			conf.awsLockBucket,
+			conf.awsRegion,
+			conf.lockGroup,
+			conf.owner(),
+			maxRetries,
+		)
 		var err error
-		bucketLock, err = lock.NewS3(conf.awsLockBucket, conf.awsRoleARN, conf.awsRegion, conf.lockGroup, conf.owner(), maxRetries)
+		bucketLock, err = lock.NewS3(cfg)
 		// fail fast when lacking required AWS credentials
 		if err != nil {
 			l.Fatal("cannot create lock on s3: " + err.Error())

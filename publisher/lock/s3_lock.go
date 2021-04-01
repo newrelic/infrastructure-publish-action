@@ -18,7 +18,8 @@ import (
 )
 
 const (
-	defaultTTL = 1000 * time.Hour // disable to manage leftover lockfiles manually for now
+	defaultTTL          = 1000 * time.Hour // disable to manage leftover lockfiles manually for now
+	defaultRetryBackoff = time.Minute
 )
 
 // We should parametrise these:
@@ -29,6 +30,18 @@ var (
 	tagProject    = "infrastructure-publish-action"
 	tagEnv        = "us-development"
 )
+
+// S3Config S3 lock config DTO.
+type S3Config struct {
+	Bucket       string
+	RoleARN      string
+	Region       string
+	Filepath     string
+	Owner        string
+	TTL          time.Duration
+	RetryBackoff time.Duration
+	MaxRetries   uint
+}
 
 // S3 based lock.
 type S3 struct {
@@ -56,27 +69,40 @@ func (l *lockData) isExpired(ttl time.Duration, t time.Time) bool {
 	return l.CreatedAt.Add(ttl).Before(t)
 }
 
+func NewS3Config(bucketName, roleARN, awsRegion, lockGroup, owner string, maxRetries uint) S3Config {
+	return S3Config{
+		Bucket:       bucketName,
+		RoleARN:      roleARN,
+		Region:       awsRegion,
+		Filepath:     lockGroup,
+		Owner:        owner,
+		TTL:          defaultTTL,
+		RetryBackoff: defaultRetryBackoff,
+		MaxRetries:   maxRetries,
+	}
+}
+
 // NewS3 creates a lock instance ready to be used validating required AWS credentials.
-func NewS3(bucket, roleARN, region, filepath, owner string, maxRetries uint) (*S3, error) {
+func NewS3(c S3Config) (*S3, error) {
 	sess, err := session.NewSession()
 	if err != nil {
 		return nil, err
 	}
 
-	creds := stscreds.NewCredentials(sess, roleARN, func(p *stscreds.AssumeRoleProvider) {})
-	conf := aws.Config{
+	creds := stscreds.NewCredentials(sess, c.RoleARN, func(p *stscreds.AssumeRoleProvider) {})
+	awsCfg := aws.Config{
 		Credentials: creds,
-		Region:      aws.String(region),
+		Region:      aws.String(c.Region),
 	}
 
 	return &S3{
-		client:     s3.New(sess, &conf),
-		owner:      owner,
-		bucket:     bucket,
-		filePath:   filepath,
+		client:     s3.New(sess, &awsCfg),
+		owner:      c.Owner,
+		bucket:     c.Bucket,
+		filePath:   c.Filepath,
 		tags:       fmt.Sprintf("department=product&product=%s&project=%s&owning_team=%s&environment=%s", tagProduct, tagProject, tagOwningTeam, tagEnv),
-		ttl:        defaultTTL,
-		maxRetries: maxRetries,
+		ttl:        c.TTL,
+		maxRetries: c.MaxRetries,
 	}, nil
 }
 

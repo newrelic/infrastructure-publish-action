@@ -17,14 +17,14 @@ const (
 )
 
 func TestNewS3(t *testing.T) {
-	l, err := NewS3(bucket, roleARN, region, "TestNewS3", "owner", 0)
+	l, err := NewS3(newTestConf(t.Name(), "owner"))
 	require.NoError(t, err)
 
 	assert.NotEmpty(t, l)
 }
 
 func TestS3_Lock(t *testing.T) {
-	l, err := NewS3(bucket, roleARN, region, "TestS3_Lock", "owner", 0)
+	l, err := NewS3(newTestConf(t.Name(), "owner"))
 	require.NoError(t, err)
 
 	assert.NoError(t, l.Lock())
@@ -32,10 +32,10 @@ func TestS3_Lock(t *testing.T) {
 }
 
 func TestS3_Lock_onLocked(t *testing.T) {
-	l1, err := NewS3(bucket, roleARN, region, "TestS3_Lock_onLocked", "owner-1", 0)
+	l1, err := NewS3(newTestConf(t.Name(), "owner-1"))
 	require.NoError(t, err)
 
-	l2, err := NewS3(bucket, roleARN, region, "TestS3_Lock_onLocked", "owner-2", 0)
+	l2, err := NewS3(newTestConf(t.Name(), "owner-2"))
 	require.NoError(t, err)
 
 	assert.NoError(t, l1.Lock())
@@ -46,9 +46,13 @@ func TestS3_Lock_onLocked(t *testing.T) {
 }
 
 func TestS3_Release(t *testing.T) {
-	l, err := NewS3(bucket, roleARN, region, "TestS3_Release", "owner", 0)
+	l, err := NewS3(newTestConf(t.Name(), "owner"))
 	require.NoError(t, err)
 
 	assert.NoError(t, l.Lock())
 	assert.NoError(t, l.Release())
+}
+
+func newTestConf(lockgroup, owner string) S3Config {
+	return NewS3Config(bucket, roleARN, region, lockgroup, owner, 0)
 }
