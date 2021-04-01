@@ -5,7 +5,6 @@ package lock
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"log"
 	"time"
@@ -17,20 +16,12 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3"
 )
 
-// We should parametrise these:
-var (
-	// resource tags
-	tagOwningTeam = "CAOS"
-	tagProduct    = "integrations"
-	tagProject    = "infrastructure-publish-action"
-	tagEnv        = "us-development"
-)
-
 // S3Config S3 lock config DTO.
 type S3Config struct {
 	Bucket       string
 	RoleARN      string
 	Region       string
+	Tags         string
 	Filepath     string
 	Owner        string
 	MaxRetries   uint
@@ -40,19 +31,13 @@ type S3Config struct {
 
 // S3 based lock.
 type S3 struct {
-	client       *s3.S3
-	logF         Logf
-	owner        string
-	bucket       string
-	tags         string
-	filePath     string
-	maxRetries   uint
-	retryBackoff time.Duration
-	ttl          time.Duration
+	client *s3.S3
+	logF   Logf
+	conf   S3Config
 }
 
 // Logf logger to provide feedback on retries.
-type Logf func (format string, args ...interface{})
+type Logf func(format string, args ...interface{})
 
 // lockData represents contents of the JSON lock-file at S3.
 type lockData struct {
@@ -69,11 +54,12 @@ func (l *lockData) isExpired(ttl time.Duration, t time.Time) bool {
 	return l.CreatedAt.Add(ttl).Before(t)
 }
 
-func NewS3Config(bucketName, roleARN, awsRegion, lockGroup, owner string, maxRetries uint, retryBackoff, ttl time.Duration) S3Config {
+func NewS3Config(bucketName, roleARN, awsRegion, tags, lockGroup, owner string, maxRetries uint, retryBackoff, ttl time.Duration) S3Config {
 	return S3Config{
 		Bucket:       bucketName,
 		RoleARN:      roleARN,
 		Region:       awsRegion,
+		Tags:         tags,
 		Filepath:     lockGroup,
 		Owner:        owner,
 		TTL:          ttl,
@@ -96,15 +82,9 @@ func NewS3(c S3Config, logfn Logf) (*S3, error) {
 	}
 
 	return &S3{
-		client:       s3.New(sess, &awsCfg),
-		logF:         logfn,
-		owner:        c.Owner,
-		bucket:       c.Bucket,
-		filePath:     c.Filepath,
-		tags:         fmt.Sprintf("department=product&product=%s&project=%s&owning_team=%s&environment=%s", tagProduct, tagProject, tagOwningTeam, tagEnv),
-		maxRetries:   c.MaxRetries,
-		retryBackoff: c.RetryBackoff,
-		ttl:          c.TTL,
+		client: s3.New(sess, &awsCfg),
+		logF:   logfn,
+		conf:   c,
 	}, nil
 }
 
@@ -112,12 +92,12 @@ func NewS3(c S3Config, logfn Logf) (*S3, error) {
 func (l *S3) Lock() error {
 	var tries uint
 retry:
-	if (l.maxRetries - tries) > 0 {
+	if (l.conf.MaxRetries - tries) > 0 {
 		tries++
-		l.logF("%s attempt %d", l.owner, tries)
+		l.logF("%s attempt %d", l.conf.Owner, tries)
 		if l.isBusyDeletingExpired() {
-			l.logF("%s failed, waiting %s", l.owner, l.retryBackoff.String())
-			time.Sleep(l.retryBackoff)
+			l.logF("%s failed, waiting %s", l.conf.Owner, l.conf.RetryBackoff.String())
+			time.Sleep(l.conf.RetryBackoff)
 			goto retry
 		}
 	}
@@ -127,7 +107,7 @@ retry:
 	}
 
 	data := lockData{
-		Owner:     l.owner,
+		Owner:     l.conf.Owner,
 		CreatedAt: time.Now(),
 	}
 	dataB, err := json.Marshal(data)
@@ -137,9 +117,9 @@ retry:
 
 	input := &s3.PutObjectInput{
 		Body:    aws.ReadSeekCloser(bytes.NewReader(dataB)),
-		Bucket:  aws.String(l.bucket),
-		Key:     aws.String(l.filePath),
-		Tagging: aws.String(l.tags),
+		Bucket:  aws.String(l.conf.Bucket),
+		Key:     aws.String(l.conf.Filepath),
+		Tagging: aws.String(l.conf.Tags),
 	}
 
 	_, err = l.client.PutObject(input)
@@ -161,8 +141,8 @@ func (l *S3) Release() error {
 	}
 
 	delObjIn := &s3.DeleteObjectInput{
-		Bucket: aws.String(l.bucket),
-		Key:    aws.String(l.filePath),
+		Bucket: aws.String(l.conf.Bucket),
+		Key:    aws.String(l.conf.Filepath),
 	}
 
 	_, err := l.client.DeleteObject(delObjIn)
@@ -183,8 +163,8 @@ func (l *S3) isBusyDeletingExpired() (busy bool) {
 	busy = true
 
 	readObjIn := &s3.GetObjectInput{
-		Bucket: aws.String(l.bucket),
-		Key:    aws.String(l.filePath),
+		Bucket: aws.String(l.conf.Bucket),
+		Key:    aws.String(l.conf.Filepath),
 	}
 
 	resp, err := l.client.GetObject(readObjIn)
@@ -215,12 +195,12 @@ func (l *S3) isBusyDeletingExpired() (busy bool) {
 		return
 	}
 
-	if data.isExpired(l.ttl, time.Now()) {
+	if data.isExpired(l.conf.TTL, time.Now()) {
 		busy = false
 		return
 	}
 
-	busy = !data.belongsTo(l.owner)
+	busy = !data.belongsTo(l.conf.Owner)
 
 	return
 }

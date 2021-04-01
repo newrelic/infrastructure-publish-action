@@ -95,5 +95,5 @@ func TestS3_retry(t *testing.T) {
 }
 
 func newTestConf(lockgroup, owner string) S3Config {
-	return NewS3Config(bucket, roleARN, region, lockgroup, owner, 0, DefaultRetryBackoff, DefaultTTL)
+	return NewS3Config(bucket, roleARN, region, "", lockgroup, owner, 0, DefaultRetryBackoff, DefaultTTL)
 }

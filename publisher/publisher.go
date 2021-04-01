@@ -59,7 +59,7 @@ var (
 )
 
 type config struct {
-	lock                 lock.Mode // modes: "disabled", "retry_when_busy" (default), "fail_when_busy"
+	lockMode             lock.Mode // modes: "disabled", "retry_when_busy" (default), "fail_when_busy"
 	destPrefix           string
 	repoName             string
 	appName              string
@@ -101,12 +101,12 @@ type uploadArtifactsSchema []uploadArtifactSchema
 func main() {
 	conf := loadConfig()
 
-	if !conf.lock.IsValid() {
+	if !conf.lockMode.IsValid() {
 		l.Fatal("invalid lock mode")
 	}
 
 	var bucketLock lock.BucketLock
-	if conf.lock.IsDisabled() {
+	if conf.lockMode.IsDisabled() {
 		bucketLock = lock.NewNoop()
 	} else {
 		if conf.awsRegion == "" {
@@ -122,14 +122,25 @@ func main() {
 			l.Fatal("missing 'run_id' value")
 		}
 
+		// TODO parametrise
+		// resource tags
+		var (
+			tagOwningTeam = "CAOS"
+			tagProduct    = "integrations"
+			tagProject    = "infrastructure-publish-action"
+			tagEnv        = "us-development"
+		)
+		tags := fmt.Sprintf("department=product&product=%s&project=%s&owning_team=%s&environment=%s", tagProduct, tagProject, tagOwningTeam, tagEnv)
+
 		var maxRetries uint
-		if conf.lock.IsRetryOnBusy() {
+		if conf.lockMode.IsRetryOnBusy() {
 			maxRetries = defaultLockRetries
 		}
 		cfg := lock.NewS3Config(
 			conf.awsLockBucket,
 			conf.awsLockBucket,
 			conf.awsRegion,
+			tags,
 			conf.lockGroup,
 			conf.owner(),
 			maxRetries,
@@ -214,7 +225,7 @@ func loadConfig() config {
 		awsLockBucket:        viper.GetString("aws_s3_lock_bucket_name"),
 		awsRoleARN:           viper.GetString("aws_role_arn"),
 		awsRegion:            viper.GetString("aws_region"),
-		lock:                 lock.Mode(viper.GetString("lock")),
+		lockMode:             lock.Mode(viper.GetString("lock")),
 	}
 }
 
