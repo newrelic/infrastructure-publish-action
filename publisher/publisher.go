@@ -51,6 +51,21 @@ const (
 	aptPoolMain        = "pool/main/"
 	aptDists           = "dists/"
 	commandTimeout     = time.Hour * 1
+
+	// AWS lock resource tags
+	defaultTagOwningTeam = "CAOS"
+	defaultTagProduct    = "integrations"
+	defaultTagProject    = "infrastructure-publish-action"
+	defaultTagEnv        = "us-development"
+)
+
+var (
+	defaultTags = fmt.Sprintf("department=product&product=%s&project=%s&owning_team=%s&environment=%s",
+		defaultTagProduct,
+		defaultTagProject,
+		defaultTagOwningTeam,
+		defaultTagEnv,
+	)
 )
 
 var (
@@ -76,6 +91,7 @@ type config struct {
 	lockGroup            string
 	awsRegion            string
 	awsRoleARN           string
+	awsTags              string
 }
 
 func (c *config) owner() string {
@@ -122,15 +138,9 @@ func main() {
 			l.Fatal("missing 'run_id' value")
 		}
 
-		// TODO parametrise
-		// resource tags
-		var (
-			tagOwningTeam = "CAOS"
-			tagProduct    = "integrations"
-			tagProject    = "infrastructure-publish-action"
-			tagEnv        = "us-development"
-		)
-		tags := fmt.Sprintf("department=product&product=%s&project=%s&owning_team=%s&environment=%s", tagProduct, tagProject, tagOwningTeam, tagEnv)
+		if conf.awsTags == "" {
+			conf.awsTags = defaultTags
+		}
 
 		var maxRetries uint
 		if conf.lockMode.IsRetryOnBusy() {
@@ -140,7 +150,7 @@ func main() {
 			conf.awsLockBucket,
 			conf.awsLockBucket,
 			conf.awsRegion,
-			tags,
+			conf.awsTags,
 			conf.lockGroup,
 			conf.owner(),
 			maxRetries,
@@ -225,6 +235,7 @@ func loadConfig() config {
 		awsLockBucket:        viper.GetString("aws_s3_lock_bucket_name"),
 		awsRoleARN:           viper.GetString("aws_role_arn"),
 		awsRegion:            viper.GetString("aws_region"),
+		awsTags:              viper.GetString("aws_tags"),
 		lockMode:             lock.Mode(viper.GetString("lock")),
 	}
 }
