@@ -58,6 +58,7 @@ var (
 )
 
 type config struct {
+	lock                 lock.Mode // modes: "disabled", "retry_when_busy" (default), "fail_when_busy"
 	destPrefix           string
 	repoName             string
 	appName              string
@@ -74,7 +75,6 @@ type config struct {
 	lockGroup            string
 	awsRegion            string
 	awsRoleARN           string
-	disableLock          bool
 }
 
 func (c *config) owner() string {
@@ -100,9 +100,13 @@ type uploadArtifactsSchema []uploadArtifactSchema
 func main() {
 	conf := loadConfig()
 
+	if !conf.lock.IsValid() {
+		l.Fatal("invalid lock mode")
+	}
+
 	var bucketLock lock.BucketLock
 	var err error
-	if conf.disableLock {
+	if conf.lock.IsDisabled() {
 		bucketLock, err = lock.NewNoop()
 	} else {
 		if conf.awsRegion == "" {
@@ -117,6 +121,7 @@ func main() {
 		if conf.runID == "" {
 			l.Fatal("missing 'run_id' value")
 		}
+
 		bucketLock, err = lock.NewS3(conf.awsLockBucket, conf.awsRoleARN, conf.awsRegion, conf.lockGroup, conf.owner())
 	}
 	// fail fast when lacking required AWS credentials
@@ -165,7 +170,7 @@ func loadConfig() config {
 	viper.BindEnv("aws_s3_lock_bucket_name")
 	viper.BindEnv("aws_role_arn")
 	viper.BindEnv("aws_region")
-	viper.BindEnv("disable_lock")
+	viper.BindEnv("lock")
 
 	aptlyF := viper.GetString("aptly_folder")
 	if aptlyF == "" {
@@ -194,7 +199,7 @@ func loadConfig() config {
 		awsLockBucket:        viper.GetString("aws_s3_lock_bucket_name"),
 		awsRoleARN:           viper.GetString("aws_role_arn"),
 		awsRegion:            viper.GetString("aws_region"),
-		disableLock:          viper.GetBool("disable_lock"),
+		lock:                 lock.Mode(viper.GetString("lock")),
 	}
 }
 
