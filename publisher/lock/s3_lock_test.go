@@ -63,7 +63,7 @@ func TestS3_retry(t *testing.T) {
 	// AND a 2nd one being a retry grabber
 	c2 := newTestConf(t.Name(), "owner-2")
 	c2.MaxRetries = 1
-	c2.RetryBackoff = 500 * time.Millisecond // big boat indeed, ops are addressing an external API
+	c2.RetryBackoff = 1000 * time.Millisecond // big boat indeed, ops are addressing an external API
 	l2, err := NewS3(c2)
 	require.NoError(t, err)
 
