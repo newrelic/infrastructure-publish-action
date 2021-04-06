@@ -46,7 +46,7 @@ const (
 	repodataRpmPath    = "/repodata/repomd.xml"
 	signatureRpmPath   = "/repodata/repomd.xml.asc"
 	defaultAptlyFolder = "/root/.aptly"
-	defaultLockRetries = 10
+	defaultLockRetries = 30
 	defaultLockgroup   = "lockgroup"
 	aptPoolMain        = "pool/main/"
 	aptDists           = "dists/"
