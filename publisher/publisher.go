@@ -74,7 +74,6 @@ var (
 )
 
 type config struct {
-	lockMode             lock.Mode // modes: "disabled" (default), "retry_when_busy", "fail_when_busy"
 	destPrefix           string
 	repoName             string
 	appName              string
@@ -87,11 +86,15 @@ type config struct {
 	uploadSchemaFilePath string
 	gpgPassphrase        string
 	gpgKeyRing           string
-	awsLockBucket        string
-	lockGroup            string
 	awsRegion            string
 	awsRoleARN           string
-	awsTags              string
+	// locking properties (candidate for factoring)
+	awsLockBucket     string
+	awsTags           string
+	lockGroup         string
+	disableLock       bool
+	lockRetries       uint
+	useDefLockRetries bool
 }
 
 func (c *config) owner() string {
@@ -117,12 +120,8 @@ type uploadArtifactsSchema []uploadArtifactSchema
 func main() {
 	conf := loadConfig()
 
-	if !conf.lockMode.IsValid() {
-		l.Fatal("invalid lock mode")
-	}
-
 	var bucketLock lock.BucketLock
-	if conf.lockMode.IsDisabled() {
+	if conf.disableLock {
 		bucketLock = lock.NewNoop()
 	} else {
 		if conf.awsRegion == "" {
@@ -142,9 +141,8 @@ func main() {
 			conf.awsTags = defaultTags
 		}
 
-		var maxRetries uint
-		if conf.lockMode.IsRetryOnBusy() {
-			maxRetries = defaultLockRetries
+		if conf.useDefLockRetries {
+			conf.lockRetries = defaultLockRetries
 		}
 		cfg := lock.NewS3Config(
 			conf.awsLockBucket,
@@ -153,7 +151,7 @@ func main() {
 			conf.awsTags,
 			conf.lockGroup,
 			conf.owner(),
-			maxRetries,
+			conf.lockRetries,
 			lock.DefaultRetryBackoff,
 			lock.DefaultTTL,
 		)
@@ -236,7 +234,9 @@ func loadConfig() config {
 		awsRoleARN:           viper.GetString("aws_role_arn"),
 		awsRegion:            viper.GetString("aws_region"),
 		awsTags:              viper.GetString("aws_tags"),
-		lockMode:             lock.Mode(viper.GetString("lock")),
+		disableLock:          viper.GetBool("disable_lock"),
+		lockRetries:          viper.GetUint("lock_retries"),
+		useDefLockRetries:    !viper.IsSet("lock_retries"), // when non set: use default value
 	}
 }
 

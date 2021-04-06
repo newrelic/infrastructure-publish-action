@@ -23,41 +23,6 @@ type BucketLock interface {
 	Release() error
 }
 
-type Mode string
-
-const (
-	modeDefault = ""
-	modeDisabled = "disabled"
-	modeRetryOnBusy = "retry_on_busy"
-	modeFailOnBusy = "fail_on_busy"
-)
-
-func (m Mode) IsValid() bool {
-	switch m {
-	case modeDefault:
-		return true
-	case modeDisabled:
-		return true
-	case modeRetryOnBusy:
-		return true
-	case modeFailOnBusy:
-		return true
-	}
-	return false
-}
-
-func (m Mode) IsDisabled() bool {
-	return m == modeDefault || m == modeDisabled
-}
-
-func (m Mode) IsRetryOnBusy() bool {
-	return m == modeRetryOnBusy
-}
-
-func (m Mode) IsFailOnBusy() bool {
-	return m == modeFailOnBusy
-}
-
 type noop struct{}
 
 // Noop returns a NO-OP lock, to be used when releasing stuff that won't need locking.
