@@ -204,7 +204,8 @@ func loadConfig() config {
 	viper.BindEnv("aws_s3_lock_bucket_name")
 	viper.BindEnv("aws_role_arn")
 	viper.BindEnv("aws_region")
-	viper.BindEnv("lock")
+	viper.BindEnv("disable_lock")
+	viper.BindEnv("lock_retries")
 
 	aptlyF := viper.GetString("aptly_folder")
 	if aptlyF == "" {
