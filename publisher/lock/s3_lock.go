@@ -98,6 +98,8 @@ func (l *S3) Lock() error {
 			}
 			l.logF("%s failed, waiting %s", l.conf.Owner, l.conf.RetryBackoff.String())
 			time.Sleep(l.conf.RetryBackoff)
+		} else {
+		break
 		}
 	}
 
