@@ -92,15 +92,11 @@ func NewS3(c S3Config, logfn Logf) (*S3, error) {
 func (l *S3) Lock() error {
 	for tries := 0; tries < int(l.conf.MaxRetries); tries++ {
 		l.logF("%s attempt %d", l.conf.Owner, tries)
-		if l.isBusyDeletingExpired() {
-			if tries >= int(l.conf.MaxRetries) {
-				break
-			}
-			l.logF("%s failed, waiting %s", l.conf.Owner, l.conf.RetryBackoff.String())
-			time.Sleep(l.conf.RetryBackoff)
-		} else {
+		if !l.isBusyDeletingExpired() || tries >= int(l.conf.MaxRetries) {
 			break
 		}
+		l.logF("%s failed, waiting %s", l.conf.Owner, l.conf.RetryBackoff.String())
+		time.Sleep(l.conf.RetryBackoff)
 	}
 
 	if l.isBusyDeletingExpired() {
