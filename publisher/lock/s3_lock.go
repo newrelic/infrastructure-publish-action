@@ -90,16 +90,13 @@ func NewS3(c S3Config, logfn Logf) (*S3, error) {
 
 // Lock S3 has no compare-and-swap so this is no bulletproof solution, but should be good enough.
 func (l *S3) Lock() error {
-	var tries uint
-retry:
-	if (l.conf.MaxRetries - tries) > 0 {
-		tries++
+	for tries := 0; tries < int(l.conf.MaxRetries); tries++ {
 		l.logF("%s attempt %d", l.conf.Owner, tries)
-		if l.isBusyDeletingExpired() {
-			l.logF("%s failed, waiting %s", l.conf.Owner, l.conf.RetryBackoff.String())
-			time.Sleep(l.conf.RetryBackoff)
-			goto retry
+		if !l.isBusyDeletingExpired() || tries >= int(l.conf.MaxRetries) {
+			break
 		}
+		l.logF("%s failed, waiting %s", l.conf.Owner, l.conf.RetryBackoff.String())
+		time.Sleep(l.conf.RetryBackoff)
 	}
 
 	if l.isBusyDeletingExpired() {
