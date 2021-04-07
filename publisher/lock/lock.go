@@ -2,7 +2,15 @@
 // SPDX-License-Identifier: Apache-2.0
 package lock
 
-import "errors"
+import (
+	"errors"
+	"time"
+)
+
+const (
+	DefaultTTL          = 1000 * time.Hour // disabled to manage leftover lockfiles manually for now
+	DefaultRetryBackoff = time.Minute
+)
 
 var (
 	ErrLockBusy = errors.New("lock is busy")
@@ -18,8 +26,8 @@ type BucketLock interface {
 type noop struct{}
 
 // Noop returns a NO-OP lock, to be used when releasing stuff that won't need locking.
-func NewNoop() (BucketLock, error) {
-	return &noop{}, nil
+func NewNoop() BucketLock {
+	return &noop{}
 }
 
 func (l *noop) Lock() error    { return nil }
