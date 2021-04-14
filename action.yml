@@ -5,10 +5,6 @@ inputs:
     description: Disabled locking, for stuff that won't need one, like Windows MSIs.
     required: false
     default: "false"
-  lock_retries:
-    description: Retries amount when repo is busy. Retry backoff is 1 minute.
-    required: false
-    default: "30"
   run_id:
     description: Action run identifier. To be provisioned from env-var `GITHUB_RUN_ID`.
     required: false
