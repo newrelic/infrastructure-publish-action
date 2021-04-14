@@ -539,10 +539,6 @@ func uploadApt(conf config, srcTemplate string, upload Upload, arch string) (err
 		l.Printf("[✔] Published succesfully deb repo for %s/%s", osVersion, arch)
 
 		// Copying the binary
-		//if err = copyFile(srcPath, filePath); err != nil {
-		//	return err
-		//}
-		// copy from temp repodata to repo repodata
 		if err = execLogOutput(l, "cp", "-f", srcPath, filePath); err != nil {
 			return err
 		}
@@ -566,6 +562,14 @@ func syncAPTMetadata(conf config, destPath string, osVersion string, arch string
 	}
 	l.Printf("[ ] Sync local repo for %s/%s into s3", osVersion, arch)
 	if err = execLogOutput(l, "cp", "-rf", conf.aptlyFolder+"/public/"+aptDists+osVersion, destPath); err != nil {
+		return err
+	}
+	// drop local repo, to be able to recreate it later
+	if err = execLogOutput(l, "aptly", "repo", "drop", osVersion); err != nil {
+		return err
+	}
+	// rm local repo files, as aptly keep them
+	if err = execLogOutput(l, "rm", "-rf", conf.aptlyFolder+"/public/"+aptDists+osVersion); err != nil {
 		return err
 	}
 	l.Printf("[✔] Sync local repo was successful for %s/%s into s3", osVersion, arch)
