@@ -46,26 +46,10 @@ const (
 	repodataRpmPath    = "/repodata/repomd.xml"
 	signatureRpmPath   = "/repodata/repomd.xml.asc"
 	defaultAptlyFolder = "/root/.aptly"
-	defaultLockRetries = 30
 	defaultLockgroup   = "lockgroup"
 	aptPoolMain        = "pool/main/"
 	aptDists           = "dists/"
 	commandTimeout     = time.Hour * 1
-
-	// AWS lock resource tags
-	defaultTagOwningTeam = "CAOS"
-	defaultTagProduct    = "integrations"
-	defaultTagProject    = "infrastructure-publish-action"
-	defaultTagEnv        = "us-development"
-)
-
-var (
-	defaultTags = fmt.Sprintf("department=product&product=%s&project=%s&owning_team=%s&environment=%s",
-		defaultTagProduct,
-		defaultTagProject,
-		defaultTagOwningTeam,
-		defaultTagEnv,
-	)
 )
 
 var (
@@ -86,15 +70,11 @@ type config struct {
 	uploadSchemaFilePath string
 	gpgPassphrase        string
 	gpgKeyRing           string
+	awsLockBucket        string
+	lockGroup            string
 	awsRegion            string
 	awsRoleARN           string
-	// locking properties (candidate for factoring)
-	awsLockBucket     string
-	awsTags           string
-	lockGroup         string
-	disableLock       bool
-	lockRetries       uint
-	useDefLockRetries bool
+	disableLock          bool
 }
 
 func (c *config) owner() string {
@@ -121,8 +101,9 @@ func main() {
 	conf := loadConfig()
 
 	var bucketLock lock.BucketLock
+	var err error
 	if conf.disableLock {
-		bucketLock = lock.NewNoop()
+		bucketLock, err = lock.NewNoop()
 	} else {
 		if conf.awsRegion == "" {
 			l.Fatal("missing 'aws_region' value")
@@ -136,31 +117,11 @@ func main() {
 		if conf.runID == "" {
 			l.Fatal("missing 'run_id' value")
 		}
-
-		if conf.awsTags == "" {
-			conf.awsTags = defaultTags
-		}
-
-		if conf.useDefLockRetries {
-			conf.lockRetries = defaultLockRetries
-		}
-		cfg := lock.NewS3Config(
-			conf.awsLockBucket,
-			conf.awsLockBucket,
-			conf.awsRegion,
-			conf.awsTags,
-			conf.lockGroup,
-			conf.owner(),
-			conf.lockRetries,
-			lock.DefaultRetryBackoff,
-			lock.DefaultTTL,
-		)
-		var err error
-		bucketLock, err = lock.NewS3(cfg, l.Printf)
-		// fail fast when lacking required AWS credentials
-		if err != nil {
-			l.Fatal("cannot create lock on s3: " + err.Error())
-		}
+		bucketLock, err = lock.NewS3(conf.awsLockBucket, conf.awsRoleARN, conf.awsRegion, conf.lockGroup, conf.owner())
+	}
+	// fail fast when lacking required AWS credentials
+	if err != nil {
+		l.Fatal("cannot create lock: " + err.Error())
 	}
 
 	uploadSchemaContent, err := readFileContent(conf.uploadSchemaFilePath)
@@ -204,7 +165,7 @@ func loadConfig() config {
 	viper.BindEnv("aws_s3_lock_bucket_name")
 	viper.BindEnv("aws_role_arn")
 	viper.BindEnv("aws_region")
-	viper.BindEnv("lock")
+	viper.BindEnv("disable_lock")
 
 	aptlyF := viper.GetString("aptly_folder")
 	if aptlyF == "" {
@@ -233,10 +194,7 @@ func loadConfig() config {
 		awsLockBucket:        viper.GetString("aws_s3_lock_bucket_name"),
 		awsRoleARN:           viper.GetString("aws_role_arn"),
 		awsRegion:            viper.GetString("aws_region"),
-		awsTags:              viper.GetString("aws_tags"),
 		disableLock:          viper.GetBool("disable_lock"),
-		lockRetries:          viper.GetUint("lock_retries"),
-		useDefLockRetries:    !viper.IsSet("lock_retries"), // when non set: use default value
 	}
 }
 

@@ -5,6 +5,7 @@ package lock
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"time"
@@ -16,28 +17,28 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3"
 )
 
-// S3Config S3 lock config DTO.
-type S3Config struct {
-	Bucket       string
-	RoleARN      string
-	Region       string
-	Tags         string
-	Filepath     string
-	Owner        string
-	MaxRetries   uint
-	RetryBackoff time.Duration
-	TTL          time.Duration
-}
+const (
+	defaultTTL = 1000 * time.Hour // disable to manage leftover lockfiles manually for now
+)
+
+// We should parametrise these:
+var (
+	// resource tags
+	tagOwningTeam = "CAOS"
+	tagProduct    = "integrations"
+	tagProject    = "infrastructure-publish-action"
+	tagEnv        = "us-development"
+)
 
 // S3 based lock.
 type S3 struct {
-	client *s3.S3
-	logF   Logf
-	conf   S3Config
+	client   *s3.S3
+	owner    string
+	bucket   string
+	tags     string
+	filePath string
+	ttl      time.Duration
 }
-
-// Logf logger to provide feedback on retries.
-type Logf func(format string, args ...interface{})
 
 // lockData represents contents of the JSON lock-file at S3.
 type lockData struct {
@@ -54,57 +55,37 @@ func (l *lockData) isExpired(ttl time.Duration, t time.Time) bool {
 	return l.CreatedAt.Add(ttl).Before(t)
 }
 
-func NewS3Config(bucketName, roleARN, awsRegion, tags, lockGroup, owner string, maxRetries uint, retryBackoff, ttl time.Duration) S3Config {
-	return S3Config{
-		Bucket:       bucketName,
-		RoleARN:      roleARN,
-		Region:       awsRegion,
-		Tags:         tags,
-		Filepath:     lockGroup,
-		Owner:        owner,
-		TTL:          ttl,
-		RetryBackoff: retryBackoff,
-		MaxRetries:   maxRetries,
-	}
-}
-
 // NewS3 creates a lock instance ready to be used validating required AWS credentials.
-func NewS3(c S3Config, logfn Logf) (*S3, error) {
+func NewS3(bucket, roleARN, region, filepath, owner string) (*S3, error) {
 	sess, err := session.NewSession()
 	if err != nil {
 		return nil, err
 	}
 
-	creds := stscreds.NewCredentials(sess, c.RoleARN, func(p *stscreds.AssumeRoleProvider) {})
-	awsCfg := aws.Config{
+	creds := stscreds.NewCredentials(sess, roleARN, func(p *stscreds.AssumeRoleProvider) {})
+	conf := aws.Config{
 		Credentials: creds,
-		Region:      aws.String(c.Region),
+		Region:      aws.String(region),
 	}
 
 	return &S3{
-		client: s3.New(sess, &awsCfg),
-		logF:   logfn,
-		conf:   c,
+		client:   s3.New(sess, &conf),
+		owner:    owner,
+		bucket:   bucket,
+		filePath: filepath,
+		tags:     fmt.Sprintf("department=product&product=%s&project=%s&owning_team=%s&environment=%s", tagProduct, tagProject, tagOwningTeam, tagEnv),
+		ttl:      defaultTTL,
 	}, nil
 }
 
 // Lock S3 has no compare-and-swap so this is no bulletproof solution, but should be good enough.
 func (l *S3) Lock() error {
-	for tries := 0; tries < int(l.conf.MaxRetries); tries++ {
-		l.logF("%s attempt %d", l.conf.Owner, tries)
-		if !l.isBusyDeletingExpired() || tries >= int(l.conf.MaxRetries) {
-			break
-		}
-		l.logF("%s failed, waiting %s", l.conf.Owner, l.conf.RetryBackoff.String())
-		time.Sleep(l.conf.RetryBackoff)
-	}
-
 	if l.isBusyDeletingExpired() {
 		return ErrLockBusy
 	}
 
 	data := lockData{
-		Owner:     l.conf.Owner,
+		Owner:     l.owner,
 		CreatedAt: time.Now(),
 	}
 	dataB, err := json.Marshal(data)
@@ -114,9 +95,9 @@ func (l *S3) Lock() error {
 
 	input := &s3.PutObjectInput{
 		Body:    aws.ReadSeekCloser(bytes.NewReader(dataB)),
-		Bucket:  aws.String(l.conf.Bucket),
-		Key:     aws.String(l.conf.Filepath),
-		Tagging: aws.String(l.conf.Tags),
+		Bucket:  aws.String(l.bucket),
+		Key:     aws.String(l.filePath),
+		Tagging: aws.String(l.tags),
 	}
 
 	_, err = l.client.PutObject(input)
@@ -138,8 +119,8 @@ func (l *S3) Release() error {
 	}
 
 	delObjIn := &s3.DeleteObjectInput{
-		Bucket: aws.String(l.conf.Bucket),
-		Key:    aws.String(l.conf.Filepath),
+		Bucket: aws.String(l.bucket),
+		Key:    aws.String(l.filePath),
 	}
 
 	_, err := l.client.DeleteObject(delObjIn)
@@ -160,8 +141,8 @@ func (l *S3) isBusyDeletingExpired() (busy bool) {
 	busy = true
 
 	readObjIn := &s3.GetObjectInput{
-		Bucket: aws.String(l.conf.Bucket),
-		Key:    aws.String(l.conf.Filepath),
+		Bucket: aws.String(l.bucket),
+		Key:    aws.String(l.filePath),
 	}
 
 	resp, err := l.client.GetObject(readObjIn)
@@ -192,12 +173,12 @@ func (l *S3) isBusyDeletingExpired() (busy bool) {
 		return
 	}
 
-	if data.isExpired(l.conf.TTL, time.Now()) {
+	if data.isExpired(l.ttl, time.Now()) {
 		busy = false
 		return
 	}
 
-	busy = !data.belongsTo(l.conf.Owner)
+	busy = !data.belongsTo(l.owner)
 
 	return
 }
