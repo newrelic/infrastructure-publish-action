@@ -426,6 +426,7 @@ func uploadRpm(conf config, srcTemplate string, upload Upload, arch string) (err
 
 		srcPath := path.Join(conf.artifactsSrcFolder, fileName)
 		repoPath := path.Join(conf.artifactsDestFolder, destPath)
+		s3RepoData := path.Join(repoPath, "repodata")
 		filePath := path.Join(repoPath, fileName)
 		repomd := path.Join(repoPath, repodataRpmPath)
 		signaturePath := path.Join(repoPath, signatureRpmPath)
@@ -448,9 +449,11 @@ func uploadRpm(conf config, srcTemplate string, upload Upload, arch string) (err
 			_ = os.Remove(signaturePath)
 		}
 
-		// "cache" the repodata so it doesnt have to process all again
-		if err = execLogOutput(l, "cp", "-rf", repoPath+"/repodata/", os.TempDir()+"/repodata/"); err != nil {
-			return err
+		if _, err = os.Stat(s3RepoData + "/"); err == nil {
+			// "cache" the repodata so it doesnt have to process all again
+			if err = execLogOutput(l, "cp", "-rf", s3RepoData + "/", os.TempDir()+"/repodata/"); err != nil {
+				return err
+			}
 		}
 
 		if err = execLogOutput(l, "createrepo", "--update", "-s", "sha", repoPath, "-o", os.TempDir()); err != nil {
@@ -458,7 +461,7 @@ func uploadRpm(conf config, srcTemplate string, upload Upload, arch string) (err
 		}
 
 		// remove the 'old' repodata
-		if err = execLogOutput(l, "rm", "-rf", repoPath+"/repodata/"); err != nil {
+		if err = execLogOutput(l, "rm", "-rf", s3RepoData + "/"); err != nil {
 			return err
 		}
 
