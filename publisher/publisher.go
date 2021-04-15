@@ -568,6 +568,10 @@ func syncAPTMetadata(conf config, destPath string, osVersion string, arch string
 	if err = execLogOutput(l, "aptly", "publish", "drop", osVersion); err != nil {
 		return err
 	}
+	// drop local mirror, to be able to recreate it later
+	if err = execLogOutput(l, "aptly", "mirror", "drop", "-force", "mirror-"+osVersion); err != nil {
+		return err
+	}
 	// drop local repo, to be able to recreate it later
 	if err = execLogOutput(l, "aptly", "repo", "drop", osVersion); err != nil {
 		return err
