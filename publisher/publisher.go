@@ -78,6 +78,7 @@ type config struct {
 	repoName             string
 	appName              string
 	tag                  string
+	accessPointHost      string
 	runID                string
 	version              string
 	artifactsDestFolder  string
@@ -192,6 +193,7 @@ func loadConfig() config {
 	viper.BindEnv("repo_name")
 	viper.BindEnv("app_name")
 	viper.BindEnv("tag")
+	viper.BindEnv("access_point_host")
 	viper.BindEnv("run_id")
 	viper.BindEnv("artifacts_dest_folder")
 	viper.BindEnv("artifacts_src_folder")
@@ -222,6 +224,7 @@ func loadConfig() config {
 		repoName:             viper.GetString("repo_name"),
 		appName:              viper.GetString("app_name"),
 		tag:                  viper.GetString("tag"),
+		accessPointHost:      viper.GetString("access_point_host"),
 		runID:                viper.GetString("run_id"),
 		version:              strings.Replace(viper.GetString("tag"), "v", "", -1),
 		artifactsDestFolder:  viper.GetString("artifacts_dest_folder"),
@@ -426,6 +429,7 @@ func uploadRpm(conf config, srcTemplate string, upload Upload, arch string) (err
 
 		srcPath := path.Join(conf.artifactsSrcFolder, fileName)
 		repoPath := path.Join(conf.artifactsDestFolder, destPath)
+		repoFilePath := path.Join(repoPath, "newrelic-infra.repo")
 		s3RepoData := path.Join(repoPath, "repodata")
 		filePath := path.Join(repoPath, fileName)
 		repomd := path.Join(repoPath, repodataRpmPath)
@@ -449,9 +453,23 @@ func uploadRpm(conf config, srcTemplate string, upload Upload, arch string) (err
 			_ = os.Remove(signaturePath)
 		}
 
+		// check for .repo file
+		if _, err = os.Stat(repoFilePath); conf.accessPointHost != "" && os.IsNotExist(err) {
+			l.Println(fmt.Sprintf("creating 'newrelic-infra.repo' file in %s", repoPath))
+
+			repoFileContent := fmt.Sprintf(
+				"[newrelic-infra]\nname=New Relic Infrastructure\nbaseurl=%s/%s\ngpgkey=https://download.newrelic.com/infrastructure_agent/gpg/newrelic-infra.gpg\ngpgcheck=1\nrepo_gpgcheck=1",
+				conf.accessPointHost, destPath)
+
+			err := ioutil.WriteFile(repoFilePath, []byte(repoFileContent), 0644)
+			if err != nil {
+				return err
+			}
+		}
+
 		if _, err = os.Stat(s3RepoData + "/"); err == nil {
 			// "cache" the repodata so it doesnt have to process all again
-			if err = execLogOutput(l, "cp", "-rf", s3RepoData + "/", os.TempDir()+"/repodata/"); err != nil {
+			if err = execLogOutput(l, "cp", "-rf", s3RepoData+"/", os.TempDir()+"/repodata/"); err != nil {
 				return err
 			}
 		}
@@ -461,7 +479,7 @@ func uploadRpm(conf config, srcTemplate string, upload Upload, arch string) (err
 		}
 
 		// remove the 'old' repodata
-		if err = execLogOutput(l, "rm", "-rf", s3RepoData + "/"); err != nil {
+		if err = execLogOutput(l, "rm", "-rf", s3RepoData+"/"); err != nil {
 			return err
 		}
 

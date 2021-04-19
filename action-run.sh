@@ -22,6 +22,7 @@ docker run --rm \
         -e REPO_NAME \
         -e APP_NAME \
         -e TAG \
+        -e ACCESS_POINT_HOST \
         -e RUN_ID \
         -e ARTIFACTS_DEST_FOLDER=/mnt/s3 \
         -e ARTIFACTS_SRC_FOLDER=/home/gha/assets \

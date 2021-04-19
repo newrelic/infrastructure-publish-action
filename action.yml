@@ -42,6 +42,9 @@ inputs:
   tag:
     description: Tag pointing to the release
     required: true
+  access_point_host:
+    description: Http host to use and AP for .repo files in YUM/ZYPP repos
+    required: false
   schema:
     description: Name of the schema describing the packages to be published (i.e. infra-agent, ohi, nrjmx, custom - requires schemaUrl)
     required: true
@@ -68,6 +71,7 @@ runs:
         REPO_NAME: ${{ inputs.repo_name }}
         APP_NAME: ${{ inputs.app_name }}
         TAG: ${{ inputs.tag }}
+        ACCESS_POINT_HOST: ${{ inputs.access_point_host }}
         SCHEMA: ${{ inputs.schema }}
         SCHEMA_URL: ${{ inputs.schema_url }}
         RUN_ID: ${{ inputs.run_id }}
