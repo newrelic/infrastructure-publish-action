@@ -146,7 +146,7 @@ func main() {
 		}
 		cfg := lock.NewS3Config(
 			conf.awsLockBucket,
-			conf.awsLockBucket,
+			conf.awsRoleARN,
 			conf.awsRegion,
 			conf.awsTags,
 			conf.lockGroup,

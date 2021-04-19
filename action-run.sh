@@ -31,4 +31,5 @@ docker run --rm \
         -e GPG_PASSPHRASE \
         -e DISABLE_LOCK \
         -e GPG_KEY_RING=/home/gha/keyring.gpg \
+        -e DEST_PREFIX \
         newrelic/infrastructure-publish-action
