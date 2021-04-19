@@ -24,6 +24,10 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         run: make test
 
+      # GHA aws-cli issue https://github.com/aws/aws-cli/issues/5262#issuecomment-801301976
+      - name: Configure AWS Region
+        run: echo "AWS_DEFAULT_REGION=us-east-1" >> $GITHUB_ENV
+
       - name: End-to-end tests
         env:
           GPG_KEY_NAME: ${{ secrets.GPG_KEY_NAME }}
