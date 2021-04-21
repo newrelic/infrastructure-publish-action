@@ -74,7 +74,7 @@ func (c *urlRecorderHTTPClient) Do(req *http.Request) (*http.Response, error) {
 
 	return &http.Response{
 		StatusCode: http.StatusOK,
-		Body: ioutil.NopCloser(bytes.NewReader([]byte{})),
+		Body:       ioutil.NopCloser(bytes.NewReader([]byte{})),
 	}, nil
 }
 
@@ -423,6 +423,26 @@ func Test_execLogOutput_streamExecOutputEnabled(t *testing.T) {
 			}
 		})
 	}
+}
+
+func Test_generateDownloadUrl(t *testing.T) {
+
+	repoName := "newrelic/infrastructure-agent"
+	tag := "1.16.4"
+	srcFile := "newrelic-infra-1.16.4-1.el8.arm.rpm"
+
+	url := generateDownloadUrl(urlTemplate, repoName, tag, srcFile)
+
+	assert.Equal(t, "https://github.com/newrelic/infrastructure-agent/releases/download/1.16.4/newrelic-infra-1.16.4-1.el8.arm.rpm", url)
+}
+
+func Test_generateAptSrcRepoUrl(t *testing.T) {
+	template := "{access_point_host}/infrastructure_agent/linux/apt"
+	accessPointHost := "https://download.newrelic.com"
+
+	srcRepo := generateAptSrcRepoUrl(template, accessPointHost)
+
+	assert.Equal(t, "https://download.newrelic.com/infrastructure_agent/linux/apt", srcRepo)
 }
 
 func expectedLog(prefix, content string) string {

@@ -25,15 +25,16 @@ import (
 )
 
 const (
-	placeholderForOsVersion  = "{os_version}"
-	placeholderForDestPrefix = "{dest_prefix}"
-	placeholderForRepoName   = "{repo_name}"
-	placeholderForAppName    = "{app_name}"
-	placeholderForArch       = "{arch}"
-	placeholderForTag        = "{tag}"
-	placeholderForVersion    = "{version}"
-	placeholderForSrc        = "{src}"
-	urlTemplate              = "https://github.com/{repo_name}/releases/download/{tag}/{src}"
+	placeholderForOsVersion       = "{os_version}"
+	placeholderForDestPrefix      = "{dest_prefix}"
+	placeholderForRepoName        = "{repo_name}"
+	placeholderForAppName         = "{app_name}"
+	placeholderForArch            = "{arch}"
+	placeholderForTag             = "{tag}"
+	placeholderForVersion         = "{version}"
+	placeholderForSrc             = "{src}"
+	placeholderForAccessPointHost = "{access_point_host}"
+	urlTemplate                   = "https://github.com/{repo_name}/releases/download/{tag}/{src}"
 
 	//Errors
 	noDestinationError = "no uploads were provided for the schema"
@@ -539,7 +540,8 @@ func uploadApt(conf config, srcTemplate string, upload Upload, arch string) (err
 		l.Printf("[✔] Local repo created for os %s/%s", osVersion, arch)
 
 		// Mirror repo start
-		err = mirrorAPTRepo(conf, upload.SrcRepo, srcPath, osVersion, arch)
+		srcRepo := generateAptSrcRepoUrl(upload.SrcRepo, conf.accessPointHost)
+		err = mirrorAPTRepo(conf, srcRepo, srcPath, osVersion, arch)
 		if err != nil {
 			return err
 		}
@@ -782,6 +784,12 @@ func replaceSrcDestTemplates(srcFileTemplate, destPathTemplate, repoName, appNam
 func generateDownloadUrl(template, repoName, tag, srcFile string) (url string) {
 	url = replacePlaceholders(template, repoName, "", "", tag, "", "", "")
 	url = strings.Replace(url, placeholderForSrc, srcFile, -1)
+
+	return
+}
+
+func generateAptSrcRepoUrl(template, accessPointHost string) (url string) {
+	url = strings.Replace(template, placeholderForAccessPointHost, accessPointHost, -1)
 
 	return
 }
