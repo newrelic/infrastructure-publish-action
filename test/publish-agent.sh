@@ -20,7 +20,7 @@ AWS_ROLE_ARN="arn:aws:iam::017663287629:role/caos_testing"
 DEST_PREFIX="infrastructure_agent/test_e2e/$(uuidgen)"
 # Private vars
 _ASSERT_DIR="s3://${AWS_S3_BUCKET_NAME}/${DEST_PREFIX}binaries/linux/386/"
-_ASSERT_FILE="newrelic-infra_linux_${TAG}"
+_ASSERT_FILE="newrelic-infra_linux_${TAG}" # aws-s3-ls returns files matching the prefix and 0-exit in case of match
 
 
 printf "\n- Verifying secrets are available through env-vars...\n"
