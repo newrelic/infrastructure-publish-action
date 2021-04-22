@@ -458,9 +458,7 @@ func uploadRpm(conf config, srcTemplate string, upload Upload, arch string) (err
 		if _, err = os.Stat(repoFilePath); conf.accessPointHost != "" && os.IsNotExist(err) {
 			l.Println(fmt.Sprintf("creating 'newrelic-infra.repo' file in %s", repoPath))
 
-			repoFileContent := fmt.Sprintf(
-				"[newrelic-infra]\nname=New Relic Infrastructure\nbaseurl=%s/%s\ngpgkey=https://download.newrelic.com/infrastructure_agent/gpg/newrelic-infra.gpg\ngpgcheck=1\nrepo_gpgcheck=1",
-				conf.accessPointHost, destPath)
+			repoFileContent := generateRepoFileContent(conf.accessPointHost, destPath)
 
 			err := ioutil.WriteFile(repoFilePath, []byte(repoFileContent), 0644)
 			if err != nil {
@@ -790,6 +788,20 @@ func generateDownloadUrl(template, repoName, tag, srcFile string) (url string) {
 
 func generateAptSrcRepoUrl(template, accessPointHost string) (url string) {
 	url = strings.Replace(template, placeholderForAccessPointHost, accessPointHost, -1)
+
+	return
+}
+
+func generateRepoFileContent(accessPointHost, destPath string) (repoFileContent string) {
+
+	contentTemplate := `[newrelic-infra]
+name=New Relic Infrastructure
+baseurl=%s/%s
+gpgkey=https://download.newrelic.com/infrastructure_agent/gpg/newrelic-infra.gpg
+gpgcheck=1
+repo_gpgcheck=1`
+
+	repoFileContent = fmt.Sprintf(contentTemplate, accessPointHost, destPath)
 
 	return
 }

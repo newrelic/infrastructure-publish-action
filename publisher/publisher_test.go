@@ -445,6 +445,18 @@ func Test_generateAptSrcRepoUrl(t *testing.T) {
 	assert.Equal(t, "https://download.newrelic.com/infrastructure_agent/linux/apt", srcRepo)
 }
 
+func Test_generateRepoFileContent(t *testing.T) {
+
+	accessPointHost := "https://download.newrelic.com"
+	repoPath := "infrastructure_agent/linux/apt"
+	repoFileContent := generateRepoFileContent(accessPointHost, repoPath)
+
+	expectedContent := "[newrelic-infra]\nname=New Relic Infrastructure\nbaseurl=https://download.newrelic.com/infrastructure_agent/linux/apt\ngpgkey=https://download.newrelic.com/infrastructure_agent/gpg/newrelic-infra.gpg\ngpgcheck=1\nrepo_gpgcheck=1"
+
+	assert.Equal(t, expectedContent, repoFileContent)
+
+}
+
 func expectedLog(prefix, content string) string {
 	if content == "" {
 		return content
