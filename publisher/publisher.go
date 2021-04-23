@@ -25,15 +25,16 @@ import (
 )
 
 const (
-	placeholderForOsVersion  = "{os_version}"
-	placeholderForDestPrefix = "{dest_prefix}"
-	placeholderForRepoName   = "{repo_name}"
-	placeholderForAppName    = "{app_name}"
-	placeholderForArch       = "{arch}"
-	placeholderForTag        = "{tag}"
-	placeholderForVersion    = "{version}"
-	placeholderForSrc        = "{src}"
-	urlTemplate              = "https://github.com/{repo_name}/releases/download/{tag}/{src}"
+	placeholderForOsVersion       = "{os_version}"
+	placeholderForDestPrefix      = "{dest_prefix}"
+	placeholderForRepoName        = "{repo_name}"
+	placeholderForAppName         = "{app_name}"
+	placeholderForArch            = "{arch}"
+	placeholderForTag             = "{tag}"
+	placeholderForVersion         = "{version}"
+	placeholderForSrc             = "{src}"
+	placeholderForAccessPointHost = "{access_point_host}"
+	urlTemplate                   = "https://github.com/{repo_name}/releases/download/{tag}/{src}"
 
 	//Errors
 	noDestinationError = "no uploads were provided for the schema"
@@ -78,6 +79,7 @@ type config struct {
 	repoName             string
 	appName              string
 	tag                  string
+	accessPointHost      string
 	runID                string
 	version              string
 	artifactsDestFolder  string
@@ -192,6 +194,7 @@ func loadConfig() config {
 	viper.BindEnv("repo_name")
 	viper.BindEnv("app_name")
 	viper.BindEnv("tag")
+	viper.BindEnv("access_point_host")
 	viper.BindEnv("run_id")
 	viper.BindEnv("artifacts_dest_folder")
 	viper.BindEnv("artifacts_src_folder")
@@ -222,6 +225,7 @@ func loadConfig() config {
 		repoName:             viper.GetString("repo_name"),
 		appName:              viper.GetString("app_name"),
 		tag:                  viper.GetString("tag"),
+		accessPointHost:      viper.GetString("access_point_host"),
 		runID:                viper.GetString("run_id"),
 		version:              strings.Replace(viper.GetString("tag"), "v", "", -1),
 		artifactsDestFolder:  viper.GetString("artifacts_dest_folder"),
@@ -426,6 +430,8 @@ func uploadRpm(conf config, srcTemplate string, upload Upload, arch string) (err
 
 		srcPath := path.Join(conf.artifactsSrcFolder, fileName)
 		repoPath := path.Join(conf.artifactsDestFolder, destPath)
+		repoFilePath := path.Join(repoPath, "newrelic-infra.repo")
+		s3RepoData := path.Join(repoPath, "repodata")
 		filePath := path.Join(repoPath, fileName)
 		repomd := path.Join(repoPath, repodataRpmPath)
 		signaturePath := path.Join(repoPath, signatureRpmPath)
@@ -448,9 +454,23 @@ func uploadRpm(conf config, srcTemplate string, upload Upload, arch string) (err
 			_ = os.Remove(signaturePath)
 		}
 
-		// "cache" the repodata so it doesnt have to process all again
-		if err = execLogOutput(l, "cp", "-rf", repoPath+"/repodata/", os.TempDir()+"/repodata/"); err != nil {
-			return err
+		// check for .repo file
+		if _, err = os.Stat(repoFilePath); conf.accessPointHost != "" && os.IsNotExist(err) {
+			l.Println(fmt.Sprintf("creating 'newrelic-infra.repo' file in %s", repoPath))
+
+			repoFileContent := generateRepoFileContent(conf.accessPointHost, destPath)
+
+			err := ioutil.WriteFile(repoFilePath, []byte(repoFileContent), 0644)
+			if err != nil {
+				return err
+			}
+		}
+
+		if _, err = os.Stat(s3RepoData + "/"); err == nil {
+			// "cache" the repodata so it doesnt have to process all again
+			if err = execLogOutput(l, "cp", "-rf", s3RepoData+"/", os.TempDir()+"/repodata/"); err != nil {
+				return err
+			}
 		}
 
 		if err = execLogOutput(l, "createrepo", "--update", "-s", "sha", repoPath, "-o", os.TempDir()); err != nil {
@@ -458,7 +478,7 @@ func uploadRpm(conf config, srcTemplate string, upload Upload, arch string) (err
 		}
 
 		// remove the 'old' repodata
-		if err = execLogOutput(l, "rm", "-rf", repoPath+"/repodata/"); err != nil {
+		if err = execLogOutput(l, "rm", "-rf", s3RepoData+"/"); err != nil {
 			return err
 		}
 
@@ -518,7 +538,8 @@ func uploadApt(conf config, srcTemplate string, upload Upload, arch string) (err
 		l.Printf("[✔] Local repo created for os %s/%s", osVersion, arch)
 
 		// Mirror repo start
-		err = mirrorAPTRepo(conf, upload.SrcRepo, srcPath, osVersion, arch)
+		srcRepo := generateAptSrcRepoUrl(upload.SrcRepo, conf.accessPointHost)
+		err = mirrorAPTRepo(conf, srcRepo, srcPath, osVersion, arch)
 		if err != nil {
 			return err
 		}
@@ -536,10 +557,6 @@ func uploadApt(conf config, srcTemplate string, upload Upload, arch string) (err
 		l.Printf("[✔] Published succesfully deb repo for %s/%s", osVersion, arch)
 
 		// Copying the binary
-		//if err = copyFile(srcPath, filePath); err != nil {
-		//	return err
-		//}
-		// copy from temp repodata to repo repodata
 		if err = execLogOutput(l, "cp", "-f", srcPath, filePath); err != nil {
 			return err
 		}
@@ -563,6 +580,22 @@ func syncAPTMetadata(conf config, destPath string, osVersion string, arch string
 	}
 	l.Printf("[ ] Sync local repo for %s/%s into s3", osVersion, arch)
 	if err = execLogOutput(l, "cp", "-rf", conf.aptlyFolder+"/public/"+aptDists+osVersion, destPath); err != nil {
+		return err
+	}
+	// drop local published repo, to be able to recreate it later
+	if err = execLogOutput(l, "aptly", "publish", "drop", osVersion); err != nil {
+		return err
+	}
+	// drop local mirror, to be able to recreate it later
+	if err = execLogOutput(l, "aptly", "mirror", "drop", "-force", "mirror-"+osVersion); err != nil {
+		return err
+	}
+	// drop local repo, to be able to recreate it later
+	if err = execLogOutput(l, "aptly", "repo", "drop", osVersion); err != nil {
+		return err
+	}
+	// rm local repo files, as aptly keep them
+	if err = execLogOutput(l, "rm", "-rf", conf.aptlyFolder+"/public/"+aptDists+osVersion); err != nil {
 		return err
 	}
 	l.Printf("[✔] Sync local repo was successful for %s/%s into s3", osVersion, arch)
@@ -749,6 +782,26 @@ func replaceSrcDestTemplates(srcFileTemplate, destPathTemplate, repoName, appNam
 func generateDownloadUrl(template, repoName, tag, srcFile string) (url string) {
 	url = replacePlaceholders(template, repoName, "", "", tag, "", "", "")
 	url = strings.Replace(url, placeholderForSrc, srcFile, -1)
+
+	return
+}
+
+func generateAptSrcRepoUrl(template, accessPointHost string) (url string) {
+	url = strings.Replace(template, placeholderForAccessPointHost, accessPointHost, -1)
+
+	return
+}
+
+func generateRepoFileContent(accessPointHost, destPath string) (repoFileContent string) {
+
+	contentTemplate := `[newrelic-infra]
+name=New Relic Infrastructure
+baseurl=%s/%s
+gpgkey=https://download.newrelic.com/infrastructure_agent/gpg/newrelic-infra.gpg
+gpgcheck=1
+repo_gpgcheck=1`
+
+	repoFileContent = fmt.Sprintf(contentTemplate, accessPointHost, destPath)
 
 	return
 }
