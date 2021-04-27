@@ -42,6 +42,7 @@ RUN chmod +x ./mount-s3.sh
 RUN mkdir ./assets
 RUN mkdir $AWS_S3_MOUNT_DIRECTORY
 ENV AWS_S3_MOUNT_DIRECTORY $AWS_S3_MOUNT_DIRECTORY
+ENV DEST_PREFIX $DEST_PREFIX
 
 # Run action
 CMD ["make", "--jobs=1"]
