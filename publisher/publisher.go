@@ -414,6 +414,12 @@ func uploadArtifacts(conf config, schema uploadArtifactsSchema, bucketLock lock.
 
 func uploadRpm(conf config, srcTemplate string, upload Upload, arch string) (err error) {
 
+	// RPM specific architecture variables
+	switch arch {
+	case "arm64":
+		arch = "aarch64"
+	}
+
 	for _, osVersion := range upload.OsVersion {
 		l.Printf("[ ] Start uploading rpm for os %s/%s", osVersion, arch)
 
