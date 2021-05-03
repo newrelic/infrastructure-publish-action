@@ -82,7 +82,7 @@ type config struct {
 	accessPointHost      string
 	runID                string
 	version              string
-	artifactsDestFolder  string
+	artifactsDestFolder  string // s3 mounted folder
 	artifactsSrcFolder   string
 	aptlyFolder          string
 	uploadSchemaFilePath string
@@ -415,17 +415,17 @@ func uploadArtifacts(conf config, schema uploadArtifactsSchema, bucketLock lock.
 func uploadRpm(conf config, srcTemplate string, upload Upload, arch string) (err error) {
 
 	// RPM specific architecture variables
-	switch arch {
+	destPathArch := arch
+	switch destPathArch {
 	case "arm64":
-		arch = "aarch64"
+		destPathArch = "aarch64"
 	}
 
 	for _, osVersion := range upload.OsVersion {
 		l.Printf("[ ] Start uploading rpm for os %s/%s", osVersion, arch)
 
-		fileName, destPath := replaceSrcDestTemplates(
+		downloadedRpmFileName := generateDownloadFileName(
 			srcTemplate,
-			upload.Dest,
 			conf.repoName,
 			conf.appName,
 			arch,
@@ -434,62 +434,75 @@ func uploadRpm(conf config, srcTemplate string, upload Upload, arch string) (err
 			conf.destPrefix,
 			osVersion)
 
-		srcPath := path.Join(conf.artifactsSrcFolder, fileName)
-		repoPath := path.Join(conf.artifactsDestFolder, destPath)
-		repoFilePath := path.Join(repoPath, "newrelic-infra.repo")
-		s3RepoData := path.Join(repoPath, "repodata")
-		filePath := path.Join(repoPath, fileName)
-		repomd := path.Join(repoPath, repodataRpmPath)
-		signaturePath := path.Join(repoPath, signatureRpmPath)
+		destPath := generateDestinationAssetsPath(
+			downloadedRpmFileName,
+			upload.Dest,
+			conf.repoName,
+			conf.appName,
+			destPathArch,
+			conf.tag,
+			conf.version,
+			conf.destPrefix,
+			osVersion)
 
-		err = copyFile(srcPath, filePath, upload.Override)
+		downloadedRpmFilePath := path.Join(conf.artifactsSrcFolder, downloadedRpmFileName)
+		s3RepoPath := path.Join(conf.artifactsDestFolder, destPath)
+		s3DotRepoFilepath := path.Join(s3RepoPath, "newrelic-infra.repo")
+		s3RepoData := path.Join(s3RepoPath, "repodata")
+		rpmDestinationPath := path.Join(s3RepoPath, downloadedRpmFileName)
+		s3RepomdFilepath := path.Join(s3RepoPath, repodataRpmPath)
+		signaturePath := path.Join(s3RepoPath, signatureRpmPath)
+
+		// copy rpm file to be able to add it into the index later
+		err = copyFile(downloadedRpmFilePath, rpmDestinationPath, upload.Override)
 		if err != nil {
 			return err
 		}
 
-		if _, err = os.Stat(repomd); os.IsNotExist(err) {
+		// check for repo and create if missing
+		if _, err = os.Stat(s3RepomdFilepath); os.IsNotExist(err) {
 
-			l.Printf("[ ] Didn't fine repo for %s, run repo init command", repoPath)
+			l.Printf("[ ] Didn't fine repo for %s, run repo init command", s3RepoPath)
 
-			if err := execLogOutput(l, "createrepo", repoPath, "-o", os.TempDir()); err != nil {
+			if err := execLogOutput(l, "createrepo", s3RepoPath, "-o", os.TempDir()); err != nil {
 				return err
 			}
 
-			l.Printf("[✔] Repo created: %s", repoPath)
+			l.Printf("[✔] Repo created: %s", s3RepoPath)
 		} else {
 			_ = os.Remove(signaturePath)
 		}
 
-		// check for .repo file
-		if _, err = os.Stat(repoFilePath); conf.accessPointHost != "" && os.IsNotExist(err) {
-			l.Println(fmt.Sprintf("creating 'newrelic-infra.repo' file in %s", repoPath))
+		// check for .repo file and create if needed
+		if _, err = os.Stat(s3DotRepoFilepath); conf.accessPointHost != "" && os.IsNotExist(err) {
+			l.Println(fmt.Sprintf("creating 'newrelic-infra.repo' file in %s", s3RepoPath))
 
 			repoFileContent := generateRepoFileContent(conf.accessPointHost, destPath)
 
-			err := ioutil.WriteFile(repoFilePath, []byte(repoFileContent), 0644)
+			err := ioutil.WriteFile(s3DotRepoFilepath, []byte(repoFileContent), 0644)
 			if err != nil {
 				return err
 			}
 		}
 
+		// "cache" the repodata from s3 to local so it doesnt have to process all again
 		if _, err = os.Stat(s3RepoData + "/"); err == nil {
-			// "cache" the repodata so it doesnt have to process all again
 			if err = execLogOutput(l, "cp", "-rf", s3RepoData+"/", os.TempDir()+"/repodata/"); err != nil {
 				return err
 			}
 		}
 
-		if err = execLogOutput(l, "createrepo", "--update", "-s", "sha", repoPath, "-o", os.TempDir()); err != nil {
+		if err = execLogOutput(l, "createrepo", "--update", "-s", "sha", s3RepoPath, "-o", os.TempDir()); err != nil {
 			return err
 		}
 
-		// remove the 'old' repodata
+		// remove the 'old' repodata from s3
 		if err = execLogOutput(l, "rm", "-rf", s3RepoData+"/"); err != nil {
 			return err
 		}
 
-		// copy from temp repodata to repo repodata
-		if err = execLogOutput(l, "cp", "-rf", os.TempDir()+"/repodata/", repoPath); err != nil {
+		// copy from temp repodata to repo repodata in s3
+		if err = execLogOutput(l, "cp", "-rf", os.TempDir()+"/repodata/", s3RepoPath); err != nil {
 			return err
 		}
 
@@ -498,16 +511,17 @@ func uploadRpm(conf config, srcTemplate string, upload Upload, arch string) (err
 			return err
 		}
 
-		_, err = os.Stat(repomd)
-
-		if err != nil {
-			return fmt.Errorf("error while creating repository %s for source %s and destination %s", err.Error(), srcPath, destPath)
+		// verify that metadata copied to s3
+		if _, err = os.Stat(s3RepomdFilepath); err != nil {
+			return fmt.Errorf("error while creating repository %s for source %s and destination %s", err.Error(), downloadedRpmFilePath, destPath)
 		}
 
-		if err := execLogOutput(l, "gpg", "--batch", "--pinentry-mode=loopback", "--passphrase", conf.gpgPassphrase, "--keyring", conf.gpgKeyRing, "--detach-sign", "--armor", repomd); err != nil {
+		// sign metadata with GPG key
+		if err := execLogOutput(l, "gpg", "--batch", "--pinentry-mode=loopback", "--passphrase", conf.gpgPassphrase, "--keyring", conf.gpgKeyRing, "--detach-sign", "--armor", s3RepomdFilepath); err != nil {
 			return err
 		}
-		l.Printf("[✔] Uploading RPM succeded for src %s and dest %s \n", srcPath, destPath)
+
+		l.Printf("[✔] Uploading RPM succeded for src %s and dest %s \n", downloadedRpmFilePath, destPath)
 	}
 
 	return nil
@@ -777,12 +791,22 @@ func replacePlaceholders(template, repoName, appName, arch, tag, version, destPr
 	return
 }
 
+// @TODO: deprecate this function and use generateDestinationAssetsPath() generateDownloadFileName()
 func replaceSrcDestTemplates(srcFileTemplate, destPathTemplate, repoName, appName, arch, tag, version, destPrefix, osVersion string) (srcFile string, destPath string) {
 	srcFile = replacePlaceholders(srcFileTemplate, repoName, appName, arch, tag, version, destPrefix, osVersion)
 	destPath = replacePlaceholders(destPathTemplate, repoName, appName, arch, tag, version, destPrefix, osVersion)
 	destPath = strings.Replace(destPath, placeholderForSrc, srcFile, -1)
 
 	return
+}
+
+func generateDestinationAssetsPath(downloadedFileName, destPathTemplate, repoName, appName, arch, tag, version, destPrefix, osVersion string) string{
+	destPath := replacePlaceholders(destPathTemplate, repoName, appName, arch, tag, version, destPrefix, osVersion)
+	return strings.Replace(destPath, placeholderForSrc, downloadedFileName, -1)
+}
+
+func generateDownloadFileName(srcFileTemplate, repoName, appName, arch, tag, version, destPrefix, osVersion string) string{
+	 return replacePlaceholders(srcFileTemplate, repoName, appName, arch, tag, version, destPrefix, osVersion)
 }
 
 func generateDownloadUrl(template, repoName, tag, srcFile string) (url string) {
