@@ -556,7 +556,10 @@ func uploadApt(conf config, srcTemplate string, upload Upload, arch string) (err
 		}
 		l.Printf("[✔] Published succesfully deb repo for %s/%s", osVersion, arch)
 
-		// Copying the binary
+		// Create the directory and copy the binary
+		if err = execLogOutput(l, "mkdir", "-p", path.Dir(filePath)); err != nil {
+			return err
+		}
 		if err = execLogOutput(l, "cp", "-f", srcPath, filePath); err != nil {
 			return err
 		}

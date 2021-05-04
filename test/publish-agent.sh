@@ -19,9 +19,13 @@ AWS_ROLE_SESSION_NAME="caos_testing"
 AWS_ROLE_ARN="arn:aws:iam::017663287629:role/caos_testing"
 DEST_PREFIX="infrastructure_agent/test_e2e/$(uuidgen)/"
 # Private vars
-_ASSERT_DIR="s3://${AWS_S3_BUCKET_NAME}/${DEST_PREFIX}binaries/linux/386/"
-_ASSERT_FILE="newrelic-infra_linux_${TAG}" # aws-s3-ls returns files matching the prefix and 0-exit in case of match
-
+_ASSERT_FILES=()
+_ASSERT_FILES+=("s3://${AWS_S3_BUCKET_NAME}/${DEST_PREFIX}binaries/linux/386/newrelic-infra_linux_${TAG}")
+_ASSERT_FILES+=("s3://${AWS_S3_BUCKET_NAME}/${DEST_PREFIX}linux/apt/pool/main/n/newrelic-infra/newrelic-infra_systemd_${TAG}")
+_ASSERT_FILES+=("s3://${AWS_S3_BUCKET_NAME}/${DEST_PREFIX}linux/yum/el/6/x86_64/newrelic-infra-${TAG}")
+_ASSERT_FILES+=("s3://${AWS_S3_BUCKET_NAME}/${DEST_PREFIX}linux/zypp/sles/11.4/x86_64/newrelic-infra-${TAG}")
+_ASSERT_FILES+=("s3://${AWS_S3_BUCKET_NAME}/${DEST_PREFIX}windows/newrelic-infra.${TAG}")
+_ASSERT_FILES+=("s3://${AWS_S3_BUCKET_NAME}/${DEST_PREFIX}binaries/windows/amd64/newrelic-infra-amd64.${TAG}")
 
 printf "\n- Verifying secrets are available through env-vars...\n"
 
@@ -60,22 +64,25 @@ if [ "$DOCKER_HUB_PASSWORD" == "" ]; then
   exit 1
 fi
 
+for _ASSERT_FILE_ABSOLUTE_PATH in "${_ASSERT_FILES[@]}";do
+  _ASSERT_DIR=$( dirname "${_ASSERT_FILE_ABSOLUTE_PATH}" )
+  printf "\n- Verifying TAG %s was not published into ${_ASSERT_DIR}...\n" "$TAG"
 
-printf "\n- Verifying TAG %s was not published into ${_ASSERT_DIR}...\n" "$TAG"
-
-aws s3 ls "${_ASSERT_DIR}${_ASSERT_FILE}" \
-  && printf '\nError: asset %s already exists!\n' "${_ASSERT_DIR}${_ASSERT_FILE}" \
+  aws s3 ls "${_ASSERT_FILE_ABSOLUTE_PATH}" \
+  && printf '\nError: asset %s already exists!\n' "${_ASSERT_FILE_ABSOLUTE_PATH}" \
   && exit 1
-
+done
 
 printf "\n- Running action: pre-release tarballs...\n"
+
+# TODO : change SCHEMA_URL to point to main branch before merge@
 
 ENV=pre-release \
 APP_NAME=newrelic-infra \
 REPO_NAME=newrelic/infrastructure-agent \
 RUN_ID="000" \
 SCHEMA=custom \
-SCHEMA_URL=https://raw.githubusercontent.com/newrelic/infrastructure-agent/ci/pipeline/build/upload-schema-linux-targz.yml \
+SCHEMA_URL=https://raw.githubusercontent.com/newrelic/infrastructure-publish-action/test/e2e_multiple_platforms/schemas/e2e.yml \
 GITHUB_ACTION_PATH="$ROOT_DIR" \
 AWS_S3_MOUNT_DIRECTORY=/mnt/s3 \
 TAG="$TAG" \
@@ -92,9 +99,13 @@ printf "\n * Action run finished.\n"
 
 printf "\n- Asserting published assets exist...\n"
 
-aws s3 ls "${_ASSERT_DIR}${_ASSERT_FILE}" \
-  || (printf '\nError: missing published asset: %s!\n' "${_ASSERT_DIR}${_ASSERT_FILE}" && exit 1)
+for _ASSERT_FILE_ABSOLUTE_PATH in "${_ASSERT_FILES[@]}";do
+  _ASSERT_DIR=$( dirname "${_ASSERT_FILE_ABSOLUTE_PATH}" )
+  printf "\n- Verifying TAG %s was published into ${_ASSERT_DIR}...\n" "$TAG"
 
+  aws s3 ls "${_ASSERT_FILE_ABSOLUTE_PATH}" \
+  || (printf '\nError: missing published asset: %s!\n' "${_ASSERT_FILE_ABSOLUTE_PATH}" && exit 1)
+done
 
 printf "\n- Tear down:\n"
 
