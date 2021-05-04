@@ -462,7 +462,7 @@ func uploadRpm(conf config, srcTemplate string, upload Upload, arch string) (err
 		// check for repo and create if missing
 		if _, err = os.Stat(s3RepomdFilepath); os.IsNotExist(err) {
 
-			l.Printf("[ ] Didn't fine repo for %s, run repo init command", s3RepoPath)
+			l.Printf("[ ] Didn't find repo for %s, run repo init command", s3RepoPath)
 
 			if err := execLogOutput(l, "createrepo", s3RepoPath, "-o", os.TempDir()); err != nil {
 				return err
