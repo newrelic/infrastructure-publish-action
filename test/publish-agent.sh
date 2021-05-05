@@ -104,7 +104,7 @@ for _ASSERT_FILE_ABSOLUTE_PATH in "${_ASSERT_FILES[@]}";do
   printf "\n- Verifying TAG %s was published into ${_ASSERT_DIR}...\n" "$TAG"
 
   aws s3 ls "${_ASSERT_FILE_ABSOLUTE_PATH}" \
-  || (printf '\nError: missing published asset: %s!\n' "${_ASSERT_FILE_ABSOLUTE_PATH}" && exit 1)
+  || printf '\nError: missing published asset: %s!\n' "${_ASSERT_FILE_ABSOLUTE_PATH}"
 done
 
 printf "\n- Tear down:\n"
