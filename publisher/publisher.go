@@ -576,7 +576,10 @@ func uploadApt(conf config, srcTemplate string, upload Upload, arch string) (err
 		}
 		l.Printf("[✔] Published succesfully deb repo for %s/%s", osVersion, arch)
 
-		// Copying the binary
+		// Create the directory and copy the binary
+		if err = execLogOutput(l, "mkdir", "-p", path.Dir(filePath)); err != nil {
+			return err
+		}
 		if err = execLogOutput(l, "cp", "-f", srcPath, filePath); err != nil {
 			return err
 		}
@@ -641,24 +644,24 @@ func mirrorAPTRepo(conf config, repoUrl string, srcPath string, osVersion string
 		return nil
 	}
 
-	l.Printf("[ ] Mirror create APT repo for %s/%s/%s from %s", srcPath, osVersion, arch, repoUrl)
+	l.Printf("[ ] Mirror create APT repo %s for %s/%s from %s", srcPath, osVersion, arch, repoUrl)
 	if err = execLogOutput(l, "aptly", "mirror", "create", "-keyring", conf.gpgKeyRing, "mirror-"+osVersion, repoUrl, osVersion, "main"); err != nil {
 		return err
 	}
-	l.Printf("[✔] Mirror create succesfully APT repo for %s/%s/%s", srcPath, osVersion, arch)
+	l.Printf("[✔] Mirror create succesfully APT repo %s for %s/%s", srcPath, osVersion, arch)
 
-	l.Printf("[ ] Mirror update APT repo for %s/%s/%s", srcPath, osVersion, arch)
+	l.Printf("[ ] Mirror update APT repo %s for %s/%s", srcPath, osVersion, arch)
 	if err = execLogOutput(l, "aptly", "mirror", "update", "-keyring", conf.gpgKeyRing, "mirror-"+osVersion); err != nil {
 		return err
 	}
-	l.Printf("[✔] Mirror update succesfully APT repo for %s/%s/%s", srcPath, osVersion, arch)
+	l.Printf("[✔] Mirror update succesfully APT repo %s for %s/%s", srcPath, osVersion, arch)
 
 	// The last parameter is `Name` that means a query matches all the packages (as it means “package name is not empty”).
-	l.Printf("[ ] Mirror repo import APT repo for %s/%s/%s", srcPath, osVersion, arch)
+	l.Printf("[ ] Mirror repo import APT repo %s for %s/%s", srcPath, osVersion, arch)
 	if err = execLogOutput(l, "aptly", "repo", "import", "mirror-"+osVersion, osVersion, "Name"); err != nil {
 		return err
 	}
-	l.Printf("[✔] Mirror repo import succesfully APT repo for %s/%s/%s", srcPath, osVersion, arch)
+	l.Printf("[✔] Mirror repo import succesfully APT repo %s for %s/%s", srcPath, osVersion, arch)
 
 	return nil
 }
