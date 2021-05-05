@@ -99,12 +99,16 @@ printf "\n * Action run finished.\n"
 
 printf "\n- Asserting published assets exist...\n"
 
+PUBLISH_ERROR=0
 for _ASSERT_FILE_ABSOLUTE_PATH in "${_ASSERT_FILES[@]}";do
   _ASSERT_DIR=$( dirname "${_ASSERT_FILE_ABSOLUTE_PATH}" )
   printf "\n- Verifying TAG %s was published into ${_ASSERT_DIR}...\n" "$TAG"
 
-  aws s3 ls "${_ASSERT_FILE_ABSOLUTE_PATH}" \
-  || printf '\nError: missing published asset: %s!\n' "${_ASSERT_FILE_ABSOLUTE_PATH}"
+  aws s3 ls "${_ASSERT_FILE_ABSOLUTE_PATH}"
+  if [ $? -eq 1 ];then
+    PUBLISH_ERROR=1
+    printf '\nError: missing published asset: %s!\n' "${_ASSERT_FILE_ABSOLUTE_PATH}"
+  fi
 done
 
 printf "\n- Tear down:\n"
@@ -122,3 +126,5 @@ printf "\n * Cleaning up files...\n"
 
 aws --profile bucketRole s3 rm --recursive "s3://${AWS_S3_BUCKET_NAME}/${DEST_PREFIX}" \
   || (printf '\nError: cannot clean up published files at %s!\n' "${AWS_S3_BUCKET_NAME}/${DEST_PREFIX}" && exit 1)
+
+exit $PUBLISH_ERROR
