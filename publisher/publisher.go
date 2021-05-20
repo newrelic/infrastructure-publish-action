@@ -60,8 +60,8 @@ const (
 	defaultTagEnv        = "us-development"
 
 	//Access points
-	accessPointStaging               = "http://nr-downloads-ohai-staging.s3-website-us-east-1.amazonaws.com"
-	accessPointTesting               = "http://nr-downloads-ohai-testing.s3-website-us-east-1.amazonaws.com"
+	accessPointStaging               = "https://nr-downloads-ohai-staging.s3-website-us-east-1.amazonaws.com"
+	accessPointTesting               = "https://nr-downloads-ohai-testing.s3-website-us-east-1.amazonaws.com"
 	accessPointProduction            = "https://download.newrelic.com"
 	placeholderAccessPointStaging    = "staging"
 	placeholderAccessPointTesting    = "testing"
