@@ -445,6 +445,27 @@ func Test_generateAptSrcRepoUrl(t *testing.T) {
 	assert.Equal(t, "https://download.newrelic.com/infrastructure_agent/linux/apt", srcRepo)
 }
 
+func Test_parseAccessPointHost(t *testing.T) {
+	tests := []struct {
+		name            string
+		accessPointHost string
+		expectedUrl     string
+	}{
+		{"empty value fallback to prod", "", "https://download.newrelic.com"},
+		{"production placeholder", "production", "https://download.newrelic.com"},
+		{"staging placeholder", "staging", "https://nr-downloads-ohai-staging.s3-website-us-east-1.amazonaws.com"},
+		{"testing placeholder", "testing", "https://nr-downloads-ohai-testing.s3-website-us-east-1.amazonaws.com"},
+		{"fixed url", "https://www.some-bucket-url.com", "https://www.some-bucket-url.com"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			srcRepo := parseAccessPointHost(tt.accessPointHost)
+			assert.Equal(t, tt.expectedUrl, srcRepo)
+		})
+	}
+}
+
 func Test_generateRepoFileContent(t *testing.T) {
 
 	accessPointHost := "https://download.newrelic.com"
