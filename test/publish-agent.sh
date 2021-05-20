@@ -80,6 +80,7 @@ printf "\n- Running action: pre-release tarballs...\n"
 ENV=pre-release \
 APP_NAME=newrelic-infra \
 REPO_NAME=newrelic/infrastructure-agent \
+ACCESS_POINT_HOST=testing \
 RUN_ID="000" \
 SCHEMA=custom \
 SCHEMA_URL=https://raw.githubusercontent.com/newrelic/infrastructure-publish-action/main/schemas/e2e.yml \

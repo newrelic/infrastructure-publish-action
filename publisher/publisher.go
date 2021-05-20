@@ -58,6 +58,14 @@ const (
 	defaultTagProduct    = "integrations"
 	defaultTagProject    = "infrastructure-publish-action"
 	defaultTagEnv        = "us-development"
+
+	//Access points
+	accessPointStaging               = "http://nr-downloads-ohai-staging.s3-website-us-east-1.amazonaws.com"
+	accessPointTesting               = "http://nr-downloads-ohai-testing.s3-website-us-east-1.amazonaws.com"
+	accessPointProduction            = "https://download.newrelic.com"
+	placeholderAccessPointStaging    = "staging"
+	placeholderAccessPointTesting    = "testing"
+	placeholderAccessPointProduction = "production"
 )
 
 var (
@@ -220,12 +228,14 @@ func loadConfig() config {
 		lockGroup = defaultLockgroup
 	}
 
+	accessPointHost := parseAccessPointHost(viper.GetString("access_point_host"))
+
 	return config{
 		destPrefix:           viper.GetString("dest_prefix"),
 		repoName:             viper.GetString("repo_name"),
 		appName:              viper.GetString("app_name"),
 		tag:                  viper.GetString("tag"),
-		accessPointHost:      viper.GetString("access_point_host"),
+		accessPointHost:      accessPointHost,
 		runID:                viper.GetString("run_id"),
 		version:              strings.Replace(viper.GetString("tag"), "v", "", -1),
 		artifactsDestFolder:  viper.GetString("artifacts_dest_folder"),
@@ -803,13 +813,13 @@ func replaceSrcDestTemplates(srcFileTemplate, destPathTemplate, repoName, appNam
 	return
 }
 
-func generateDestinationAssetsPath(downloadedFileName, destPathTemplate, repoName, appName, arch, tag, version, destPrefix, osVersion string) string{
+func generateDestinationAssetsPath(downloadedFileName, destPathTemplate, repoName, appName, arch, tag, version, destPrefix, osVersion string) string {
 	destPath := replacePlaceholders(destPathTemplate, repoName, appName, arch, tag, version, destPrefix, osVersion)
 	return strings.Replace(destPath, placeholderForSrc, downloadedFileName, -1)
 }
 
-func generateDownloadFileName(srcFileTemplate, repoName, appName, arch, tag, version, destPrefix, osVersion string) string{
-	 return replacePlaceholders(srcFileTemplate, repoName, appName, arch, tag, version, destPrefix, osVersion)
+func generateDownloadFileName(srcFileTemplate, repoName, appName, arch, tag, version, destPrefix, osVersion string) string {
+	return replacePlaceholders(srcFileTemplate, repoName, appName, arch, tag, version, destPrefix, osVersion)
 }
 
 func generateDownloadUrl(template, repoName, tag, srcFile string) (url string) {
@@ -837,4 +847,22 @@ repo_gpgcheck=1`
 	repoFileContent = fmt.Sprintf(contentTemplate, accessPointHost, destPath)
 
 	return
+}
+
+// parseAccessPointHost accessPointHost will be parsed to detect production, staging or testing placeholders
+// and substitute them with their specific real values. Empty will fallback to production and any other value
+// will be considered a different access point and will be return as it is
+func parseAccessPointHost(accessPointHost string) string {
+	switch accessPointHost {
+	case "":
+		return accessPointProduction
+	case placeholderAccessPointProduction:
+		return accessPointProduction
+	case placeholderAccessPointStaging:
+		return accessPointStaging
+	case placeholderAccessPointTesting:
+		return accessPointTesting
+	default:
+		return accessPointHost
+	}
 }
