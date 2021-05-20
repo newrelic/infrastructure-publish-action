@@ -23,6 +23,7 @@ A GitHub Action to publish artifacts from GitHub release assets into an S3 bucke
 | `schema_url`               | Url to custom schema file. |
 | `gpg_passphrase`           | Passphrase for the gpg key. |
 | `gpg_private_key_base64`   | Encoded gpg key. |
+| `access_point_host`        | Host url to be used in apt repo mirror & .repo files template. |
 
 All keys are required.
 
@@ -89,6 +90,7 @@ jobs:
           run_id: ${{ github.run_id }}
           aws_region: ${{ env.AWS_REGION }}
           aws_role_arn: ${{ env.AWS_ROLE_ARN }}
+          access_point_host: "https://download.newrelic.com"
           # used for signing package stuff
           gpg_passphrase: ${{ env.GPG_PASSPHRASE }}
           gpg_private_key_base64: ${{ env.GPG_PRIVATE_KEY_BASE64 }}
