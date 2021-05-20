@@ -23,7 +23,7 @@ A GitHub Action to publish artifacts from GitHub release assets into an S3 bucke
 | `schema_url`               | Url to custom schema file. |
 | `gpg_passphrase`           | Passphrase for the gpg key. |
 | `gpg_private_key_base64`   | Encoded gpg key. |
-| `access_point_host`        | Host url to be used in apt repo mirror & .repo files template. It accepts a url or fixed values <code>production &#124; staging &#124; testing </code> for default urls.<br/><br/>`staging` : https://nr-downloads-ohai-staging.s3-website-us-east-1.amazonaws.com <br/> `testing`: https://nr-downloads-ohai-testing.s3-website-us-east-1.amazonaws.com <br/> `production`: https://download.newrelic.com |
+| `access_point_host`        | Host url to be used in apt repo mirror & .repo files template. It accepts a url or fixed values <code>production &#124; staging &#124; testing </code> for default urls.<br/><br/>`staging` : http://nr-downloads-ohai-staging.s3-website-us-east-1.amazonaws.com <br/> `testing`: http://nr-downloads-ohai-testing.s3-website-us-east-1.amazonaws.com <br/> `production`: https://download.newrelic.com |
 
 All keys are required.
 
