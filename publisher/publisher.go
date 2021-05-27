@@ -483,16 +483,12 @@ func uploadRpm(conf config, srcTemplate string, upload Upload, arch string) (err
 			_ = os.Remove(signaturePath)
 		}
 
-		// check for .repo file and create if needed
-		if _, err = os.Stat(s3DotRepoFilepath); conf.accessPointHost != "" && os.IsNotExist(err) {
-			l.Println(fmt.Sprintf("creating 'newrelic-infra.repo' file in %s", s3RepoPath))
-
-			repoFileContent := generateRepoFileContent(conf.accessPointHost, destPath)
-
-			err := ioutil.WriteFile(s3DotRepoFilepath, []byte(repoFileContent), 0644)
-			if err != nil {
-				return err
-			}
+		// create .repo file
+		l.Println(fmt.Sprintf("creating 'newrelic-infra.repo' file in %s", s3RepoPath))
+		repoFileContent := generateRepoFileContent(conf.accessPointHost, destPath)
+		err = ioutil.WriteFile(s3DotRepoFilepath, []byte(repoFileContent), 0644)
+		if err != nil {
+			return err
 		}
 
 		// "cache" the repodata from s3 to local so it doesnt have to process all again
