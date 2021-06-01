@@ -451,8 +451,8 @@ func Test_parseAccessPointHost(t *testing.T) {
 		accessPointHost string
 		expectedUrl     string
 	}{
-		{"empty value fallback to prod", "", "https://download.newrelic.com"},
-		{"production placeholder", "production", "https://download.newrelic.com"},
+		{"empty value fallback to prod", "", "https://nr-downloads-main.s3.amazonaws.com"},
+		{"production placeholder", "production", "https://nr-downloads-main.s3.amazonaws.com"},
 		{"staging placeholder", "staging", "http://nr-downloads-ohai-staging.s3-website-us-east-1.amazonaws.com"},
 		{"testing placeholder", "testing", "http://nr-downloads-ohai-testing.s3-website-us-east-1.amazonaws.com"},
 		{"fixed url", "https://www.some-bucket-url.com", "https://www.some-bucket-url.com"},

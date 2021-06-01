@@ -62,7 +62,7 @@ const (
 	//Access points
 	accessPointStaging               = "http://nr-downloads-ohai-staging.s3-website-us-east-1.amazonaws.com"
 	accessPointTesting               = "http://nr-downloads-ohai-testing.s3-website-us-east-1.amazonaws.com"
-	accessPointProduction            = "https://download.newrelic.com"
+	accessPointProduction            = "https://nr-downloads-main.s3.amazonaws.com"
 	placeholderAccessPointStaging    = "staging"
 	placeholderAccessPointTesting    = "testing"
 	placeholderAccessPointProduction = "production"
