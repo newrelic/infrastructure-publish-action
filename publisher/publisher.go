@@ -62,7 +62,8 @@ const (
 	//Access points
 	accessPointStaging               = "http://nr-downloads-ohai-staging.s3-website-us-east-1.amazonaws.com"
 	accessPointTesting               = "http://nr-downloads-ohai-testing.s3-website-us-east-1.amazonaws.com"
-	accessPointProduction            = "https://nr-downloads-main.s3.amazonaws.com"
+	accessPointProduction            = "https://download.newrelic.com"
+	mirrorProduction                 = "https://nr-downloads-main.s3.amazonaws.com"
 	placeholderAccessPointStaging    = "staging"
 	placeholderAccessPointTesting    = "testing"
 	placeholderAccessPointProduction = "production"
@@ -87,6 +88,7 @@ type config struct {
 	repoName             string
 	appName              string
 	tag                  string
+	mirrorHost           string
 	accessPointHost      string
 	runID                string
 	version              string
@@ -228,13 +230,14 @@ func loadConfig() config {
 		lockGroup = defaultLockgroup
 	}
 
-	accessPointHost := parseAccessPointHost(viper.GetString("access_point_host"))
+	accessPointHost, mirrorHost := parseAccessPointHost(viper.GetString("access_point_host"))
 
 	return config{
 		destPrefix:           viper.GetString("dest_prefix"),
 		repoName:             viper.GetString("repo_name"),
 		appName:              viper.GetString("app_name"),
 		tag:                  viper.GetString("tag"),
+		mirrorHost:           mirrorHost,
 		accessPointHost:      accessPointHost,
 		runID:                viper.GetString("run_id"),
 		version:              strings.Replace(viper.GetString("tag"), "v", "", -1),
@@ -564,7 +567,7 @@ func uploadApt(conf config, srcTemplate string, upload Upload, arch string) (err
 		l.Printf("[✔] Local repo created for os %s/%s", osVersion, arch)
 
 		// Mirror repo start
-		srcRepo := generateAptSrcRepoUrl(upload.SrcRepo, conf.accessPointHost)
+		srcRepo := generateAptSrcRepoUrl(upload.SrcRepo, conf.mirrorHost)
 		err = mirrorAPTRepo(conf, srcRepo, srcPath, osVersion, arch)
 		if err != nil {
 			return err
@@ -848,17 +851,17 @@ repo_gpgcheck=1`
 // parseAccessPointHost accessPointHost will be parsed to detect production, staging or testing placeholders
 // and substitute them with their specific real values. Empty will fallback to production and any other value
 // will be considered a different access point and will be return as it is
-func parseAccessPointHost(accessPointHost string) string {
+func parseAccessPointHost(accessPointHost string) (string, string) {
 	switch accessPointHost {
 	case "":
-		return accessPointProduction
+		return accessPointProduction, mirrorProduction
 	case placeholderAccessPointProduction:
-		return accessPointProduction
+		return accessPointProduction, mirrorProduction
 	case placeholderAccessPointStaging:
-		return accessPointStaging
+		return accessPointStaging, accessPointStaging
 	case placeholderAccessPointTesting:
-		return accessPointTesting
+		return accessPointTesting, accessPointTesting
 	default:
-		return accessPointHost
+		return accessPointHost, accessPointHost
 	}
 }
