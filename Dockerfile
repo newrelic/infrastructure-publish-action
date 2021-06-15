@@ -1,18 +1,23 @@
-ARG VERSION=1.15.7-buster
-FROM golang:$VERSION
+# centos-8 provides more up-to-date version of createrepo which supports rpm weak dependencies
+FROM centos:8
 
 # Args
 ARG AWS_S3_MOUNT_DIRECTORY=/mnt/s3
 
 # Tools
 # validate s3fs-fuse with the sec team
-RUN apt-get -qq update && apt-get -qq install -y \
-    make \
-    curl \
-    gnupg2 \
-    bzip2 \
-    createrepo \
-    unzip
+RUN dnf install -y createrepo \
+                    unzip \
+                    bzip2 \
+                    gnupg2 \
+                    curl \
+                    make \
+                    wget
+
+# install golang version 1.15.7
+RUN curl -L https://golang.org/dl/go1.15.7.linux-amd64.tar.gz | tar xvzf - -C /usr/local
+ENV PATH $PATH:/usr/local/go/bin
+
 
 # Sadly installing aptly with apt lead you to a old version not supporting gpg2
 WORKDIR /tmp
