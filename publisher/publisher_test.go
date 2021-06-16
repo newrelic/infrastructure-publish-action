@@ -494,3 +494,55 @@ func expectedLog(prefix, content string) string {
 func reader(content string) io.ReadCloser {
 	return ioutil.NopCloser(bytes.NewReader([]byte(content)))
 }
+
+func Test_loadConfig(t *testing.T) {
+	tests := []struct {
+		name string
+		env  map[string]string
+		want config
+	}{
+		{
+			name: "defaults are applied",
+			env: map[string]string{
+				"TAG": "vFooBar",
+			},
+			want: config{
+				tag:               "vFooBar",
+				version:           "FooBar",
+				accessPointHost:   accessPointProduction,
+				mirrorHost:        mirrorProduction,
+				aptlyFolder:       defaultAptlyFolder,
+				lockGroup:         defaultLockgroup,
+				useDefLockRetries: true,
+			},
+		},
+		{
+			name: "custom values",
+			env: map[string]string{
+				"TAG":               "vFooBar",
+				"APP_VERSION":       "Baz",
+				"APTLY_FOLDER":      "FooFolder",
+				"LOCK_GROUP":        "FooGroup",
+				"ACCESS_POINT_HOST": "FooAPH",
+				"LOCK_RETRIES":      "false",
+			},
+			want: config{
+				tag:               "vFooBar",
+				version:           "Baz",
+				accessPointHost:   "FooAPH",
+				mirrorHost:        "FooAPH",
+				aptlyFolder:       "FooFolder",
+				lockGroup:         "FooGroup",
+				useDefLockRetries: false,
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			for k, v := range tt.env {
+				os.Setenv(k, v)
+			}
+			assert.Equal(t, tt.want, loadConfig(), "Case failed:", tt.name, tt.env)
+		})
+	}
+}

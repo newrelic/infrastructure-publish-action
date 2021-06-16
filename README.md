@@ -19,13 +19,13 @@ A GitHub Action to publish artifacts from GitHub release assets into an S3 bucke
 | `repo_name`                | Github repository name, combination of organization and repository. |
 | `app_name`                 | Name of the package. |
 | `tag`                      | Tag version from GitHub release. |
+| `app_version`              | Version of the package. If not present is extracted from the tag removing trailing v (i.e tag=v1.0.1 -> version=1.0.1) |
 | `schema`                   | Describes the packages to be published: infra-agent, ohi, or nrjmx. |
 | `schema_url`               | Url to custom schema file. |
 | `gpg_passphrase`           | Passphrase for the gpg key. |
 | `gpg_private_key_base64`   | Encoded gpg key. |
 | `access_point_host`        | Host url to be used in apt repo mirror & .repo files template. It accepts a url or fixed values <code>production &#124; staging &#124; testing </code> for default urls.<br/><br/>`staging` : http://nr-downloads-ohai-staging.s3-website-us-east-1.amazonaws.com <br/> `testing`: http://nr-downloads-ohai-testing.s3-website-us-east-1.amazonaws.com <br/> `production`: https://nr-downloads-main.s3.amazonaws.com |
 
-All keys are required.
 
 ## Use Publish Tag
 
