@@ -660,7 +660,7 @@ func mirrorAPTRepo(conf config, repoUrl string, srcPath string, osVersion string
 	l.Printf("[✔] Mirror create succesfully APT repo %s for %s/%s", srcPath, osVersion, arch)
 
 	l.Printf("[ ] Mirror update APT repo %s for %s/%s", srcPath, osVersion, arch)
-	if err = execLogOutput(l, "aptly", "mirror", "update", "-keyring", conf.gpgKeyRing, "mirror-"+osVersion); err != nil {
+	if err = execLogOutput(l, "aptly", "mirror", "update", "-ignore-checksums", "-keyring", conf.gpgKeyRing, "mirror-"+osVersion); err != nil {
 		return err
 	}
 	l.Printf("[✔] Mirror update succesfully APT repo %s for %s/%s", srcPath, osVersion, arch)
