@@ -4,6 +4,7 @@ package main
 
 import (
 	"bytes"
+	"errors"
 	"io"
 	"io/ioutil"
 	"log"
@@ -353,14 +354,28 @@ func TestUploadArtifacts_cantBeRunInParallel(t *testing.T) {
 }
 
 func TestSchema(t *testing.T) {
-	uploadSchemaContent, err := readFileContent("../schemas/nrjmx.yml")
-
-	uploadSchema, err := parseUploadSchema(uploadSchemaContent)
-
-	if err != nil {
-		log.Fatal(err)
+	tests := []struct {
+		name          string
+		schemaPath    string
+		expectedError error
+	}{
+		{"e2e", "../schemas/e2e.yml", nil},
+		{"nrjmx", "../schemas/nrjmx.yml", nil},
+		{"ohi", "../schemas/ohi.yml", nil},
+		{"ohi-jmx", "../schemas/ohi-jmx.yml", nil},
+		{"invalid yaml schema", "../test/schemas/bad-formatted-yaml.yml", errors.New("yaml: line 27: mapping values are not allowed in this context")},
 	}
-	log.Println(uploadSchema)
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			uploadSchemaContent, err := readFileContent(tt.schemaPath)
+
+			uploadSchema, err := parseUploadSchema(uploadSchemaContent)
+			assert.Equal(t, tt.expectedError, err)
+			log.Println(uploadSchema)
+		})
+	}
 }
 
 func Test_streamAsLog(t *testing.T) {
