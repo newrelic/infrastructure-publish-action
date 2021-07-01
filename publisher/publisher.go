@@ -203,6 +203,7 @@ func loadConfig() config {
 	// TODO: make all the config required
 	viper.BindEnv("repo_name")
 	viper.BindEnv("app_name")
+	viper.BindEnv("app_version")
 	viper.BindEnv("tag")
 	viper.BindEnv("access_point_host")
 	viper.BindEnv("run_id")
@@ -219,6 +220,7 @@ func loadConfig() config {
 	viper.BindEnv("aws_region")
 	viper.BindEnv("disable_lock")
 	viper.BindEnv("lock_retries")
+	viper.BindEnv("lock_group")
 
 	aptlyF := viper.GetString("aptly_folder")
 	if aptlyF == "" {
@@ -228,6 +230,11 @@ func loadConfig() config {
 	lockGroup := viper.GetString("lock_group")
 	if lockGroup == "" {
 		lockGroup = defaultLockgroup
+	}
+
+	version := viper.GetString("app_version")
+	if version == "" {
+		version = strings.Replace(viper.GetString("tag"), "v", "", -1)
 	}
 
 	accessPointHost, mirrorHost := parseAccessPointHost(viper.GetString("access_point_host"))
@@ -240,7 +247,7 @@ func loadConfig() config {
 		mirrorHost:           mirrorHost,
 		accessPointHost:      accessPointHost,
 		runID:                viper.GetString("run_id"),
-		version:              strings.Replace(viper.GetString("tag"), "v", "", -1),
+		version:              version,
 		artifactsDestFolder:  viper.GetString("artifacts_dest_folder"),
 		artifactsSrcFolder:   viper.GetString("artifacts_src_folder"),
 		aptlyFolder:          aptlyF,

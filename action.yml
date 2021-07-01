@@ -39,6 +39,9 @@ inputs:
   app_name:
     description: Name of the package (i.e. nri-redis)
     required: true
+  app_version:
+    description: Version of the package. If not present is extracted from the tag removing trailing v (i.e tag=v1.0.1 -> version=1.0.1)
+    required: false
   tag:
     description: Tag pointing to the release
     required: true
@@ -70,6 +73,7 @@ runs:
         GPG_PRIVATE_KEY_BASE64: ${{ inputs.gpg_private_key_base64}}
         REPO_NAME: ${{ inputs.repo_name }}
         APP_NAME: ${{ inputs.app_name }}
+        APP_VERSION: ${{ inputs.app_version }}
         TAG: ${{ inputs.tag }}
         ACCESS_POINT_HOST: ${{ inputs.access_point_host }}
         SCHEMA: ${{ inputs.schema }}

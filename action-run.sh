@@ -21,6 +21,7 @@ docker run --rm \
         -e AWS_S3_LOCK_BUCKET_NAME \
         -e REPO_NAME \
         -e APP_NAME \
+        -e APP_VERSION \
         -e TAG \
         -e ACCESS_POINT_HOST \
         -e RUN_ID \
