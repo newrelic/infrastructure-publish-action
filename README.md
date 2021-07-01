@@ -19,7 +19,7 @@ A GitHub Action to publish artifacts from GitHub release assets into an S3 bucke
 | `repo_name`                | Github repository name, combination of organization and repository. |
 | `app_name`                 | Name of the package. |
 | `tag`                      | Tag version from GitHub release. |
-| `app_version`              | Version of the package. If not present is extracted from the tag removing trailing v (i.e tag=v1.0.1 -> version=1.0.1) |
+| `app_version`              | Version of the package. If not present is extracted from the tag removing the leading v (e.g. tag=v1.0.1 -> version=1.0.1) |
 | `schema`                   | Describes the packages to be published: infra-agent, ohi, or nrjmx. |
 | `schema_url`               | Url to custom schema file. |
 | `gpg_passphrase`           | Passphrase for the gpg key. |
