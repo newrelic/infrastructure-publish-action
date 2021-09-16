@@ -1,6 +1,7 @@
 package config
 
 import (
+	"errors"
 	"github.com/newrelic/infrastructure-publish-action/publisher/utils"
 	"github.com/stretchr/testify/assert"
 	"log"
@@ -115,12 +116,26 @@ func TestParseConfigError(t *testing.T) {
 }
 
 func TestSchema(t *testing.T) {
-	uploadSchemaContent, err := utils.ReadFileContent("../schemas/nrjmx.yml")
-
-	uploadSchema, err := ParseUploadSchema(uploadSchemaContent)
-
-	if err != nil {
-		log.Fatal(err)
+	tests := []struct {
+		name          string
+		schemaPath    string
+		expectedError error
+	}{
+		{"e2e", "../schemas/e2e.yml", nil},
+		{"nrjmx", "../schemas/nrjmx.yml", nil},
+		{"ohi", "../schemas/ohi.yml", nil},
+		{"ohi-jmx", "../schemas/ohi-jmx.yml", nil},
+		{"invalid yaml schema", "../test/schemas/bad-formatted-yaml.yml", errors.New("yaml: line 27: mapping values are not allowed in this context")},
 	}
-	log.Println(uploadSchema)
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			uploadSchemaContent, err := utils.ReadFileContent(tt.schemaPath)
+
+			uploadSchema, err := ParseUploadSchema(uploadSchemaContent)
+			assert.Equal(t, tt.expectedError, err)
+			log.Println(uploadSchema)
+		})
+	}
 }

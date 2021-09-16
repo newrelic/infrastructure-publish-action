@@ -372,10 +372,12 @@ func syncAPTMetadata(conf config.Config, destPath string, osVersion string, arch
 			return err
 		}
 	}
+
 	// drop local repo, to be able to recreate it later
 	if err = utils.ExecLogOutput(l, "aptly", commandTimeout, "repo", "drop", osVersion); err != nil {
 		return err
 	}
+
 	// rm local repo files, as aptly keep them
 	if err = utils.ExecLogOutput(l, "rm", commandTimeout, "-rf", conf.AptlyFolder+"/public/"+aptDists+osVersion); err != nil {
 		return err

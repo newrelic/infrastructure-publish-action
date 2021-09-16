@@ -11,10 +11,10 @@ const (
 	defaultLockgroup   = "lockgroup"
 
 	//Access points
-	accessPointStaging    = "http://nr-downloads-ohai-staging.s3-website-us-east-1.amazonaws.com"
-	accessPointTesting    = "http://nr-downloads-ohai-testing.s3-website-us-east-1.amazonaws.com"
-	accessPointProduction         = "https://download.newrelic.com"
-	mirrorProduction              = "https://nr-downloads-main.s3.amazonaws.com"
+	accessPointStaging               = "http://nr-downloads-ohai-staging.s3-website-us-east-1.amazonaws.com"
+	accessPointTesting               = "http://nr-downloads-ohai-testing.s3-website-us-east-1.amazonaws.com"
+	accessPointProduction            = "https://download.newrelic.com"
+	mirrorProduction                 = "https://nr-downloads-main.s3.amazonaws.com"
 	placeholderAccessPointStaging    = "staging"
 	placeholderAccessPointTesting    = "testing"
 	placeholderAccessPointProduction = "production"
@@ -50,7 +50,6 @@ func (c *Config) Owner() string {
 	return fmt.Sprintf("%s_%s_%s", c.AppName, c.Tag, c.RunID)
 }
 
-
 // parseAccessPointHost accessPointHost will be parsed to detect production, staging or testing placeholders
 // and substitute them with their specific real values. Empty will fallback to production and any other value
 // will be considered a different access point and will be return as it is
@@ -69,11 +68,11 @@ func parseAccessPointHost(accessPointHost string) (string, string) {
 	}
 }
 
-
 func LoadConfig() Config {
 	// TODO: make all the config required
 	viper.BindEnv("repo_name")
 	viper.BindEnv("app_name")
+	viper.BindEnv("app_version")
 	viper.BindEnv("tag")
 	viper.BindEnv("access_point_host")
 	viper.BindEnv("run_id")
@@ -90,6 +89,7 @@ func LoadConfig() Config {
 	viper.BindEnv("aws_region")
 	viper.BindEnv("disable_lock")
 	viper.BindEnv("lock_retries")
+	viper.BindEnv("lock_group")
 
 	aptlyF := viper.GetString("aptly_folder")
 	if aptlyF == "" {
@@ -99,6 +99,11 @@ func LoadConfig() Config {
 	lockGroup := viper.GetString("lock_group")
 	if lockGroup == "" {
 		lockGroup = defaultLockgroup
+	}
+
+	version := viper.GetString("app_version")
+	if version == "" {
+		version = strings.Replace(viper.GetString("tag"), "v", "", -1)
 	}
 
 	accessPointHost, mirrorHost := parseAccessPointHost(viper.GetString("access_point_host"))
@@ -111,7 +116,7 @@ func LoadConfig() Config {
 		MirrorHost:           mirrorHost,
 		AccessPointHost:      accessPointHost,
 		RunID:                viper.GetString("run_id"),
-		Version:              strings.Replace(viper.GetString("tag"), "v", "", -1),
+		Version:              version,
 		ArtifactsDestFolder:  viper.GetString("artifacts_dest_folder"),
 		ArtifactsSrcFolder:   viper.GetString("artifacts_src_folder"),
 		AptlyFolder:          aptlyF,
