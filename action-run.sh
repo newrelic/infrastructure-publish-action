@@ -1,9 +1,5 @@
 #!/bin/bash
 set -e
-# build docker image form Dockerfile
-echo "Build fresh docker image for newrelic/infrastructure-publish-action"
-# @TODO add --no-cache
-docker build  -t newrelic/infrastructure-publish-action -f $GITHUB_ACTION_PATH/Dockerfile $GITHUB_ACTION_PATH
 
 # run docker container to perform all actions inside
 echo "Run docker container with action logic inside"
@@ -34,4 +30,4 @@ docker run --rm \
         -e DISABLE_LOCK \
         -e GPG_KEY_RING=/home/gha/keyring.gpg \
         -e DEST_PREFIX \
-        newrelic/infrastructure-publish-action
+        ohaiops/infrastructure-publish-action:latest
