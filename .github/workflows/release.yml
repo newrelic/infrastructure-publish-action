@@ -1,0 +1,33 @@
+name: Release docker image
+
+on:
+  release:
+    types:
+      - released
+    tags:
+      - '*'
+
+env:
+  TAG: ${{ github.event.release.tag_name }}
+  DOCKER_HUB_ID: ${{ secrets.DOCKER_HUB_ID }}
+  DOCKER_HUB_PASSWORD: ${{ secrets.DOCKER_HUB_PASSWORD }}
+
+jobs:
+  build:
+    name: Build and publish docker image
+    runs-on: ubuntu-20.04
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Login to DockerHub
+        uses: docker/login-action@v1
+        with:
+          username: ${{ env.DOCKER_HUB_ID }}
+          password: ${{ env.DOCKER_HUB_PASSWORD }}
+
+      - name: Build docker images
+        run: make docker/build
+
+      - name: Publish images
+        run: make docker/publish
