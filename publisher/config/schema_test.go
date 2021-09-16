@@ -121,18 +121,18 @@ func TestSchema(t *testing.T) {
 		schemaPath    string
 		expectedError error
 	}{
-		{"e2e", "../schemas/e2e.yml", nil},
-		{"nrjmx", "../schemas/nrjmx.yml", nil},
-		{"ohi", "../schemas/ohi.yml", nil},
-		{"ohi-jmx", "../schemas/ohi-jmx.yml", nil},
-		{"invalid yaml schema", "../test/schemas/bad-formatted-yaml.yml", errors.New("yaml: line 27: mapping values are not allowed in this context")},
+		{"e2e", "../../schemas/e2e.yml", nil},
+		{"nrjmx", "../../schemas/nrjmx.yml", nil},
+		{"ohi", "../../schemas/ohi.yml", nil},
+		{"ohi-jmx", "../../schemas/ohi-jmx.yml", nil},
+		{"invalid yaml schema", "../../test/schemas/bad-formatted-yaml.yml", errors.New("yaml: line 27: mapping values are not allowed in this context")},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			uploadSchemaContent, err := utils.ReadFileContent(tt.schemaPath)
-
+			assert.Nil(t, err)
 			uploadSchema, err := ParseUploadSchema(uploadSchemaContent)
 			assert.Equal(t, tt.expectedError, err)
 			log.Println(uploadSchema)

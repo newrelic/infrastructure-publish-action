@@ -1,17 +1,14 @@
-// Copyright 2021 New Relic Corporation. All rights reserved.
-// SPDX-License-Identifier: Apache-2.0
-package main
+package upload
 
 import (
 	"github.com/newrelic/infrastructure-publish-action/publisher/config"
+	"github.com/newrelic/infrastructure-publish-action/publisher/lock"
+	"github.com/stretchr/testify/assert"
 	"os"
 	"path"
 	"sync"
 	"testing"
 	"time"
-
-	"github.com/newrelic/infrastructure-publish-action/publisher/lock"
-	"github.com/stretchr/testify/assert"
 )
 
 func TestReplacePlaceholders(t *testing.T) {
@@ -128,7 +125,7 @@ func TestUploadArtifacts(t *testing.T) {
 	err = writeDummyFile(path.Join(src, "nri-foobar-386-2.0.0.txt"))
 	assert.NoError(t, err)
 
-	err = uploadArtifacts(cfg, schema, lock.NewInMemory())
+	err = UploadArtifacts(cfg, schema, lock.NewInMemory())
 	assert.NoError(t, err)
 
 	_, err = os.Stat(path.Join(dest, "amd64/nri-foobar/nri-foobar-amd64-2.0.0.txt"))
@@ -174,13 +171,13 @@ func TestUploadArtifacts_cantBeRunInParallel(t *testing.T) {
 	l := lock.NewInMemory()
 	go func() {
 		<-ready
-		err1 = uploadArtifacts(cfg, schema, l)
+		err1 = UploadArtifacts(cfg, schema, l)
 		wg.Done()
 	}()
 	go func() {
 		<-ready
 		time.Sleep(1 * time.Millisecond)
-		err2 = uploadArtifacts(cfg, schema, l)
+		err2 = UploadArtifacts(cfg, schema, l)
 		wg.Done()
 	}()
 
