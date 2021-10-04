@@ -49,3 +49,9 @@ docker/publish:
 	@printf 'Publishing docker image\n'
 	docker push ohaiops/infrastructure-publish-action:$(TAG)
 	docker push ohaiops/infrastructure-publish-action:latest
+
+.PHONY: recreate-tag
+recreate-tag:
+	@printf '\n------------------------------------------------------\n'
+	@printf 'Recreate v1 tag with main\n'
+	$(CURDIR)/scripts/recreate-tag.sh
