@@ -49,4 +49,4 @@ src/versioninfo.json
 src/resource.syso
 
 publisher/vendor
-publisher/nri-foobar*.txt
+nri-foobar*.txt

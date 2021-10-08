@@ -69,7 +69,7 @@ func main() {
 			conf.AwsRegion,
 			conf.AwsTags,
 			conf.LockGroup,
-			conf.Owner(),
+			conf.LockOwner(),
 			conf.LockRetries,
 			lock.DefaultRetryBackoff,
 			lock.DefaultTTL,
