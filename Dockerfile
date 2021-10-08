@@ -15,7 +15,7 @@ RUN dnf install -y createrepo \
                     wget
 
 # install golang version 1.15.7
-RUN curl -L https://golang.org/dl/go1.15.7.linux-amd64.tar.gz | tar xvzf - -C /usr/local
+RUN curl -L https://golang.org/dl/go1.17.2.linux-amd64.tar.gz | tar xvzf - -C /usr/local
 ENV PATH $PATH:/usr/local/go/bin
 
 
