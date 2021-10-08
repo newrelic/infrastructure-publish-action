@@ -2,8 +2,8 @@ package config
 
 import (
 	"fmt"
-	"github.com/newrelic/infrastructure-publish-action/publisher/utils"
 	"gopkg.in/yaml.v2"
+	"io/ioutil"
 )
 
 //Errors
@@ -27,14 +27,16 @@ type Upload struct {
 
 type UploadArtifactSchemas []UploadArtifactSchema
 
+// ParseUploadSchemasFile reads content of a file and marshal it into yaml
+// config struct
 func ParseUploadSchemasFile(cfgPath string) (UploadArtifactSchemas, error) {
 
-	uploadSchemaContent, err := utils.ReadFileContent(cfgPath)
+	uploadSchemaContent, err := ioutil.ReadFile(cfgPath)
 	if err != nil {
 		return nil, err
 	}
 
-	uploadSchemas, err := ParseUploadSchema(uploadSchemaContent)
+	uploadSchemas, err := parseUploadSchema(uploadSchemaContent)
 	if err != nil {
 		return nil, err
 	}
@@ -42,7 +44,7 @@ func ParseUploadSchemasFile(cfgPath string) (UploadArtifactSchemas, error) {
 	return uploadSchemas, nil
 }
 
-func ParseUploadSchema(fileContent []byte) (UploadArtifactSchemas, error) {
+func parseUploadSchema(fileContent []byte) (UploadArtifactSchemas, error) {
 
 	var schema UploadArtifactSchemas
 

@@ -16,20 +16,19 @@ import (
 )
 
 const (
-	PlaceholderForOsVersion       = "{os_version}"
-	PlaceholderForDestPrefix      = "{dest_prefix}"
-	PlaceholderForRepoName        = "{repo_name}"
-	PlaceholderForAppName         = "{app_name}"
-	PlaceholderForArch            = "{arch}"
-	PlaceholderForTag             = "{tag}"
-	PlaceholderForVersion         = "{version}"
+	placeholderForOsVersion       = "{os_version}"
+	placeholderForDestPrefix      = "{dest_prefix}"
+	placeholderForRepoName        = "{repo_name}"
+	placeholderForAppName         = "{app_name}"
+	placeholderForArch            = "{arch}"
+	placeholderForTag             = "{tag}"
+	placeholderForVersion         = "{version}"
 	PlaceholderForSrc             = "{src}"
 	PlaceholderForAccessPointHost = "{access_point_host}"
 )
 
 var (
-	l = log.New(log.Writer(), "", 0)
-	streamExecOutput = true
+	Logger           = log.New(log.Writer(), "", 0)
 )
 
 func ReadFileContent(filePath string) ([]byte, error) {
@@ -39,30 +38,24 @@ func ReadFileContent(filePath string) ([]byte, error) {
 }
 
 func ReplacePlaceholders(template, repoName, appName, arch, tag, version, destPrefix, osVersion string) (str string) {
-	str = strings.Replace(template, PlaceholderForRepoName, repoName, -1)
-	str = strings.Replace(str, PlaceholderForAppName, appName, -1)
-	str = strings.Replace(str, PlaceholderForArch, arch, -1)
-	str = strings.Replace(str, PlaceholderForTag, tag, -1)
-	str = strings.Replace(str, PlaceholderForVersion, version, -1)
-	str = strings.Replace(str, PlaceholderForDestPrefix, destPrefix, -1)
-	str = strings.Replace(str, PlaceholderForOsVersion, osVersion, -1)
+	str = strings.Replace(template, placeholderForRepoName, repoName, -1)
+	str = strings.Replace(str, placeholderForAppName, appName, -1)
+	str = strings.Replace(str, placeholderForArch, arch, -1)
+	str = strings.Replace(str, placeholderForTag, tag, -1)
+	str = strings.Replace(str, placeholderForVersion, version, -1)
+	str = strings.Replace(str, placeholderForDestPrefix, destPrefix, -1)
+	str = strings.Replace(str, placeholderForOsVersion, osVersion, -1)
 
 	return
 }
 
-// execLogOutput executes a command writing stdout & stderr to provided l.
+// execLogOutput executes a command writing stdout & stderr to provided Logger.
 func ExecLogOutput(l *log.Logger, cmdName string, commandTimeout time.Duration, cmdArgs ...string) (err error) {
 	ctx, cancel := context.WithTimeout(context.Background(), commandTimeout)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, cmdName, cmdArgs...)
 
 	l.Printf("Executing in shell '%s'", cmd.String())
-
-	if !streamExecOutput {
-		output, err := cmd.CombinedOutput()
-		l.Println(string(output))
-		return err
-	}
 
 	stdoutR, err := cmd.StdoutPipe()
 	if err != nil {
@@ -80,14 +73,14 @@ func ExecLogOutput(l *log.Logger, cmdName string, commandTimeout time.Duration, 
 		return err
 	}
 
-	go StreamAsLog(&wg, l, stdoutR, "stdout")
-	go StreamAsLog(&wg, l, stderrR, "stderr")
+	go streamAsLog(&wg, l, stdoutR, "stdout")
+	go streamAsLog(&wg, l, stderrR, "stderr")
 
 	wg.Wait()
 	return cmd.Wait()
 }
 
-func StreamAsLog(wg *sync.WaitGroup, l *log.Logger, r io.ReadCloser, prefix string) {
+func streamAsLog(wg *sync.WaitGroup, l *log.Logger, r io.ReadCloser, prefix string) {
 	defer wg.Done()
 
 	if prefix != "" {
@@ -114,7 +107,7 @@ func CopyFile(srcPath string, destPath string, override bool) (err error) {
 
 	// We do not want to override already pushed packages
 	if _, err = os.Stat(destPath); !override && err == nil {
-		l.Println(fmt.Sprintf("Skipping copying file '%s': already exists at:  %s", srcPath, destPath))
+		Logger.Println(fmt.Sprintf("Skipping copying file '%s': already exists at:  %s", srcPath, destPath))
 		return
 	}
 
@@ -128,7 +121,7 @@ func CopyFile(srcPath string, destPath string, override bool) (err error) {
 		}
 	}
 
-	l.Println("[ ] Copy " + srcPath + " into " + destPath)
+	Logger.Println("[ ] Copy " + srcPath + " into " + destPath)
 	input, err := ioutil.ReadFile(srcPath)
 	if err != nil {
 		return err
@@ -139,7 +132,6 @@ func CopyFile(srcPath string, destPath string, override bool) (err error) {
 		return err
 	}
 
-	l.Println("[✔] Copy " + srcPath + " into " + destPath)
+	Logger.Println("[✔] Copy " + srcPath + " into " + destPath)
 	return nil
 }
-

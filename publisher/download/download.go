@@ -5,7 +5,6 @@ import (
 	"github.com/newrelic/infrastructure-publish-action/publisher/config"
 	"github.com/newrelic/infrastructure-publish-action/publisher/utils"
 	"io"
-	"log"
 	"net/http"
 	"os"
 	"path"
@@ -16,20 +15,18 @@ const (
 	urlTemplate = "https://github.com/{repo_name}/releases/download/{tag}/{src}"
 )
 
-var (
-	l = log.New(log.Writer(), "", 0)
-)
+
 
 func (d *downloader) downloadArtifact(conf config.Config, src, arch, osVersion string) error {
 
-	l.Println("Starting downloading artifacts!")
+	utils.Logger.Println("Starting downloading artifacts!")
 
 	srcFile := utils.ReplacePlaceholders(src, conf.RepoName, conf.AppName, arch, conf.Tag, conf.Version, conf.DestPrefix, osVersion)
 	url := generateDownloadUrl(urlTemplate, conf.RepoName, conf.Tag, srcFile)
 
 	destPath := path.Join(conf.ArtifactsSrcFolder, srcFile)
 
-	l.Println(fmt.Sprintf("[ ] Download %s into %s", url, destPath))
+	utils.Logger.Println(fmt.Sprintf("[ ] Download %s into %s", url, destPath))
 
 	err := d.downloadFile(url, destPath)
 	if err != nil {
@@ -41,7 +38,7 @@ func (d *downloader) downloadArtifact(conf config.Config, src, arch, osVersion s
 		return err
 	}
 
-	l.Println(fmt.Sprintf("[✔] Download %s into %s %d bytes", url, destPath, fi.Size()))
+	utils.Logger.Println(fmt.Sprintf("[✔] Download %s into %s %d bytes", url, destPath, fi.Size()))
 
 	return nil
 }

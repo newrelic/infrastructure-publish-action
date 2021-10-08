@@ -46,7 +46,7 @@ type Config struct {
 	UseDefLockRetries bool
 }
 
-func (c *Config) Owner() string {
+func (c *Config) LockOwner() string {
 	return fmt.Sprintf("%s_%s_%s", c.AppName, c.Tag, c.RunID)
 }
 

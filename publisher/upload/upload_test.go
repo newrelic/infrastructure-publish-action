@@ -109,8 +109,8 @@ func TestUploadArtifacts(t *testing.T) {
 		}},
 	}
 
-	dest := t.TempDir()
-	src := t.TempDir()
+	dest := os.TempDir()
+	src := os.TempDir()
 	cfg := config.Config{
 		Version:              "2.0.0",
 		ArtifactsDestFolder:  dest,
@@ -151,8 +151,8 @@ func TestUploadArtifacts_cantBeRunInParallel(t *testing.T) {
 		}},
 	}
 
-	dest := t.TempDir()
-	src := t.TempDir()
+	dest := os.TempDir()
+	src := os.TempDir()
 	cfg := config.Config{
 		Version:              "2.0.0",
 		ArtifactsDestFolder:  dest,

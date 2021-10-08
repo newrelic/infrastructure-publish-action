@@ -2,7 +2,6 @@ package config
 
 import (
 	"errors"
-	"github.com/newrelic/infrastructure-publish-action/publisher/utils"
 	"github.com/stretchr/testify/assert"
 	"log"
 	"testing"
@@ -90,7 +89,7 @@ func TestParseSchema(t *testing.T) {
 		tt := tt
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			schema, err := ParseUploadSchema([]byte(tt.schema))
+			schema, err := parseUploadSchema([]byte(tt.schema))
 			assert.NoError(t, err)
 			assert.EqualValues(t, tt.output, schema)
 		})
@@ -108,7 +107,7 @@ func TestParseConfigError(t *testing.T) {
 		tt := tt
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			schema, err := ParseUploadSchema([]byte(tt))
+			schema, err := parseUploadSchema([]byte(tt))
 			assert.Error(t, err)
 			assert.Nil(t, schema)
 		})
@@ -131,9 +130,7 @@ func TestSchema(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			uploadSchemaContent, err := utils.ReadFileContent(tt.schemaPath)
-			assert.Nil(t, err)
-			uploadSchema, err := ParseUploadSchema(uploadSchemaContent)
+			uploadSchema, err := ParseUploadSchemasFile(tt.schemaPath)
 			assert.Equal(t, tt.expectedError, err)
 			log.Println(uploadSchema)
 		})
