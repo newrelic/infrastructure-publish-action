@@ -22,26 +22,29 @@ const (
 	typeYum          = "yum"
 	typeApt          = "apt"
 	repodataRpmPath  = "/repodata/repomd.xml"
-	signatureRpmPath = "/repodata/repomd.xmutils.Logger.asc"
+	signatureRpmPath = "/repodata/repomd.xml.asc"
 	aptPoolMain      = "pool/main/"
 	aptDists         = "dists/"
 	commandTimeout   = time.Hour * 1
+
 	s3Retries          = 10
 )
 
-var ()
-
-func uploadArtifact(conf config.Config, schema config.UploadArtifactSchema, arch string, upload config.Upload) (err error) {
+func uploadArtifact(conf config.Config, schema config.UploadArtifactSchema, upload config.Upload) (err error) {
 
 	if upload.Type == typeFile {
 		utils.Logger.Println("Uploading file artifact")
-		err = uploadFileArtifact(conf, schema, upload, arch)
+		for _, arch := range schema.Arch {
+			err = uploadFileArtifact(conf, schema, upload, arch)
+		}
 	} else if upload.Type == typeYum || upload.Type == typeZypp {
 		utils.Logger.Println("Uploading rpm as yum or zypp")
-		err = uploadRpm(conf, schema.Src, upload, arch)
+		for _, arch := range schema.Arch {
+			err = uploadRpm(conf, schema.Src, upload, arch)
+		}
 	} else if upload.Type == typeApt {
 		utils.Logger.Println("Uploading apt")
-		err = uploadApt(conf, schema.Src, upload, arch)
+		err = uploadApt(conf, schema.Src, upload, schema.Arch)
 	}
 	if err != nil {
 		return err
@@ -65,13 +68,12 @@ func UploadArtifacts(conf config.Config, schema config.UploadArtifactSchemas, bu
 	}()
 
 	for _, artifactSchema := range schema {
-		for _, arch := range artifactSchema.Arch {
-			for _, upload := range artifactSchema.Uploads {
-				err := uploadArtifact(conf, artifactSchema, arch, upload)
-				if err != nil {
-					return err
-				}
+		for _, upload := range artifactSchema.Uploads {
+			err := uploadArtifact(conf, artifactSchema, upload)
+			if err != nil {
+				return err
 			}
+
 		}
 	}
 	return nil
@@ -148,7 +150,7 @@ func uploadRpm(conf config.Config, srcTemplate string, uploadConf config.Upload,
 
 		// "cache" the repodata from s3 to local so it doesnt have to process all again
 		if _, err = os.Stat(s3RepoData + "/"); err == nil {
-			if err = utils.ExecWithRetries(s3Retries, utils.S3RemountFn, utils.Logger, "cp", commandTimeout, "-rf", s3RepoData+"/", os.TempDir()+"/repodata/"); err != nil {
+			if err =  utils.ExecWithRetries(s3Retries, utils.S3RemountFn, utils.Logger, "cp", commandTimeout, "-rf", s3RepoData+"/", os.TempDir()+"/repodata/"); err != nil {
 				return err
 			}
 		}
@@ -158,17 +160,17 @@ func uploadRpm(conf config.Config, srcTemplate string, uploadConf config.Upload,
 		}
 
 		// remove the 'old' repodata from s3
-		if err = utils.ExecWithRetries(s3Retries, utils.S3RemountFn, utils.Logger, "rm", commandTimeout, "-rf", s3RepoData+"/"); err != nil {
+		if err =  utils.ExecWithRetries(s3Retries, utils.S3RemountFn, utils.Logger, "rm", commandTimeout, "-rf", s3RepoData+"/"); err != nil {
 			return err
 		}
 
 		// copy from temp repodata to repo repodata in s3
-		if err = utils.ExecWithRetries(s3Retries, utils.S3RemountFn, utils.Logger, "cp", commandTimeout, "-rf", os.TempDir()+"/repodata/", s3RepoPath); err != nil {
+		if err =  utils.ExecWithRetries(s3Retries, utils.S3RemountFn, utils.Logger, "cp", commandTimeout, "-rf", os.TempDir()+"/repodata/", s3RepoPath); err != nil {
 			return err
 		}
 
 		// remove temp repodata so the next repo doesn't get confused
-		if err = utils.ExecWithRetries(s3Retries, utils.S3RemountFn, utils.Logger, "rm", commandTimeout, "-rf", os.TempDir()+"/repodata/"); err != nil {
+		if err =  utils.ExecWithRetries(s3Retries, utils.S3RemountFn, utils.Logger, "rm", commandTimeout, "-rf", os.TempDir()+"/repodata/"); err != nil {
 			return err
 		}
 
@@ -188,73 +190,74 @@ func uploadRpm(conf config.Config, srcTemplate string, uploadConf config.Upload,
 	return nil
 }
 
-func uploadApt(conf config.Config, srcTemplate string, upload config.Upload, arch string) (err error) {
+func uploadApt(conf config.Config, srcTemplate string, upload config.Upload, archs []string) (err error) {
 
 	// the dest path for apt is the same for each distribution since it does not depend on it
 	var destPath string
 	for _, osVersion := range upload.OsVersion {
-		utils.Logger.Printf("[ ] Start uploading deb for os %s/%s", osVersion, arch)
+		utils.Logger.Printf("[ ] Start uploading deb for os %s", osVersion)
 
-		fileName, dest := replaceSrcDestTemplates(
-			srcTemplate,
-			upload.Dest,
-			conf.RepoName,
-			conf.AppName,
-			arch,
-			conf.Tag,
-			conf.Version,
-			conf.DestPrefix,
-			osVersion)
-
-		srcPath := path.Join(conf.ArtifactsSrcFolder, fileName)
-		destPath = path.Join(conf.ArtifactsDestFolder, dest, aptDists)
-		filePath := path.Join(conf.ArtifactsDestFolder, dest, aptPoolMain, string(fileName[0]), "/", conf.AppName, fileName)
-
-		utils.Logger.Printf("[ ] Create local repo for os %s/%s", osVersion, arch)
-
+		utils.Logger.Printf("[ ] Create local repo for os %s", osVersion)
 		// aptly repo create --distribution=${DISTRO} ${DISTRO}
 		if err = utils.ExecLogOutput(utils.Logger, "aptly", commandTimeout, "repo", "create", "--distribution="+osVersion, osVersion); err != nil {
 			return err
 		}
-		utils.Logger.Printf("[✔] Local repo created for os %s/%s", osVersion, arch)
+		utils.Logger.Printf("[✔] Local repo created for os %s", osVersion)
 
 		// Mirror repo start
 		srcRepo := generateAptSrcRepoUrl(upload.SrcRepo, conf.MirrorHost)
-		err = mirrorAPTRepo(conf, srcRepo, srcPath, osVersion, arch)
+		err = mirrorAPTRepo(conf, srcRepo, osVersion)
 		if err != nil {
 			return err
 		}
 
-		utils.Logger.Printf("[ ] Add package %s into deb repo for %s/%s", srcPath, osVersion, arch)
-		if err = utils.ExecLogOutput(utils.Logger, "aptly", commandTimeout, "repo", "add", "-force-replace=true", osVersion, srcPath); err != nil {
-			return err
-		}
-		utils.Logger.Printf("[✔] Added successfully package into deb repo for %s/%s", osVersion, arch)
+		for _, arch := range archs {
+			fileName, dest := replaceSrcDestTemplates(
+				srcTemplate,
+				upload.Dest,
+				conf.RepoName,
+				conf.AppName,
+				arch,
+				conf.Tag,
+				conf.Version,
+				conf.DestPrefix,
+				osVersion)
 
-		utils.Logger.Printf("[ ] Publish deb repo for %s/%s", osVersion, arch)
+			srcPath := path.Join(conf.ArtifactsSrcFolder, fileName)
+			destPath = path.Join(conf.ArtifactsDestFolder, dest, aptDists)
+			filePath := path.Join(conf.ArtifactsDestFolder, dest, aptPoolMain, string(fileName[0]), "/", conf.AppName, fileName)
+
+			utils.Logger.Printf("[ ] Add package %s into deb repo for %s/%s", srcPath, osVersion, arch)
+			if err = utils.ExecLogOutput(utils.Logger, "aptly", commandTimeout, "repo", "add", "-force-replace=true", osVersion, srcPath); err != nil {
+				return err
+			}
+			utils.Logger.Printf("[✔] Added successfully package into deb repo for %s/%s", osVersion, arch)
+
+			// Create the directory and copy the binary
+			if err =  utils.ExecWithRetries(s3Retries, utils.S3RemountFn, utils.Logger, "mkdir", commandTimeout, "-p", path.Dir(filePath)); err != nil {
+				return err
+			}
+			if err =  utils.ExecWithRetries(s3Retries, utils.S3RemountFn, utils.Logger, "cp", commandTimeout, "-f", srcPath, filePath); err != nil {
+				return err
+			}
+		}
+
+		utils.Logger.Printf("[ ] Publish deb repo for %s", osVersion)
 		if err = utils.ExecLogOutput(utils.Logger, "aptly", commandTimeout, "publish", "repo", "-origin=New Relic", "-keyring", conf.GpgKeyRing, "-passphrase", conf.GpgPassphrase, "-batch", osVersion); err != nil {
 			return err
 		}
-		utils.Logger.Printf("[✔] Published succesfully deb repo for %s/%s", osVersion, arch)
 
-		// Create the directory and copy the binary
-		if err = utils.ExecWithRetries(s3Retries, utils.S3RemountFn, utils.Logger, "mkdir", commandTimeout, "-p", path.Dir(filePath)); err != nil {
+		utils.Logger.Printf("[✔] Published successfully deb repo for %s", osVersion)
+		if err = syncAPTMetadata(conf, destPath, osVersion); err != nil {
 			return err
 		}
-		if err = utils.ExecWithRetries(s3Retries, utils.S3RemountFn, utils.Logger, "cp", commandTimeout, "-f", srcPath, filePath); err != nil {
-			return err
-		}
-
-		if err = syncAPTMetadata(conf, destPath, osVersion, arch); err != nil {
-			return err
-		}
+		utils.Logger.Printf("[✔] Synced successfully local repo for %s into s3", osVersion)
 	}
 
-	utils.Logger.Printf("[✔] Synced successfully local repo for %s into s3", arch)
 	return nil
 }
 
-func syncAPTMetadata(conf config.Config, destPath string, osVersion string, arch string) (err error) {
+func syncAPTMetadata(conf config.Config, destPath string, osVersion string) (err error) {
 	if _, err = os.Stat(destPath); os.IsNotExist(err) {
 		// set right permissions
 		err = os.MkdirAll(destPath, 0744)
@@ -262,8 +265,8 @@ func syncAPTMetadata(conf config.Config, destPath string, osVersion string, arch
 			return err
 		}
 	}
-	utils.Logger.Printf("[ ] Sync local repo for %s/%s into s3", osVersion, arch)
-	if err = utils.ExecWithRetries(s3Retries, utils.S3RemountFn, utils.Logger, "cp", commandTimeout, "-rf", conf.AptlyFolder+"/public/"+aptDists+osVersion, destPath); err != nil {
+	utils.Logger.Printf("[ ] Sync local repo for %s into s3", osVersion)
+	if err = utils.ExecLogOutput(utils.Logger, "cp", commandTimeout, "-rf", conf.AptlyFolder+"/public/"+aptDists+osVersion, destPath); err != nil {
 		return err
 	}
 	// drop local published repo, to be able to recreate it later
@@ -294,12 +297,12 @@ func syncAPTMetadata(conf config.Config, destPath string, osVersion string, arch
 	if err = utils.ExecLogOutput(utils.Logger, "rm", commandTimeout, "-rf", conf.AptlyFolder+"/public/"+aptDists+osVersion); err != nil {
 		return err
 	}
-	utils.Logger.Printf("[✔] Sync local repo was successful for %s/%s into s3", osVersion, arch)
+	utils.Logger.Printf("[✔] Sync local repo was successful for %s into s3", osVersion)
 
 	return err
 }
 
-func mirrorAPTRepo(conf config.Config, repoUrl string, srcPath string, osVersion string, arch string) (err error) {
+func mirrorAPTRepo(conf config.Config, repoUrl string, osVersion string) (err error) {
 
 	// Creating test Url, example http://bucket.fqdn/infrastructure_agent/linux/apt/dists/xenial/Release
 	u, err := url.Parse(repoUrl + "/" + aptDists + osVersion + "/Release")
@@ -317,24 +320,24 @@ func mirrorAPTRepo(conf config.Config, repoUrl string, srcPath string, osVersion
 		return nil
 	}
 
-	utils.Logger.Printf("[ ] Mirror create APT repo %s for %s/%s from %s", srcPath, osVersion, arch, repoUrl)
+	utils.Logger.Printf("[ ] Mirror create APT repo %s for %s", osVersion, repoUrl)
 	if err = utils.ExecLogOutput(utils.Logger, "aptly", commandTimeout, "mirror", "create", "-keyring", conf.GpgKeyRing, "mirror-"+osVersion, repoUrl, osVersion, "main"); err != nil {
 		return err
 	}
-	utils.Logger.Printf("[✔] Mirror create succesfully APT repo %s for %s/%s", srcPath, osVersion, arch)
+	utils.Logger.Printf("[✔] Mirror create succesfully APT repo for %s", osVersion)
 
-	utils.Logger.Printf("[ ] Mirror update APT repo %s for %s/%s", srcPath, osVersion, arch)
+	utils.Logger.Printf("[ ] Mirror update APT repo for %s", osVersion)
 	if err = utils.ExecLogOutput(utils.Logger, "aptly", commandTimeout, "mirror", "update", "-keyring", conf.GpgKeyRing, "mirror-"+osVersion); err != nil {
 		return err
 	}
-	utils.Logger.Printf("[✔] Mirror update succesfully APT repo %s for %s/%s", srcPath, osVersion, arch)
+	utils.Logger.Printf("[✔] Mirror update succesfully APT repo for %s", osVersion)
 
 	// The last parameter is `Name` that means a query matches all the packages (as it means “package name is not empty”).
-	utils.Logger.Printf("[ ] Mirror repo import APT repo %s for %s/%s", srcPath, osVersion, arch)
+	utils.Logger.Printf("[ ] Mirror repo import APT repo for %s", osVersion)
 	if err = utils.ExecLogOutput(utils.Logger, "aptly", commandTimeout, "repo", "import", "mirror-"+osVersion, osVersion, "Name"); err != nil {
 		return err
 	}
-	utils.Logger.Printf("[✔] Mirror repo import succesfully APT repo %s for %s/%s", srcPath, osVersion, arch)
+	utils.Logger.Printf("[✔] Mirror repo import succesfully APT repo for %s", osVersion)
 
 	return nil
 }
