@@ -52,6 +52,7 @@ const (
 	aptPoolMain        = "pool/main/"
 	aptDists           = "dists/"
 	commandTimeout     = time.Hour * 1
+	s3Retries          = 5
 
 	// AWS lock resource tags
 	defaultTagOwningTeam = "CAOS"
@@ -503,7 +504,7 @@ func uploadRpm(conf config, srcTemplate string, upload Upload, arch string) (err
 
 		// "cache" the repodata from s3 to local so it doesnt have to process all again
 		if _, err = os.Stat(s3RepoData + "/"); err == nil {
-			if err = execLogOutput(l, "cp", "-rf", s3RepoData+"/", os.TempDir()+"/repodata/"); err != nil {
+			if err = execWithRetries(s3Retries, l, "cp", "-rf", s3RepoData+"/", os.TempDir()+"/repodata/"); err != nil {
 				return err
 			}
 		}
@@ -513,17 +514,17 @@ func uploadRpm(conf config, srcTemplate string, upload Upload, arch string) (err
 		}
 
 		// remove the 'old' repodata from s3
-		if err = execLogOutput(l, "rm", "-rf", s3RepoData+"/"); err != nil {
+		if err = execWithRetries(s3Retries, l, "rm", "-rf", s3RepoData+"/"); err != nil {
 			return err
 		}
 
 		// copy from temp repodata to repo repodata in s3
-		if err = execLogOutput(l, "cp", "-rf", os.TempDir()+"/repodata/", s3RepoPath); err != nil {
+		if err = execWithRetries(s3Retries, l, "cp", "-rf", os.TempDir()+"/repodata/", s3RepoPath); err != nil {
 			return err
 		}
 
 		// remove temp repodata so the next repo doesn't get confused
-		if err = execLogOutput(l, "rm", "-rf", os.TempDir()+"/repodata/"); err != nil {
+		if err = execWithRetries(s3Retries, l, "rm", "-rf", os.TempDir()+"/repodata/"); err != nil {
 			return err
 		}
 
@@ -596,7 +597,7 @@ func uploadApt(conf config, srcTemplate string, upload Upload, arch string) (err
 		if err = execLogOutput(l, "mkdir", "-p", path.Dir(filePath)); err != nil {
 			return err
 		}
-		if err = execLogOutput(l, "cp", "-f", srcPath, filePath); err != nil {
+		if err = execWithRetries(s3Retries, l, "cp", "-f", srcPath, filePath); err != nil {
 			return err
 		}
 
@@ -618,7 +619,7 @@ func syncAPTMetadata(conf config, destPath string, osVersion string, arch string
 		}
 	}
 	l.Printf("[ ] Sync local repo for %s/%s into s3", osVersion, arch)
-	if err = execLogOutput(l, "cp", "-rf", conf.aptlyFolder+"/public/"+aptDists+osVersion, destPath); err != nil {
+	if err = execWithRetries(s3Retries, l, "cp", "-rf", conf.aptlyFolder+"/public/"+aptDists+osVersion, destPath); err != nil {
 		return err
 	}
 	// drop local published repo, to be able to recreate it later
@@ -727,6 +728,18 @@ func execLogOutput(l *log.Logger, cmdName string, cmdArgs ...string) (err error)
 
 	wg.Wait()
 	return cmd.Wait()
+}
+
+func execWithRetries(retries int, l *log.Logger, cmdName string, cmdArgs ...string) error {
+	var err error
+	for i := 0; i < retries; i++ {
+		err = execLogOutput(l, cmdName, cmdArgs...)
+		if err == nil {
+			break
+		}
+		l.Printf("[attempt %v] error executing command %s %s", i, cmdName, strings.Join(cmdArgs, " "))
+	}
+	return err
 }
 
 func streamAsLog(wg *sync.WaitGroup, l *log.Logger, r io.ReadCloser, prefix string) {
