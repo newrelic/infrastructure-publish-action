@@ -246,6 +246,7 @@ func TestDownloadArtifacts(t *testing.T) {
 	cfg := config{
 		version: "2.0.0",
 		appName: "nri-foobar",
+		urlTemplate: defaultUrlTemplate,
 	}
 
 	urlRecClient := newURLRecorderHTTPClient()
@@ -446,7 +447,7 @@ func Test_generateDownloadUrl(t *testing.T) {
 	tag := "1.16.4"
 	srcFile := "newrelic-infra-1.16.4-1.el8.arm.rpm"
 
-	url := generateDownloadUrl(urlTemplate, repoName, tag, srcFile)
+	url := generateDownloadUrl(defaultUrlTemplate, repoName, tag, srcFile)
 
 	assert.Equal(t, "https://github.com/newrelic/infrastructure-agent/releases/download/1.16.4/newrelic-infra-1.16.4-1.el8.arm.rpm", url)
 }
@@ -528,6 +529,7 @@ func Test_loadConfig(t *testing.T) {
 				mirrorHost:        mirrorProduction,
 				aptlyFolder:       defaultAptlyFolder,
 				lockGroup:         defaultLockgroup,
+				urlTemplate:       defaultUrlTemplate,
 				useDefLockRetries: true,
 			},
 		},
@@ -540,6 +542,7 @@ func Test_loadConfig(t *testing.T) {
 				"LOCK_GROUP":        "FooGroup",
 				"ACCESS_POINT_HOST": "FooAPH",
 				"LOCK_RETRIES":      "false",
+				"URL_TEMPLATE":      "https://this/is/a/url/{repo/{tag}",
 			},
 			want: config{
 				tag:               "vFooBar",
@@ -548,6 +551,7 @@ func Test_loadConfig(t *testing.T) {
 				mirrorHost:        "FooAPH",
 				aptlyFolder:       "FooFolder",
 				lockGroup:         "FooGroup",
+				urlTemplate:       "https://this/is/a/url/{repo/{tag}",
 				useDefLockRetries: false,
 			},
 		},

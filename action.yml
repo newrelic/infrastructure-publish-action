@@ -60,6 +60,9 @@ inputs:
   gpg_private_key_base64:
     description: Encoded gpg key
     required: true
+  url_template:
+    description: Url to download the packages from
+    required: false
 runs:
   using: "composite"
   steps:
@@ -84,3 +87,4 @@ runs:
         AWS_ROLE_ARN: ${{ inputs.aws_role_arn }}
         DISABLE_LOCK: ${{ inputs.disable_lock }}
         AWS_ROLE_SESSION_NAME: ${{ inputs.aws_role_session_name }}
+        URL_TEMPLATE: ${{ inputs.url_template }}

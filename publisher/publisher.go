@@ -34,7 +34,7 @@ const (
 	placeholderForVersion         = "{version}"
 	placeholderForSrc             = "{src}"
 	placeholderForAccessPointHost = "{access_point_host}"
-	urlTemplate                   = "https://github.com/{repo_name}/releases/download/{tag}/{src}"
+	defaultUrlTemplate            = "https://github.com/{repo_name}/releases/download/{tag}/{src}"
 
 	//Errors
 	noDestinationError = "no uploads were provided for the schema"
@@ -107,6 +107,7 @@ type config struct {
 	disableLock       bool
 	lockRetries       uint
 	useDefLockRetries bool
+	urlTemplate       string
 }
 
 func (c *config) owner() string {
@@ -221,6 +222,7 @@ func loadConfig() config {
 	viper.BindEnv("disable_lock")
 	viper.BindEnv("lock_retries")
 	viper.BindEnv("lock_group")
+	viper.BindEnv("url_template")
 
 	aptlyF := viper.GetString("aptly_folder")
 	if aptlyF == "" {
@@ -235,6 +237,11 @@ func loadConfig() config {
 	version := viper.GetString("app_version")
 	if version == "" {
 		version = strings.Replace(viper.GetString("tag"), "v", "", -1)
+	}
+
+	urlTemplate := viper.GetString("url_template")
+	if urlTemplate == "" {
+		urlTemplate = defaultUrlTemplate
 	}
 
 	accessPointHost, mirrorHost := parseAccessPointHost(viper.GetString("access_point_host"))
@@ -262,6 +269,7 @@ func loadConfig() config {
 		disableLock:          viper.GetBool("disable_lock"),
 		lockRetries:          viper.GetUint("lock_retries"),
 		useDefLockRetries:    !viper.IsSet("lock_retries"), // when non set: use default value
+		urlTemplate:          urlTemplate,
 	}
 }
 
@@ -298,7 +306,7 @@ func (d *downloader) downloadArtifact(conf config, src, arch, osVersion string) 
 	l.Println("Starting downloading artifacts!")
 
 	srcFile := replacePlaceholders(src, conf.repoName, conf.appName, arch, conf.tag, conf.version, conf.destPrefix, osVersion)
-	url := generateDownloadUrl(urlTemplate, conf.repoName, conf.tag, srcFile)
+	url := generateDownloadUrl(conf.urlTemplate, conf.repoName, conf.tag, srcFile)
 
 	destPath := path.Join(conf.artifactsSrcFolder, srcFile)
 
