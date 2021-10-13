@@ -744,7 +744,7 @@ func execWithRetries(retries int, l *log.Logger, cmdName string, cmdArgs ...stri
 }
 
 func mount(l *log.Logger) {
-	err = execLogOutput(l, "/bin/mount-s3.sh")
+	err = execLogOutput(l, "/home/gha/mount-s3.sh")
 	if err != nil {
 		l.Printf("fail to mount, %v", err)
 	}
