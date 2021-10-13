@@ -52,7 +52,7 @@ const (
 	aptPoolMain        = "pool/main/"
 	aptDists           = "dists/"
 	commandTimeout     = time.Hour * 1
-	s3Retries          = 5
+	s3Retries          = 20
 
 	// AWS lock resource tags
 	defaultTagOwningTeam = "CAOS"
@@ -738,7 +738,8 @@ func execWithRetries(retries int, l *log.Logger, cmdName string, cmdArgs ...stri
 			break
 		}
 		l.Printf("[attempt %v] error executing command %s %s", i, cmdName, strings.Join(cmdArgs, " "))
-		mount(l)
+		time.Sleep(10*time.Second)
+		// mount(l)
 	}
 	return err
 }
