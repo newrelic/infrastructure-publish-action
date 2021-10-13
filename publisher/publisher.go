@@ -738,8 +738,16 @@ func execWithRetries(retries int, l *log.Logger, cmdName string, cmdArgs ...stri
 			break
 		}
 		l.Printf("[attempt %v] error executing command %s %s", i, cmdName, strings.Join(cmdArgs, " "))
+		mount(l)
 	}
 	return err
+}
+
+func mount(l *log.Logger) {
+	err = execLogOutput(l, "/bin/mount-s3.sh")
+	if err != nil {
+		l.Printf("fail to mount, %v", err)
+	}
 }
 
 func streamAsLog(wg *sync.WaitGroup, l *log.Logger, r io.ReadCloser, prefix string) {
