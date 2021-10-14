@@ -1,7 +1,7 @@
 SHELL := /bin/bash
 WORKDIR := /home/gha
 
-default: check-env prepare-schema mount-s3 mount-s3-check prepare-schema import-GPG-key publish-artifacts unmount-s3
+default: check-env mount-s3 mount-s3-check prepare-schema import-GPG-key publish-artifacts unmount-s3
 
 check-env:
 ifndef GPG_PRIVATE_KEY_BASE64
@@ -60,7 +60,7 @@ publish-artifacts: import-GPG-key mount-s3-check
 	@echo "Publish artifacts"
 	@UPLOAD_SCHEMA_FILE_PATH=$(UPLOAD_SCHEMA_FILE_PATH) DEST_PREFIX=$(DEST_PREFIX) /bin/publisher
 
-unmount-s3: publish-artifacts
+unmount-s3:
 	@echo "Unmounting S3..."
 	@umount $(AWS_S3_MOUNT_DIRECTORY)
 

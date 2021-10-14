@@ -738,9 +738,9 @@ func execWithRetries(retries int, l *log.Logger, cmdName string, cmdArgs ...stri
 		if err == nil {
 			break
 		}
-		l.Printf("[attempt %v] error executing command %s %s", i, cmdName, strings.Join(cmdArgs, " "))
 		time.Sleep(s3RetryTimeout)
 		remountS3(l)
+		l.Printf("[attempt %v] error executing command %s %s", i, cmdName, strings.Join(cmdArgs, " "))
 	}
 	return err
 }
