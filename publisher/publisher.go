@@ -740,15 +740,12 @@ func execWithRetries(retries int, l *log.Logger, cmdName string, cmdArgs ...stri
 		}
 		l.Printf("[attempt %v] error executing command %s %s", i, cmdName, strings.Join(cmdArgs, " "))
 		time.Sleep(s3RetryTimeout)
-		err = remounts3(l)
-		if err != nil {
-			l.Printf("mounting s3 failed %v", err)
-		}
+		remountS3(l)
 	}
 	return err
 }
 
-func remounts3(l *log.Logger) error {
+func remountS3(l *log.Logger) {
 	err := execLogOutput(l, "make", "unmount-s3")
 	if err != nil {
 		l.Printf("unmounting s3 failed %v", err)
@@ -756,9 +753,8 @@ func remounts3(l *log.Logger) error {
 
 	err = execLogOutput(l, "make", "mount-s3", "mount-s3-check")
 	if err != nil {
-		return err
+		l.Printf("mounting s3 failed %v", err)
 	}
-	return nil
 }
 
 func streamAsLog(wg *sync.WaitGroup, l *log.Logger, r io.ReadCloser, prefix string) {
