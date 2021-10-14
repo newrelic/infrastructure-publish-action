@@ -52,7 +52,8 @@ const (
 	aptPoolMain        = "pool/main/"
 	aptDists           = "dists/"
 	commandTimeout     = time.Hour * 1
-	s3Retries          = 20
+	s3Retries          = 10
+	s3RetryTimeout     = 3 * time.Second
 
 	// AWS lock resource tags
 	defaultTagOwningTeam = "CAOS"
@@ -738,17 +739,21 @@ func execWithRetries(retries int, l *log.Logger, cmdName string, cmdArgs ...stri
 			break
 		}
 		l.Printf("[attempt %v] error executing command %s %s", i, cmdName, strings.Join(cmdArgs, " "))
-		time.Sleep(10*time.Second)
-		// mount(l)
+		time.Sleep(s3RetryTimeout)
+		err = mounts3(l)
+		if err != nil {
+			l.Printf("mounting s3 failed %v", err)
+		}
 	}
 	return err
 }
 
-func mount(l *log.Logger) {
-	err := execLogOutput(l, "/home/gha/mount-s3.sh")
+func mounts3(l *log.Logger) error {
+	err := execLogOutput(l, "make", "mount-s3", "mount-s3-check")
 	if err != nil {
-		l.Printf("fail to mount, %v", err)
+		return err
 	}
+	return nil
 }
 
 func streamAsLog(wg *sync.WaitGroup, l *log.Logger, r io.ReadCloser, prefix string) {
