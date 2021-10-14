@@ -740,7 +740,7 @@ func execWithRetries(retries int, l *log.Logger, cmdName string, cmdArgs ...stri
 		}
 		l.Printf("[attempt %v] error executing command %s %s", i, cmdName, strings.Join(cmdArgs, " "))
 		time.Sleep(s3RetryTimeout)
-		err = mounts3(l)
+		err = remounts3(l)
 		if err != nil {
 			l.Printf("mounting s3 failed %v", err)
 		}
@@ -748,8 +748,13 @@ func execWithRetries(retries int, l *log.Logger, cmdName string, cmdArgs ...stri
 	return err
 }
 
-func mounts3(l *log.Logger) error {
-	err := execLogOutput(l, "make", "mount-s3", "mount-s3-check")
+func remounts3(l *log.Logger) error {
+	err := execLogOutput(l, "make", "unmount-s3")
+	if err != nil {
+		l.Printf("unmounting s3 failed %v", err)
+	}
+
+	err = execLogOutput(l, "make", "mount-s3", "mount-s3-check")
 	if err != nil {
 		return err
 	}
