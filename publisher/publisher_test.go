@@ -570,7 +570,10 @@ func Test_ExecWithRetries_Ok(t *testing.T) {
 
 	err := execLogOutput(l, "ls", "/home")
 	assert.Nil(t, err)
-	err = execWithRetries(3, lRetry, "ls", "/home")
+	retryCallback := func(l *log.Logger) {
+		l.Print("remounting")
+	}
+	err = execWithRetries(3, retryCallback, lRetry, "ls", "/home")
 	assert.Nil(t, err)
 
 	assert.Equal(t, output.String(), outputRetry.String())
@@ -584,14 +587,18 @@ func Test_ExecWithRetries_Fail(t *testing.T) {
 
 	err := execLogOutput(l, "ls", "/non_existing_path")
 	assert.Error(t, err, "exit status 1")
-	err = execWithRetries(retries, lRetry, "ls", "/non_existing_path")
+
+	retryCallback := func(l *log.Logger) {
+		l.Print("remounting")
+	}
+	err = execWithRetries(retries, retryCallback, lRetry, "ls", "/non_existing_path")
 	assert.Error(t, err, "exit status 1")
 
 	var expectedOutput string
 	for i := 0; i < retries; i++ {
 		expectedOutput += output.String()
+		expectedOutput += "remounting\n"
 		expectedOutput += fmt.Sprintf("[attempt %v] error executing command ls /non_existing_path\n", i)
 	}
 	assert.Equal(t, expectedOutput, outputRetry.String())
 }
-
