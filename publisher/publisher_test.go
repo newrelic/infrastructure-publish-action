@@ -5,6 +5,7 @@ package main
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"log"
@@ -560,4 +561,44 @@ func Test_loadConfig(t *testing.T) {
 			assert.Equal(t, tt.want, loadConfig(), "Case failed:", tt.name, tt.env)
 		})
 	}
+}
+
+func Test_ExecWithRetries_Ok(t *testing.T) {
+	var output, outputRetry bytes.Buffer
+	l := log.New(&output, "", 0)
+	lRetry := log.New(&outputRetry, "", 0)
+
+	err := execLogOutput(l, "ls", "/home")
+	assert.Nil(t, err)
+	retryCallback := func(l *log.Logger) {
+		l.Print("remounting")
+	}
+	err = execWithRetries(3, retryCallback, lRetry, "ls", "/home")
+	assert.Nil(t, err)
+
+	assert.Equal(t, output.String(), outputRetry.String())
+}
+
+func Test_ExecWithRetries_Fail(t *testing.T) {
+	var output, outputRetry bytes.Buffer
+	l := log.New(&output, "", 0)
+	lRetry := log.New(&outputRetry, "", 0)
+	retries := 3
+
+	err := execLogOutput(l, "ls", "/non_existing_path")
+	assert.Error(t, err, "exit status 1")
+
+	retryCallback := func(l *log.Logger) {
+		l.Print("remounting")
+	}
+	err = execWithRetries(retries, retryCallback, lRetry, "ls", "/non_existing_path")
+	assert.Error(t, err, "exit status 1")
+
+	var expectedOutput string
+	for i := 0; i < retries; i++ {
+		expectedOutput += output.String()
+		expectedOutput += "remounting\n"
+		expectedOutput += fmt.Sprintf("[attempt %v] error executing command ls /non_existing_path\n", i)
+	}
+	assert.Equal(t, expectedOutput, outputRetry.String())
 }
