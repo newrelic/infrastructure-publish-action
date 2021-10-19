@@ -807,31 +807,27 @@ func uploadFileArtifact(conf config, schema uploadArtifactSchema, upload Upload,
 
 func copyFile(srcPath string, destPath string, override bool) (err error) {
 
-	// We do not want to override already pushed packages
-	if _, err = os.Stat(destPath); !override && err == nil {
-		l.Println(fmt.Sprintf("Skipping copying file '%s': already exists at:  %s", srcPath, destPath))
-		return
-	}
-
 	destDirectory := filepath.Dir(destPath)
 
-	if _, err = os.Stat(destDirectory); os.IsNotExist(err) {
-		// set right permissions
-		err = os.MkdirAll(destDirectory, 0744)
-		if err != nil {
-			return err
-		}
+	l.Println("[ ] Create " + destDirectory)
+
+	if err = execWithRetries(s3Retries, s3RemountFn, l, "mkdir", "-p", destDirectory); err != nil {
+		return err
 	}
+
+	l.Println("[✔] Create " + destDirectory)
 
 	l.Println("[ ] Copy " + srcPath + " into " + destPath)
-	input, err := ioutil.ReadFile(srcPath)
-	if err != nil {
-		return err
-	}
 
-	err = ioutil.WriteFile(destPath, input, 0744)
-	if err != nil {
-		return err
+	if override {
+		if err = execWithRetries(s3Retries, s3RemountFn, l, "cp", "-f", srcPath, destPath); err != nil {
+			return err
+		}
+	}else{
+		l.Println(fmt.Sprintf("Try to copy file '%s' to %s, but skipping if exists", srcPath, destPath))
+		if err = execWithRetries(s3Retries, s3RemountFn, l, "cp", "-n", srcPath, destPath); err != nil {
+			return err
+		}
 	}
 
 	l.Println("[✔] Copy " + srcPath + " into " + destPath)
