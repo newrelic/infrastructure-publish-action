@@ -26,6 +26,7 @@ const (
 	aptPoolMain      = "pool/main/"
 	aptDists         = "dists/"
 	commandTimeout   = time.Hour * 1
+	s3Retries          = 10
 )
 
 var ()
@@ -147,7 +148,7 @@ func uploadRpm(conf config.Config, srcTemplate string, uploadConf config.Upload,
 
 		// "cache" the repodata from s3 to local so it doesnt have to process all again
 		if _, err = os.Stat(s3RepoData + "/"); err == nil {
-			if err = utils.ExecLogOutput(utils.Logger, "cp", commandTimeout, "-rf", s3RepoData+"/", os.TempDir()+"/repodata/"); err != nil {
+			if err = utils.ExecWithRetries(s3Retries, utils.S3RemountFn, utils.Logger, "cp", commandTimeout, "-rf", s3RepoData+"/", os.TempDir()+"/repodata/"); err != nil {
 				return err
 			}
 		}
@@ -157,17 +158,17 @@ func uploadRpm(conf config.Config, srcTemplate string, uploadConf config.Upload,
 		}
 
 		// remove the 'old' repodata from s3
-		if err = utils.ExecLogOutput(utils.Logger, "rm", commandTimeout, "-rf", s3RepoData+"/"); err != nil {
+		if err = utils.ExecWithRetries(s3Retries, utils.S3RemountFn, utils.Logger, "rm", commandTimeout, "-rf", s3RepoData+"/"); err != nil {
 			return err
 		}
 
 		// copy from temp repodata to repo repodata in s3
-		if err = utils.ExecLogOutput(utils.Logger, "cp", commandTimeout, "-rf", os.TempDir()+"/repodata/", s3RepoPath); err != nil {
+		if err = utils.ExecWithRetries(s3Retries, utils.S3RemountFn, utils.Logger, "cp", commandTimeout, "-rf", os.TempDir()+"/repodata/", s3RepoPath); err != nil {
 			return err
 		}
 
 		// remove temp repodata so the next repo doesn't get confused
-		if err = utils.ExecLogOutput(utils.Logger, "rm", commandTimeout, "-rf", os.TempDir()+"/repodata/"); err != nil {
+		if err = utils.ExecWithRetries(s3Retries, utils.S3RemountFn, utils.Logger, "rm", commandTimeout, "-rf", os.TempDir()+"/repodata/"); err != nil {
 			return err
 		}
 
@@ -237,10 +238,10 @@ func uploadApt(conf config.Config, srcTemplate string, upload config.Upload, arc
 		utils.Logger.Printf("[✔] Published succesfully deb repo for %s/%s", osVersion, arch)
 
 		// Create the directory and copy the binary
-		if err = utils.ExecLogOutput(utils.Logger, "mkdir", commandTimeout, "-p", path.Dir(filePath)); err != nil {
+		if err = utils.ExecWithRetries(s3Retries, utils.S3RemountFn, utils.Logger, "mkdir", commandTimeout, "-p", path.Dir(filePath)); err != nil {
 			return err
 		}
-		if err = utils.ExecLogOutput(utils.Logger, "cp", commandTimeout, "-f", srcPath, filePath); err != nil {
+		if err = utils.ExecWithRetries(s3Retries, utils.S3RemountFn, utils.Logger, "cp", commandTimeout, "-f", srcPath, filePath); err != nil {
 			return err
 		}
 
@@ -262,7 +263,7 @@ func syncAPTMetadata(conf config.Config, destPath string, osVersion string, arch
 		}
 	}
 	utils.Logger.Printf("[ ] Sync local repo for %s/%s into s3", osVersion, arch)
-	if err = utils.ExecLogOutput(utils.Logger, "cp", commandTimeout, "-rf", conf.AptlyFolder+"/public/"+aptDists+osVersion, destPath); err != nil {
+	if err = utils.ExecWithRetries(s3Retries, utils.S3RemountFn, utils.Logger, "cp", commandTimeout, "-rf", conf.AptlyFolder+"/public/"+aptDists+osVersion, destPath); err != nil {
 		return err
 	}
 	// drop local published repo, to be able to recreate it later

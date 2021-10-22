@@ -2,12 +2,14 @@ package utils
 
 import (
 	"bytes"
+	"fmt"
 	"github.com/stretchr/testify/assert"
 	"io"
 	"io/ioutil"
 	"log"
 	"sync"
 	"testing"
+	"time"
 )
 
 func Test_streamAsLog(t *testing.T) {
@@ -51,4 +53,45 @@ func expectedLog(prefix, content string) string {
 
 func reader(content string) io.ReadCloser {
 	return ioutil.NopCloser(bytes.NewReader([]byte(content)))
+}
+
+
+func Test_ExecWithRetries_Ok(t *testing.T) {
+	var output, outputRetry bytes.Buffer
+	l := log.New(&output, "", 0)
+	lRetry := log.New(&outputRetry, "", 0)
+
+	err := ExecLogOutput(l, "ls", time.Millisecond * 50, "/")
+	assert.Nil(t, err)
+	retryCallback := func(l *log.Logger, commandTimeout time.Duration) {
+		l.Print("remounting")
+	}
+	err = ExecWithRetries(3, retryCallback, lRetry, "ls", time.Millisecond * 50, "/")
+	assert.Nil(t, err)
+
+	assert.Equal(t, output.String(), outputRetry.String())
+}
+
+func Test_ExecWithRetries_Fail(t *testing.T) {
+	var output, outputRetry bytes.Buffer
+	l := log.New(&output, "", 0)
+	lRetry := log.New(&outputRetry, "", 0)
+	retries := 3
+
+	err := ExecLogOutput(l, "ls", time.Millisecond * 50, "/non_existing_path")
+	assert.Error(t, err, "exit status 1")
+
+	retryCallback := func(l *log.Logger, commandTimeout time.Duration) {
+		l.Print("remounting")
+	}
+	err = ExecWithRetries(retries, retryCallback, lRetry, "ls", time.Millisecond * 50, "/non_existing_path")
+	assert.Error(t, err, "exit status 1")
+
+	var expectedOutput string
+	for i := 0; i < retries; i++ {
+		expectedOutput += output.String()
+		expectedOutput += "remounting\n"
+		expectedOutput += fmt.Sprintf("[attempt %v] error executing command ls /non_existing_path\n", i)
+	}
+	assert.Equal(t, expectedOutput, outputRetry.String())
 }
