@@ -7,7 +7,6 @@ import (
 	"io"
 	"io/ioutil"
 	"log"
-	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -26,7 +25,8 @@ const (
 	PlaceholderForSrc             = "{src}"
 	PlaceholderForAccessPointHost = "{access_point_host}"
 
-	s3RetryTimeout     = 3 * time.Second
+	s3RetrySleepTimeout = 3 * time.Second
+	s3Retries = 10
 )
 
 var (
@@ -105,33 +105,32 @@ func streamAsLog(wg *sync.WaitGroup, l *log.Logger, r io.ReadCloser, prefix stri
 	}
 }
 
-func CopyFile(srcPath string, destPath string, override bool) (err error) {
-
-	// We do not want to override already pushed packages
-	if _, err = os.Stat(destPath); !override && err == nil {
-		Logger.Println(fmt.Sprintf("Skipping copying file '%s': already exists at:  %s", srcPath, destPath))
-		return
-	}
+func CopyFile(srcPath string, destPath string, override bool, commandTimeout time.Duration) (err error) {
 
 	destDirectory := filepath.Dir(destPath)
 
-	if _, err = os.Stat(destDirectory); os.IsNotExist(err) {
-		// set right permissions
-		err = os.MkdirAll(destDirectory, 0744)
-		if err != nil {
-			return err
-		}
+	Logger.Println("[ ] Create " + destDirectory)
+
+	if err = ExecWithRetries(s3Retries, S3RemountFn,  Logger, "mkdir", commandTimeout,"-p", destDirectory); err != nil {
+		return err
 	}
+
+	Logger.Println("[✔] Create " + destDirectory)
 
 	Logger.Println("[ ] Copy " + srcPath + " into " + destPath)
-	input, err := ioutil.ReadFile(srcPath)
-	if err != nil {
-		return err
-	}
 
-	err = ioutil.WriteFile(destPath, input, 0744)
-	if err != nil {
-		return err
+	if override {
+		if err = ExecWithRetries(s3Retries, S3RemountFn,  Logger, "cp", commandTimeout,"-f", srcPath, destPath); err != nil {
+			return err
+		}
+	}else{
+		// Note: we are not doing retries here as this command is not
+		// idempotent. If one copy fails, retry will skip and leave corrupted
+		// file in the repo
+		Logger.Println(fmt.Sprintf("Try to copy file '%s' to %s, but skipping if exists", srcPath, destPath))
+		if err = ExecLogOutput(Logger, "cp", commandTimeout, "-n", srcPath, destPath); err != nil {
+			return err
+		}
 	}
 
 	Logger.Println("[✔] Copy " + srcPath + " into " + destPath)
@@ -145,7 +144,7 @@ func ExecWithRetries(retries int, s3Remount RetryCallback, l *log.Logger, cmdNam
 		if err == nil {
 			break
 		}
-		time.Sleep(s3RetryTimeout)
+		time.Sleep(s3RetrySleepTimeout)
 		s3Remount(l, commandTimeout)
 		l.Printf("[attempt %v] error executing command %s %s", i, cmdName, strings.Join(cmdArgs, " "))
 	}

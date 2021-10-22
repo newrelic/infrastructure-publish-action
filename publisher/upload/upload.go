@@ -121,7 +121,7 @@ func uploadRpm(conf config.Config, srcTemplate string, uploadConf config.Upload,
 		signaturePath := path.Join(s3RepoPath, signatureRpmPath)
 
 		// copy rpm file to be able to add it into the index later
-		err = utils.CopyFile(downloadedRpmFilePath, rpmDestinationPath, uploadConf.Override)
+		err = utils.CopyFile(downloadedRpmFilePath, rpmDestinationPath, uploadConf.Override, commandTimeout)
 		if err != nil {
 			return err
 		}
@@ -357,7 +357,7 @@ func uploadFileArtifact(conf config.Config, schema config.UploadArtifactSchema, 
 	srcPath = path.Join(conf.ArtifactsSrcFolder, srcPath)
 	destPath = path.Join(conf.ArtifactsDestFolder, destPath)
 
-	err = utils.CopyFile(srcPath, destPath, upload.Override)
+	err = utils.CopyFile(srcPath, destPath, upload.Override, commandTimeout)
 	if err != nil {
 		return err
 	}
