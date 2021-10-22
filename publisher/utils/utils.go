@@ -25,6 +25,8 @@ const (
 	placeholderForVersion         = "{version}"
 	PlaceholderForSrc             = "{src}"
 	PlaceholderForAccessPointHost = "{access_point_host}"
+
+	s3RetryTimeout     = 3 * time.Second
 )
 
 var (
@@ -134,4 +136,32 @@ func CopyFile(srcPath string, destPath string, override bool) (err error) {
 
 	Logger.Println("[✔] Copy " + srcPath + " into " + destPath)
 	return nil
+}
+
+func ExecWithRetries(retries int, s3Remount RetryCallback, l *log.Logger, cmdName string, commandTimeout time.Duration, cmdArgs ...string) error {
+	var err error
+	for i := 0; i < retries; i++ {
+		err = ExecLogOutput(l, cmdName, commandTimeout, cmdArgs...)
+		if err == nil {
+			break
+		}
+		time.Sleep(s3RetryTimeout)
+		s3Remount(l, commandTimeout)
+		l.Printf("[attempt %v] error executing command %s %s", i, cmdName, strings.Join(cmdArgs, " "))
+	}
+	return err
+}
+
+type RetryCallback func(l *log.Logger, commandTimeout time.Duration)
+
+func S3RemountFn(l *log.Logger, commandTimeout time.Duration) {
+	err := ExecLogOutput(l, "make", commandTimeout ,"unmount-s3")
+	if err != nil {
+		l.Printf("unmounting s3 failed %v", err)
+	}
+
+	err = ExecLogOutput(l, "make", commandTimeout, "mount-s3", "mount-s3-check")
+	if err != nil {
+		l.Printf("mounting s3 failed %v", err)
+	}
 }
