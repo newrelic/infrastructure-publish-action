@@ -20,6 +20,7 @@ docker run --rm \
         --security-opt apparmor:unconfined \
         --device /dev/fuse \
         --cap-add SYS_ADMIN \
+        -v $( pwd ):/srv \
         -e AWS_REGION \
         -e AWS_ACCESS_KEY_ID \
         -e AWS_SECRET_ACCESS_KEY \
@@ -42,4 +43,6 @@ docker run --rm \
         -e DISABLE_LOCK \
         -e GPG_KEY_RING=/home/gha/keyring.gpg \
         -e DEST_PREFIX \
+        -e LOCAL_PACKAGES_PATH \
+        -e APT_SKIP_MIRROR \
         newrelic/infrastructure-publish-action
