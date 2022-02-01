@@ -1,5 +1,5 @@
-# centos-8 provides more up-to-date version of createrepo which supports rpm weak dependencies
-FROM centos:8
+# RockyLinux provides more up-to-date version of createrepo which supports rpm weak dependencies
+FROM rockylinux:8
 
 # Args
 ARG AWS_S3_MOUNT_DIRECTORY=/mnt/s3
