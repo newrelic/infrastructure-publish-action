@@ -5,6 +5,14 @@ echo "Build fresh docker image for newrelic/infrastructure-publish-action"
 # @TODO add --no-cache
 docker build  -t newrelic/infrastructure-publish-action -f $GITHUB_ACTION_PATH/Dockerfile $GITHUB_ACTION_PATH
 
+
+# avoid container network errors in GHA runners
+set +e
+echo "Creating iptables rule to drop invalid packages"
+sudo iptables -D INPUT -i eth0 -m state --state INVALID -j DROP 2>/dev/null
+sudo iptables -A INPUT -i eth0 -m state --state INVALID -j DROP
+set -e
+
 # run docker container to perform all actions inside
 echo "Run docker container with action logic inside"
 docker run --rm \
