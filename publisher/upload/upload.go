@@ -27,27 +27,32 @@ const (
 	aptDists         = "dists/"
 	commandTimeout   = time.Hour * 1
 
-	s3Retries          = 10
+	s3Retries = 10
 )
 
 func uploadArtifact(conf config.Config, schema config.UploadArtifactSchema, upload config.Upload) (err error) {
-
 	if upload.Type == typeFile {
 		utils.Logger.Println("Uploading file artifact")
 		for _, arch := range schema.Arch {
 			err = uploadFileArtifact(conf, schema, upload, arch)
+			if err != nil {
+				return err
+			}
 		}
 	} else if upload.Type == typeYum || upload.Type == typeZypp {
 		utils.Logger.Println("Uploading rpm as yum or zypp")
 		for _, arch := range schema.Arch {
 			err = uploadRpm(conf, schema.Src, upload, arch)
+			if err != nil {
+				return err
+			}
 		}
 	} else if upload.Type == typeApt {
 		utils.Logger.Println("Uploading apt")
 		err = uploadApt(conf, schema.Src, upload, schema.Arch)
-	}
-	if err != nil {
-		return err
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -150,7 +155,7 @@ func uploadRpm(conf config.Config, srcTemplate string, uploadConf config.Upload,
 
 		// "cache" the repodata from s3 to local so it doesnt have to process all again
 		if _, err = os.Stat(s3RepoData + "/"); err == nil {
-			if err =  utils.ExecWithRetries(s3Retries, utils.S3RemountFn, utils.Logger, "cp", commandTimeout, "-rf", s3RepoData+"/", os.TempDir()+"/repodata/"); err != nil {
+			if err = utils.ExecWithRetries(s3Retries, utils.S3RemountFn, utils.Logger, "cp", commandTimeout, "-rf", s3RepoData+"/", os.TempDir()+"/repodata/"); err != nil {
 				return err
 			}
 		}
@@ -160,17 +165,17 @@ func uploadRpm(conf config.Config, srcTemplate string, uploadConf config.Upload,
 		}
 
 		// remove the 'old' repodata from s3
-		if err =  utils.ExecWithRetries(s3Retries, utils.S3RemountFn, utils.Logger, "rm", commandTimeout, "-rf", s3RepoData+"/"); err != nil {
+		if err = utils.ExecWithRetries(s3Retries, utils.S3RemountFn, utils.Logger, "rm", commandTimeout, "-rf", s3RepoData+"/"); err != nil {
 			return err
 		}
 
 		// copy from temp repodata to repo repodata in s3
-		if err =  utils.ExecWithRetries(s3Retries, utils.S3RemountFn, utils.Logger, "cp", commandTimeout, "-rf", os.TempDir()+"/repodata/", s3RepoPath); err != nil {
+		if err = utils.ExecWithRetries(s3Retries, utils.S3RemountFn, utils.Logger, "cp", commandTimeout, "-rf", os.TempDir()+"/repodata/", s3RepoPath); err != nil {
 			return err
 		}
 
 		// remove temp repodata so the next repo doesn't get confused
-		if err =  utils.ExecWithRetries(s3Retries, utils.S3RemountFn, utils.Logger, "rm", commandTimeout, "-rf", os.TempDir()+"/repodata/"); err != nil {
+		if err = utils.ExecWithRetries(s3Retries, utils.S3RemountFn, utils.Logger, "rm", commandTimeout, "-rf", os.TempDir()+"/repodata/"); err != nil {
 			return err
 		}
 
@@ -234,10 +239,10 @@ func uploadApt(conf config.Config, srcTemplate string, upload config.Upload, arc
 			utils.Logger.Printf("[✔] Added successfully package into deb repo for %s/%s", osVersion, arch)
 
 			// Create the directory and copy the binary
-			if err =  utils.ExecWithRetries(s3Retries, utils.S3RemountFn, utils.Logger, "mkdir", commandTimeout, "-p", path.Dir(filePath)); err != nil {
+			if err = utils.ExecWithRetries(s3Retries, utils.S3RemountFn, utils.Logger, "mkdir", commandTimeout, "-p", path.Dir(filePath)); err != nil {
 				return err
 			}
-			if err =  utils.ExecWithRetries(s3Retries, utils.S3RemountFn, utils.Logger, "cp", commandTimeout, "-f", srcPath, filePath); err != nil {
+			if err = utils.ExecWithRetries(s3Retries, utils.S3RemountFn, utils.Logger, "cp", commandTimeout, "-f", srcPath, filePath); err != nil {
 				return err
 			}
 		}
