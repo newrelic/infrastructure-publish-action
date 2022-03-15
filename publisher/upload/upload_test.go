@@ -191,48 +191,61 @@ func TestUploadArtifacts_cantBeRunInParallel(t *testing.T) {
 }
 
 func TestUploadArtifacts_errorsIfAnyArchFails(t *testing.T) {
-	schema := []config.UploadArtifactSchema{
-		{"{app_name}-{arch}-{version}.txt", []string{"amd64"}, []config.Upload{
-			{
-				Type: "file",
-				Dest: "{arch}/{app_name}/{src}",
+	tests := []struct {
+		name         string
+		schema       []config.UploadArtifactSchema
+		expectsError bool
+	}{
+		{
+			name: "no error uploading file",
+			schema: []config.UploadArtifactSchema{
+				{"{app_name}-{arch}-{version}.txt", []string{"amd64", "386"}, []config.Upload{
+					{
+						Type: "file",
+						Dest: "{arch}/{app_name}/{src}",
+					},
+				}},
 			},
-		}},
-		{"{app_name}-{arch}-{version}.txt", []string{"amd64", "386"}, []config.Upload{
-			{
-				Type: "file",
-				Dest: "{arch}/{app_name}/{src}",
+		},
+		{
+			name: "error uploading file",
+			schema: []config.UploadArtifactSchema{
+				{"{app_name}-{arch}-{version}.txt", []string{"amd64", "NOT_VALID", "386"}, []config.Upload{
+					{
+						Type: "file",
+						Dest: "{arch}/{app_name}/{src}",
+					},
+				}},
 			},
-		}},
+			expectsError: true,
+		},
 	}
 
-	dest := os.TempDir()
-	src := os.TempDir()
-	cfg := config.Config{
-		Version:              "2.0.0",
-		ArtifactsDestFolder:  dest,
-		ArtifactsSrcFolder:   src,
-		UploadSchemaFilePath: "",
-		AppName:              "nri-foobar",
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			dest := os.TempDir()
+			src := os.TempDir()
+			cfg := config.Config{
+				Version:              "2.0.0",
+				ArtifactsDestFolder:  dest,
+				ArtifactsSrcFolder:   src,
+				UploadSchemaFilePath: "",
+				AppName:              "nri-foobar",
+			}
+
+			err := writeDummyFile(path.Join(src, "nri-foobar-amd64-2.0.0.txt"))
+			assert.NoError(t, err)
+			err = writeDummyFile(path.Join(src, "nri-foobar-386-2.0.0.txt"))
+			assert.NoError(t, err)
+
+			err = UploadArtifacts(cfg, tc.schema, lock.NewNoop())
+			if tc.expectsError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
 	}
-
-	err := writeDummyFile(path.Join(src, "nri-foobar-amd64-2.0.0.txt"))
-	assert.NoError(t, err)
-
-	ready := make(chan struct{})
-	wg := sync.WaitGroup{}
-	wg.Add(1)
-	var err1 error
-	l := lock.NewInMemory()
-	go func() {
-		<-ready
-		err1 = UploadArtifacts(cfg, schema, l)
-		wg.Done()
-	}()
-
-	close(ready)
-	wg.Wait()
-	assert.Error(t, err1)
 }
 
 func Test_generateAptSrcRepoUrl(t *testing.T) {
