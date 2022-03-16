@@ -190,6 +190,64 @@ func TestUploadArtifacts_cantBeRunInParallel(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+func TestUploadArtifacts_errorsIfAnyArchFails(t *testing.T) {
+	tests := []struct {
+		name         string
+		schema       []config.UploadArtifactSchema
+		expectsError bool
+	}{
+		{
+			name: "no error uploading file",
+			schema: []config.UploadArtifactSchema{
+				{"{app_name}-{arch}-{version}.txt", []string{"amd64", "386"}, []config.Upload{
+					{
+						Type: "file",
+						Dest: "{arch}/{app_name}/{src}",
+					},
+				}},
+			},
+		},
+		{
+			name: "error uploading file",
+			schema: []config.UploadArtifactSchema{
+				{"{app_name}-{arch}-{version}.txt", []string{"amd64", "NOT_VALID", "386"}, []config.Upload{
+					{
+						Type: "file",
+						Dest: "{arch}/{app_name}/{src}",
+					},
+				}},
+			},
+			expectsError: true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			dest := os.TempDir()
+			src := os.TempDir()
+			cfg := config.Config{
+				Version:              "2.0.0",
+				ArtifactsDestFolder:  dest,
+				ArtifactsSrcFolder:   src,
+				UploadSchemaFilePath: "",
+				AppName:              "nri-foobar",
+			}
+
+			err := writeDummyFile(path.Join(src, "nri-foobar-amd64-2.0.0.txt"))
+			assert.NoError(t, err)
+			err = writeDummyFile(path.Join(src, "nri-foobar-386-2.0.0.txt"))
+			assert.NoError(t, err)
+
+			err = UploadArtifacts(cfg, tc.schema, lock.NewNoop())
+			if tc.expectsError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
 func Test_generateAptSrcRepoUrl(t *testing.T) {
 	template := "{access_point_host}/infrastructure_agent/linux/apt"
 	accessPointHost := "https://download.newrelic.com"
