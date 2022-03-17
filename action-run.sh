@@ -13,13 +13,18 @@ sudo iptables -D INPUT -i eth0 -m state --state INVALID -j DROP 2>/dev/null
 sudo iptables -A INPUT -i eth0 -m state --state INVALID -j DROP
 set -e
 
-# run docker container to perform all actions inside
+# run docker container to perform all actions inside.
+# $( pwd ) is mounted on /srv to enable grabbing packages
+# from the host machine instead of downloading them from GH,
+# and therefore as LOCAL_PACKAGES_PATH will refer to path
+# inside the docker container it should be `/srv/*`
 echo "Run docker container with action logic inside"
 docker run --rm \
         --name=infrastructure-publish-action\
         --security-opt apparmor:unconfined \
         --device /dev/fuse \
         --cap-add SYS_ADMIN \
+        -v $( pwd ):/srv \
         -e AWS_REGION \
         -e AWS_ACCESS_KEY_ID \
         -e AWS_SECRET_ACCESS_KEY \
@@ -42,4 +47,6 @@ docker run --rm \
         -e DISABLE_LOCK \
         -e GPG_KEY_RING=/home/gha/keyring.gpg \
         -e DEST_PREFIX \
+        -e LOCAL_PACKAGES_PATH \
+        -e APT_SKIP_MIRROR \
         newrelic/infrastructure-publish-action

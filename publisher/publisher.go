@@ -13,7 +13,6 @@ import (
 )
 
 const (
-
 	defaultLockRetries = 30
 
 	// AWS lock resource tags
@@ -33,7 +32,7 @@ var (
 )
 
 var (
-	l                = log.New(log.Writer(), "", 0)
+	l = log.New(log.Writer(), "", 0)
 )
 
 func main() {
@@ -87,12 +86,16 @@ func main() {
 		l.Fatal(err)
 	}
 
-	d := download.NewDownloader(http.DefaultClient)
-	err = d.DownloadArtifacts(conf, uploadSchemas)
-	if err != nil {
-		l.Fatal(err)
+	if conf.LocalPackagesPath == "" {
+		d := download.NewDownloader(http.DefaultClient)
+		err = d.DownloadArtifacts(conf, uploadSchemas)
+		if err != nil {
+			l.Fatal(err)
+		}
+		l.Println("🎉 download phase complete")
+	} else {
+		conf.ArtifactsSrcFolder = conf.LocalPackagesPath
 	}
-	l.Println("🎉 download phase complete")
 
 	err = upload.UploadArtifacts(conf, uploadSchemas, bucketLock)
 	if err != nil {
@@ -100,4 +103,3 @@ func main() {
 	}
 	l.Println("🎉 upload phase complete")
 }
-

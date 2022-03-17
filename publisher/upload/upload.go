@@ -209,11 +209,13 @@ func uploadApt(conf config.Config, srcTemplate string, upload config.Upload, arc
 		}
 		utils.Logger.Printf("[✔] Local repo created for os %s", osVersion)
 
-		// Mirror repo start
-		srcRepo := generateAptSrcRepoUrl(upload.SrcRepo, conf.MirrorHost)
-		err = mirrorAPTRepo(conf, srcRepo, osVersion)
-		if err != nil {
-			return err
+		if !conf.AptSkipMirror {
+			// Mirror repo start
+			srcRepo := generateAptSrcRepoUrl(upload.SrcRepo, conf.MirrorHost)
+			err = mirrorAPTRepo(conf, srcRepo, osVersion)
+			if err != nil {
+				return err
+			}
 		}
 
 		for _, arch := range archs {

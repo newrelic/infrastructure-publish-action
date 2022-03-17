@@ -60,6 +60,15 @@ inputs:
   gpg_private_key_base64:
     description: Encoded gpg key
     required: true
+  local_packages_path:
+    description: local path when packages are already present (/srv is the root of the project inside the docker container)
+    required: false
+  dest_prefix:
+    description: s3 path prefix
+    required: false
+  apt_skip_mirror:
+    description: skip mirroring apt repo
+    required: false
 runs:
   using: "composite"
   steps:
@@ -84,3 +93,6 @@ runs:
         AWS_ROLE_ARN: ${{ inputs.aws_role_arn }}
         DISABLE_LOCK: ${{ inputs.disable_lock }}
         AWS_ROLE_SESSION_NAME: ${{ inputs.aws_role_session_name }}
+        LOCAL_PACKAGES_PATH: ${{ inputs.local_packages_path }}
+        DEST_PREFIX: ${{ inputs.dest_prefix }}
+        APT_SKIP_MIRROR: ${{ inputs.apt_skip_mirror }}

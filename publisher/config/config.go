@@ -44,6 +44,8 @@ type Config struct {
 	DisableLock       bool
 	LockRetries       uint
 	UseDefLockRetries bool
+	LocalPackagesPath string
+	AptSkipMirror     bool
 }
 
 func (c *Config) LockOwner() string {
@@ -90,6 +92,8 @@ func LoadConfig() Config {
 	viper.BindEnv("disable_lock")
 	viper.BindEnv("lock_retries")
 	viper.BindEnv("lock_group")
+	viper.BindEnv("local_packages_path")
+	viper.BindEnv("apt_skip_mirror")
 
 	aptlyF := viper.GetString("aptly_folder")
 	if aptlyF == "" {
@@ -130,6 +134,8 @@ func LoadConfig() Config {
 		AwsTags:              viper.GetString("aws_tags"),
 		DisableLock:          viper.GetBool("disable_lock"),
 		LockRetries:          viper.GetUint("lock_retries"),
-		UseDefLockRetries:    !viper.IsSet("lock_retries"), // when non set: use default value
+		LocalPackagesPath:    viper.GetString("local_packages_path"),
+		UseDefLockRetries:    !viper.IsSet("lock_retries"),     // when non set: use default value
+		AptSkipMirror:        viper.GetBool("apt_skip_mirror"), // when non set: use default value
 	}
 }
