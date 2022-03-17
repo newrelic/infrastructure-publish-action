@@ -61,7 +61,7 @@ inputs:
     description: Encoded gpg key
     required: true
   local_packages_path:
-    description: local path when packages are already present
+    description: local path when packages are already present (/srv is the root of the project inside the docker container)
     required: false
   dest_prefix:
     description: s3 path prefix
