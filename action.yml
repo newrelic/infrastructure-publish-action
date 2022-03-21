@@ -66,6 +66,7 @@ inputs:
   dest_prefix:
     description: s3 path prefix
     required: false
+    default: "infrastructure_agent/"
   apt_skip_mirror:
     description: skip mirroring apt repo
     required: false
