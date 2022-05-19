@@ -35,6 +35,7 @@
       src_repo: "{access_point_host}/infrastructure_agent/linux/apt"
       dest: "{dest_prefix}linux/apt/"
       os_version:
+        - jammy
         - focal
         - bionic
         - buster
@@ -80,3 +81,4 @@
       dest: "{dest_prefix}linux/yum/amazonlinux/{os_version}/{arch}/"
       os_version:
         - 2
+        - 2022
