@@ -4,6 +4,7 @@ import (
 	"github.com/newrelic/infrastructure-publish-action/publisher/config"
 	"github.com/newrelic/infrastructure-publish-action/publisher/lock"
 	"github.com/stretchr/testify/assert"
+	"io/ioutil"
 	"os"
 	"path"
 	"sync"
@@ -23,6 +24,7 @@ func TestReplacePlaceholders(t *testing.T) {
 		srcOutput    string
 		destOutput   string
 		destPrefix   string
+		osVersion    string
 	}{
 		"dst no file replacement": {
 			"{app_name}-{arch}-{version}",
@@ -34,6 +36,7 @@ func TestReplacePlaceholders(t *testing.T) {
 			"nri-foobar-amd64-1.2.3",
 			"/tmp/amd64/nri-foobar/1.2.3/file",
 			"tmp",
+			"",
 		},
 		"dst src replacement": {
 			"{app_name}-{arch}-{version}",
@@ -44,7 +47,9 @@ func TestReplacePlaceholders(t *testing.T) {
 			"amd64",
 			"nri-foobar-amd64-1.2.3",
 			"/tmp/amd64/nri-foobar/1.2.3/nri-foobar-amd64-1.2.3",
-			"tmp"},
+			"tmp",
+			"",
+		},
 		"dst multiple replacements": {
 			"{app_name}-{arch}-{version}",
 			"/{dest_prefix}/{arch}/{app_name}/{version}/{app_name}-{arch}-{version}",
@@ -54,24 +59,28 @@ func TestReplacePlaceholders(t *testing.T) {
 			"amd64",
 			"nri-foobar-amd64-1.2.3",
 			"/tmp/amd64/nri-foobar/1.2.3/nri-foobar-amd64-1.2.3",
-			"tmp"},
-		"src multiple replacements": {
-			"{app_name}-{arch}-{version}-{app_name}-{arch}-{version}",
-			"/{dest_prefix}/{arch}/{app_name}/{version}/file",
+			"tmp",
+			"",
+		},
+		"src and dst multiple replacements with os_version": {
+			"{app_name}-{arch}-{version}-{app_name}-{arch}-{version}-{os_version}",
+			"/{dest_prefix}/{arch}/{app_name}/{version}/{os_version}/file",
 			"newrelic/nri-foobar",
 			"nri-foobar",
 			"1.2.3",
 			"amd64",
-			"nri-foobar-amd64-1.2.3-nri-foobar-amd64-1.2.3",
-			"/tmp/amd64/nri-foobar/1.2.3/file",
-			"tmp"},
+			"nri-foobar-amd64-1.2.3-nri-foobar-amd64-1.2.3-22",
+			"/tmp/amd64/nri-foobar/1.2.3/22/file",
+			"tmp",
+			"22",
+		},
 	}
 	for name, tt := range tests {
 		tt := tt
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			tag := "v" + tt.version
-			src, dest := replaceSrcDestTemplates(tt.srcTemplate, tt.destTemplate, "newrelic/foobar", tt.appName, tt.arch, tag, tt.version, tt.destPrefix, "")
+			src, dest := replaceSrcDestTemplates(tt.srcTemplate, tt.destTemplate, "newrelic/foobar", tt.appName, tt.arch, tag, tt.version, tt.destPrefix, tt.osVersion)
 			assert.EqualValues(t, tt.srcOutput, src)
 			assert.EqualValues(t, tt.destOutput, dest)
 		})
@@ -94,23 +103,52 @@ func writeDummyFile(path string) error {
 }
 
 func TestUploadArtifacts(t *testing.T) {
-	schema := []config.UploadArtifactSchema{
-		{"{app_name}-{arch}-{version}.txt", []string{"amd64", "386"}, []config.Upload{
-			{
-				Type: "file",
-				Dest: "{arch}/{app_name}/{src}",
+	var testArtifacts = []struct {
+		name          string
+		schema        []config.UploadArtifactSchema
+		dummyFiles    []string
+		expectedFiles []string
+	}{
+		{
+			name: "AppName, arch and app version expansion",
+			schema: []config.UploadArtifactSchema{
+				{"{app_name}-{arch}-{version}.txt", []string{"amd64", "386"}, []config.Upload{
+					{
+						Type: "file",
+						Dest: "{arch}/{app_name}/{src}",
+					},
+				}},
+				{"{app_name}-{arch}-{version}.txt", nil, []config.Upload{
+					{
+						Type: "file",
+						Dest: "{arch}/{app_name}/{src}",
+					},
+				}},
 			},
-		}},
-		{"{app_name}-{arch}-{version}.txt", nil, []config.Upload{
-			{
-				Type: "file",
-				Dest: "{arch}/{app_name}/{src}",
+			dummyFiles:    []string{"nri-foobar-amd64-2.0.0.txt", "nri-foobar-386-2.0.0.txt"},
+			expectedFiles: []string{"amd64/nri-foobar/nri-foobar-amd64-2.0.0.txt", "386/nri-foobar/nri-foobar-386-2.0.0.txt"},
+		},
+		{
+			name: "AppName, arch, app version and os version expansion",
+			schema: []config.UploadArtifactSchema{
+				{"{app_name}-{version}-1.amazonlinux-{os_version}.{arch}.rpm.sum", []string{"x86_64"}, []config.Upload{
+					{
+						Type:      "file",
+						Dest:      "{arch}/{app_name}/{os_version}/{src}",
+						OsVersion: []string{"2", "2022"},
+					},
+				}},
 			},
-		}},
+			dummyFiles:    []string{"nri-foobar-2.0.0-1.amazonlinux-2.x86_64.rpm.sum", "nri-foobar-2.0.0-1.amazonlinux-2022.x86_64.rpm.sum"},
+			expectedFiles: []string{"x86_64/nri-foobar/2/nri-foobar-2.0.0-1.amazonlinux-2.x86_64.rpm.sum", "x86_64/nri-foobar/2022/nri-foobar-2.0.0-1.amazonlinux-2022.x86_64.rpm.sum"},
+		},
 	}
 
-	dest := os.TempDir()
-	src := os.TempDir()
+	dest, err := ioutil.TempDir("", "")
+	assert.NoError(t, err)
+	src, err := ioutil.TempDir("", "")
+	assert.NoError(t, err)
+
 	cfg := config.Config{
 		Version:              "2.0.0",
 		ArtifactsDestFolder:  dest,
@@ -119,20 +157,22 @@ func TestUploadArtifacts(t *testing.T) {
 		AppName:              "nri-foobar",
 	}
 
-	err := writeDummyFile(path.Join(src, "nri-foobar-amd64-2.0.0.txt"))
-	assert.NoError(t, err)
+	for _, artifact := range testArtifacts {
+		t.Run(artifact.name, func(t *testing.T) {
+			for _, dummyFile := range artifact.dummyFiles {
+				err := writeDummyFile(path.Join(src, dummyFile))
+				assert.NoError(t, err)
+			}
+			err := UploadArtifacts(cfg, artifact.schema, lock.NewInMemory())
+			assert.NoError(t, err)
 
-	err = writeDummyFile(path.Join(src, "nri-foobar-386-2.0.0.txt"))
-	assert.NoError(t, err)
+			for _, expectedFile := range artifact.expectedFiles {
+				_, err = os.Stat(path.Join(dest, expectedFile))
+				assert.NoError(t, err)
+			}
+		})
+	}
 
-	err = UploadArtifacts(cfg, schema, lock.NewInMemory())
-	assert.NoError(t, err)
-
-	_, err = os.Stat(path.Join(dest, "amd64/nri-foobar/nri-foobar-amd64-2.0.0.txt"))
-	assert.NoError(t, err)
-
-	_, err = os.Stat(path.Join(dest, "386/nri-foobar/nri-foobar-386-2.0.0.txt"))
-	assert.NoError(t, err)
 }
 
 func TestUploadArtifacts_cantBeRunInParallel(t *testing.T) {
