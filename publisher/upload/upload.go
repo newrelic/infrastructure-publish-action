@@ -34,9 +34,18 @@ func uploadArtifact(conf config.Config, schema config.UploadArtifactSchema, uplo
 	if upload.Type == typeFile {
 		utils.Logger.Println("Uploading file artifact")
 		for _, arch := range schema.Arch {
-			err = uploadFileArtifact(conf, schema, upload, arch)
-			if err != nil {
-				return err
+			if len(upload.OsVersion) == 0 {
+				err = uploadFileArtifact(conf, schema, upload, arch, "")
+				if err != nil {
+					return err
+				}
+			} else {
+				for _, osVersion := range upload.OsVersion {
+					err = uploadFileArtifact(conf, schema, upload, arch, osVersion)
+					if err != nil {
+						return err
+					}
+				}
 			}
 		}
 	} else if upload.Type == typeYum || upload.Type == typeZypp {
@@ -349,7 +358,7 @@ func mirrorAPTRepo(conf config.Config, repoUrl string, osVersion string) (err er
 	return nil
 }
 
-func uploadFileArtifact(conf config.Config, schema config.UploadArtifactSchema, upload config.Upload, arch string) (err error) {
+func uploadFileArtifact(conf config.Config, schema config.UploadArtifactSchema, upload config.Upload, arch, osVersion string) (err error) {
 	srcPath, destPath := replaceSrcDestTemplates(
 		schema.Src,
 		upload.Dest,
@@ -359,7 +368,7 @@ func uploadFileArtifact(conf config.Config, schema config.UploadArtifactSchema, 
 		conf.Tag,
 		conf.Version,
 		conf.DestPrefix,
-		"")
+		osVersion)
 
 	srcPath = path.Join(conf.ArtifactsSrcFolder, srcPath)
 	destPath = path.Join(conf.ArtifactsDestFolder, destPath)
