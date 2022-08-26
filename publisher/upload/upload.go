@@ -2,10 +2,6 @@ package upload
 
 import (
 	"fmt"
-	"github.com/newrelic/infrastructure-publish-action/publisher/config"
-	"github.com/newrelic/infrastructure-publish-action/publisher/download"
-	"github.com/newrelic/infrastructure-publish-action/publisher/lock"
-	"github.com/newrelic/infrastructure-publish-action/publisher/utils"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -13,6 +9,11 @@ import (
 	"path"
 	"strings"
 	"time"
+
+	"github.com/newrelic/infrastructure-publish-action/publisher/config"
+	"github.com/newrelic/infrastructure-publish-action/publisher/download"
+	"github.com/newrelic/infrastructure-publish-action/publisher/lock"
+	"github.com/newrelic/infrastructure-publish-action/publisher/utils"
 )
 
 const (
@@ -397,7 +398,7 @@ func generateRepoFileContent(accessPointHost, destPath string) (repoFileContent 
 	contentTemplate := `[newrelic-infra]
 name=New Relic Infrastructure
 baseurl=%s/%s
-gpgkey=https://download.newrelic.com/infrastructure_agent/gpg/newrelic-infra.gpg
+gpgkey=https://download.newrelic.com/infrastructure_agent/keys/newrelic_rpm_key_current.gpg
 gpgcheck=1
 repo_gpgcheck=1`
 
