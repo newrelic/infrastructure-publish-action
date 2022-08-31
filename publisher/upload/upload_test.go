@@ -1,15 +1,16 @@
 package upload
 
 import (
-	"github.com/newrelic/infrastructure-publish-action/publisher/config"
-	"github.com/newrelic/infrastructure-publish-action/publisher/lock"
-	"github.com/stretchr/testify/assert"
 	"io/ioutil"
 	"os"
 	"path"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/newrelic/infrastructure-publish-action/publisher/config"
+	"github.com/newrelic/infrastructure-publish-action/publisher/lock"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestReplacePlaceholders(t *testing.T) {
@@ -303,7 +304,7 @@ func Test_generateRepoFileContent(t *testing.T) {
 	repoPath := "infrastructure_agent/linux/apt"
 	repoFileContent := generateRepoFileContent(accessPointHost, repoPath)
 
-	expectedContent := "[newrelic-infra]\nname=New Relic Infrastructure\nbaseurl=https://download.newrelic.com/infrastructure_agent/linux/apt\ngpgkey=https://download.newrelic.com/infrastructure_agent/gpg/newrelic-infra.gpg\ngpgcheck=1\nrepo_gpgcheck=1"
+	expectedContent := "[newrelic-infra]\nname=New Relic Infrastructure\nbaseurl=https://download.newrelic.com/infrastructure_agent/linux/apt\ngpgkey=https://download.newrelic.com/infrastructure_agent/keys/newrelic_rpm_key_current.gpg\ngpgcheck=1\nrepo_gpgcheck=1"
 
 	assert.Equal(t, expectedContent, repoFileContent)
 
