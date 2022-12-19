@@ -98,7 +98,20 @@ func main() {
 		conf.ArtifactsSrcFolder = conf.LocalPackagesPath
 	}
 
-	err = upload.UploadArtifacts(conf, uploadSchemas, bucketLock)
+	if err = bucketLock.Lock(); err != nil {
+		return
+	}
+	defer func() {
+		errRelease := bucketLock.Release()
+		if err == nil {
+			err = errRelease
+		} else if errRelease != nil {
+			err = fmt.Errorf("got 2 errors: uploading: \"%v\", releasing lock: \"%v\"", err, errRelease)
+		}
+		return
+	}()
+
+	err = upload.UploadArtifacts(conf, uploadSchemas)
 	if err != nil {
 		l.Fatal(err)
 	}

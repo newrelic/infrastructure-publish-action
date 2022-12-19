@@ -49,4 +49,10 @@ docker run --rm \
         -e DEST_PREFIX \
         -e LOCAL_PACKAGES_PATH \
         -e APT_SKIP_MIRROR \
+        -e FASTLY_KEY \
+        -e FASTLY_AWS_BUCKET \
+        -e FASTLY_AWS_REGION \
+        -e FASTLY_AWS_ATTEMPTS \
+        -e FASTLY_TIMEOUT_S3 \
+        -e FASTLY_TIMEOUT_CDN \
         newrelic/infrastructure-publish-action

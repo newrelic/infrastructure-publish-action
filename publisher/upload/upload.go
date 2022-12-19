@@ -12,7 +12,6 @@ import (
 
 	"github.com/newrelic/infrastructure-publish-action/publisher/config"
 	"github.com/newrelic/infrastructure-publish-action/publisher/download"
-	"github.com/newrelic/infrastructure-publish-action/publisher/lock"
 	"github.com/newrelic/infrastructure-publish-action/publisher/utils"
 )
 
@@ -68,19 +67,7 @@ func uploadArtifact(conf config.Config, schema config.UploadArtifactSchema, uplo
 	return nil
 }
 
-func UploadArtifacts(conf config.Config, schema config.UploadArtifactSchemas, bucketLock lock.BucketLock) (err error) {
-	if err = bucketLock.Lock(); err != nil {
-		return
-	}
-	defer func() {
-		errRelease := bucketLock.Release()
-		if err == nil {
-			err = errRelease
-		} else if errRelease != nil {
-			err = fmt.Errorf("got 2 errors: uploading: \"%v\", releasing lock: \"%v\"", err, errRelease)
-		}
-		return
-	}()
+func UploadArtifacts(conf config.Config, schema config.UploadArtifactSchemas) (err error) {
 
 	for _, artifactSchema := range schema {
 		for _, upload := range artifactSchema.Uploads {

@@ -70,6 +70,24 @@ inputs:
   apt_skip_mirror:
     description: skip mirroring apt repo
     required: false
+  fastly_key:
+    description: Fastly API key
+    required: false
+  fastly_aws_bucket:
+    description: Fastly | AWS bucket to check for replication status
+    required: false
+  fastly_aws_region:
+    description: Fastly | AWS region to check for replication status
+    required: false
+  fastly_aws_attempts:
+    description: Fastly | AWS replication status check retries. Replication takes some time, so we need to wait and retry.
+    required: false
+  fastly_timeout_s3:
+    description: Fastly | AWS replication status check retries timeout
+    required: false
+  fastly_timeout_cdn:
+    description: Fastly | Cache cleaning api call timeout
+    required: false
 runs:
   using: "composite"
   steps:
