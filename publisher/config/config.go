@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/spf13/viper"
 	"strings"
+	"time"
 )
 
 const (
@@ -46,6 +47,13 @@ type Config struct {
 	UseDefLockRetries bool
 	LocalPackagesPath string
 	AptSkipMirror     bool
+
+	FastlyKey         string
+	FastlyAwsBucket   string
+	FastlyAwsRegion   string
+	FastlyAwsAttempts int
+	FastlyTimeoutS3   time.Duration
+	FastlyTimeoutCDN  time.Duration
 }
 
 func (c *Config) LockOwner() string {
