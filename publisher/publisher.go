@@ -117,18 +117,21 @@ func main() {
 	}
 	l.Println("🎉 upload phase complete")
 
-	err = fastly.PurgeCache(
-		conf.FastlyKey,
-		conf.FastlyAwsBucket,
-		conf.FastlyAwsRegion,
-		conf.FastlyAwsAttempts,
-		conf.FastlyTimeoutS3,
-		conf.FastlyTimeoutCDN,
-		l)
+	if conf.FastlyApiKey != "" {
+		err = fastly.PurgeCache(
+			conf.FastlyApiKey,
+			conf.FastlyPurgeTag,
+			conf.FastlyAwsBucket,
+			conf.FastlyAwsRegion,
+			conf.FastlyAwsAttempts,
+			conf.FastlyTimeoutS3,
+			conf.FastlyTimeoutCDN,
+			l)
 
-	if err != nil {
-		l.Printf("❌ Fastly cache cleaning failed, retry manually.\n%s\n", err.Error())
-	} else {
-		l.Println("🧹 Fastly cache cleaned")
+		if err != nil {
+			l.Printf("❌ Fastly cache cleaning failed, retry manually.\n%s\n", err.Error())
+		} else {
+			l.Println("🧹 Fastly cache cleaned")
+		}
 	}
 }

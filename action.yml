@@ -70,8 +70,11 @@ inputs:
   apt_skip_mirror:
     description: skip mirroring apt repo
     required: false
-  fastly_key:
+  fastly_api_key:
     description: Fastly API key
+    required: false
+  fastly_purge_tag:
+    description: Fastly | Tag associated with resources to purge. If not set, will be "purge_all"
     required: false
   fastly_aws_bucket:
     description: Fastly | AWS bucket to check for replication status
@@ -114,4 +117,10 @@ runs:
         AWS_ROLE_SESSION_NAME: ${{ inputs.aws_role_session_name }}
         LOCAL_PACKAGES_PATH: ${{ inputs.local_packages_path }}
         DEST_PREFIX: ${{ inputs.dest_prefix }}
-        APT_SKIP_MIRROR: ${{ inputs.apt_skip_mirror }}
+        FASTLY_API_KEY: ${{ inputs.fastly_api_key }}
+        FASTLY_PURGE_TAG: ${{ inputs.fastly_purge_tag }}
+        FASTLY_AWS_BUCKET: ${{ inputs.fastly_aws_bucket }}
+        FASTLY_AWS_REGION: ${{ inputs.fastly_aws_region }}
+        FASTLY_AWS_ATTEMPTS: ${{ inputs.fastly_aws_attempts }}
+        FASTLY_TIMEOUT_S3: ${{ inputs.fastly_timeout_s3 }}
+        FASTLY_TIMEOUT_CDN: ${{ inputs.fastly_timeout_cdn }}

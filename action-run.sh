@@ -49,7 +49,7 @@ docker run --rm \
         -e DEST_PREFIX \
         -e LOCAL_PACKAGES_PATH \
         -e APT_SKIP_MIRROR \
-        -e FASTLY_KEY \
+        -e FASTLY_API_KEY \
         -e FASTLY_AWS_BUCKET \
         -e FASTLY_AWS_REGION \
         -e FASTLY_AWS_ATTEMPTS \

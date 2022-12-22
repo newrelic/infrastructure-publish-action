@@ -39,8 +39,9 @@ const (
 	defaultBucket = "nr-downloads-ohai-staging"
 	defaultRegion = "us-east-1"
 	// more keys could be added if issues arise
-	fastlyPurgeURL             = "https://api.fastly.com/service/2RMeBJ1ZTGnNJYvrWMgQhk/purge_all"
-	replicationStatusCompleted = "COMPLETED" // in s3.ReplicationStatusComplete is set to COMPLETE, which is wrong
+	fastlyPurgeAllBaseURL      = "https://api.fastly.com/service/2RMeBJ1ZTGnNJYvrWMgQhk/"
+	fastlyPurgeTagBaseURL      = "https://api.fastly.com/service/2RMeBJ1ZTGnNJYvrWMgQhk/" // TODO update with the correct service ID
+	replicationStatusCompleted = "COMPLETED"                                              // in s3.ReplicationStatusComplete is set to COMPLETE, which is wrong
 	aptDistributionsPath       = "infrastructure_agent/linux/apt/dists/"
 	aptDistributionPackageFile = "main/binary-amd64/Packages.bz2"
 	rhDistributionsPath        = "infrastructure_agent/linux/yum/"
@@ -64,7 +65,7 @@ const (
 //	flag.DurationVar(&timeoutCDN, "c", 30*time.Second, "Timeout to request CDN purge.")
 //}
 
-func PurgeCache(fastlyKey, bucket, region string, attempts int, timeoutS3, timeoutCDN time.Duration, l *log.Logger) error {
+func PurgeCache(fastlyKey, purgeTag, bucket, region string, attempts int, timeoutS3, timeoutCDN time.Duration, l *log.Logger) error {
 
 	l.Println("Fastly: check for replica status...")
 	ctx := context.Background()
@@ -88,7 +89,7 @@ func PurgeCache(fastlyKey, bucket, region string, attempts int, timeoutS3, timeo
 	l.Println("Fastly: replica is ✅")
 	l.Println("Fastly: purging cache...")
 
-	if err := purgeCDN(ctx, fastlyKey, timeoutCDN); err != nil {
+	if err := purgeCDN(ctx, fastlyKey, purgeTag, timeoutCDN); err != nil {
 		return fmt.Errorf("cannot purge CDN, error: %v", err)
 	}
 	l.Println("Fastly: cache purged ✅")
@@ -154,7 +155,7 @@ func waitForKeyReplication(ctx context.Context, bucket, key string, cl *s3.S3, t
 	return nil
 }
 
-func purgeCDN(ctx context.Context, fastlyKey string, timeoutCDN time.Duration) error {
+func purgeCDN(ctx context.Context, fastlyKey, purgeTag string, timeoutCDN time.Duration) error {
 	ctxT := ctx
 	var cancelFn func()
 	if timeoutCDN > 0 {
@@ -164,7 +165,15 @@ func purgeCDN(ctx context.Context, fastlyKey string, timeoutCDN time.Duration) e
 		defer cancelFn()
 	}
 
-	req, err := http.NewRequestWithContext(ctxT, http.MethodPost, fastlyPurgeURL, nil)
+	var req *http.Request
+	var err error
+
+	if purgeTag == "" || purgeTag == "purge_all" {
+		req, err = http.NewRequestWithContext(ctxT, http.MethodPost, fastlyPurgeAllBaseURL+"purge_all", nil)
+	} else {
+		req, err = http.NewRequestWithContext(ctxT, http.MethodPost, fastlyPurgeTagBaseURL+purgeTag, nil)
+	}
+
 	if err != nil {
 		return err
 	}

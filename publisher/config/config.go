@@ -48,7 +48,8 @@ type Config struct {
 	LocalPackagesPath string
 	AptSkipMirror     bool
 
-	FastlyKey         string
+	FastlyApiKey      string
+	FastlyPurgeTag    string
 	FastlyAwsBucket   string
 	FastlyAwsRegion   string
 	FastlyAwsAttempts int
@@ -104,6 +105,7 @@ func LoadConfig() Config {
 	viper.BindEnv("apt_skip_mirror")
 
 	viper.BindEnv("fastly_key")
+	viper.BindEnv("fastly_purge_tag")
 	viper.BindEnv("fastly_aws_bucket")
 	viper.BindEnv("fastly_aws_region")
 	viper.BindEnv("fastly_aws_attempts")
@@ -153,7 +155,8 @@ func LoadConfig() Config {
 		UseDefLockRetries:    !viper.IsSet("lock_retries"),     // when non set: use default value
 		AptSkipMirror:        viper.GetBool("apt_skip_mirror"), // when non set: use default value
 
-		FastlyKey:         viper.GetString("fastly_key"),
+		FastlyApiKey:      viper.GetString("fastly_api_key"),
+		FastlyPurgeTag:    viper.GetString("fastly_purge_tag"),
 		FastlyAwsBucket:   viper.GetString("fastly_aws_bucket"),
 		FastlyAwsRegion:   viper.GetString("fastly_aws_region"),
 		FastlyAwsAttempts: viper.GetInt("fastly_aws_attempts"),
