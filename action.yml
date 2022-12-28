@@ -49,10 +49,13 @@ inputs:
     description: Http host to use and AP for .repo files in YUM/ZYPP repos
     required: false
   schema:
-    description: Name of the schema describing the packages to be published (i.e. infra-agent, ohi, nrjmx, custom - requires schemaUrl)
+    description: Name of the schema describing the packages to be published (i.e. infra-agent, ohi, nrjmx, custom - requires schema_url, custom-local - requires schema_path)
     required: true
   schema_url:
     description: Url to custom schema file
+    required: false
+  schema_path:
+    description: Path to custom schema file
     required: false
   gpg_passphrase:
     description: Passphrase for the gpg key
@@ -88,6 +91,7 @@ runs:
         ACCESS_POINT_HOST: ${{ inputs.access_point_host }}
         SCHEMA: ${{ inputs.schema }}
         SCHEMA_URL: ${{ inputs.schema_url }}
+        SCHEMA_PATH: ${{ inputs.schema_path }}
         RUN_ID: ${{ inputs.run_id }}
         AWS_S3_LOCK_BUCKET_NAME: ${{ inputs.aws_s3_lock_bucket_name }}
         AWS_REGION: ${{ inputs.aws_region }}

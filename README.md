@@ -22,6 +22,7 @@ A GitHub Action to publish artifacts from GitHub release assets into an S3 bucke
 | `app_version`              | Version of the package. If not present is extracted from the tag removing the leading v (e.g. tag=v1.0.1 -> version=1.0.1) |
 | `schema`                   | Describes the packages to be published: infra-agent, ohi, or nrjmx. |
 | `schema_url`               | Url to custom schema file. |
+| `schema_path`              | Path to custom schema file. |
 | `gpg_passphrase`           | Passphrase for the gpg key. |
 | `gpg_private_key_base64`   | Encoded gpg key. |
 | `access_point_host`        | Host url to be used in apt repo mirror & .repo files template. It accepts a url or fixed values <code>production &#124; staging &#124; testing </code> for default urls.<br/><br/>`staging` : http://nr-downloads-ohai-staging.s3-website-us-east-1.amazonaws.com <br/> `testing`: http://nr-downloads-ohai-testing.s3-website-us-east-1.amazonaws.com <br/> `production`: https://nr-downloads-main.s3.amazonaws.com |
@@ -81,8 +82,12 @@ jobs:
           app_name: "newrelic-infra"
           repo_name: "newrelic/infrastructure-agent"
           env: release
+          # Set the schema from an external server/repo
           schema: "custom"
           schema_url: "https://raw.githubusercontent.com/newrelic/infrastructure-agent/master/build/upload-schema-linux.yml"
+          # Set the schema from this branch
+          #schema: "custom-local"
+          #schema_url: "./build/upload-schema-linux.yml"
           aws_access_key_id: ${{ env.AWS_ACCESS_KEY_ID }}
           aws_secret_access_key: ${{ env.AWS_SECRET_ACCESS_KEY }}
           aws_s3_bucket_name: ${{ env.AWS_S3_BUCKET_NAME }}
