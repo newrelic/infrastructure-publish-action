@@ -3,15 +3,16 @@ set -e
 # build docker image form Dockerfile
 echo "Build fresh docker image for newrelic/infrastructure-publish-action"
 # @TODO add --no-cache
-docker build  -t newrelic/infrastructure-publish-action -f $GITHUB_ACTION_PATH/Dockerfile $GITHUB_ACTION_PATH
+docker build --platform linux/amd64 -t newrelic/infrastructure-publish-action -f $GITHUB_ACTION_PATH/Dockerfile $GITHUB_ACTION_PATH
 
-
-# avoid container network errors in GHA runners
-set +e
-echo "Creating iptables rule to drop invalid packages"
-sudo iptables -D INPUT -i eth0 -m state --state INVALID -j DROP 2>/dev/null
-sudo iptables -A INPUT -i eth0 -m state --state INVALID -j DROP
-set -e
+if [ "${CI}" = "true" ]; then
+  # avoid container network errors in GHA runners
+  set +e
+  echo "Creating iptables rule to drop invalid packages"
+  sudo iptables -D INPUT -i eth0 -m state --state INVALID -j DROP 2>/dev/null
+  sudo iptables -A INPUT -i eth0 -m state --state INVALID -j DROP
+  set -e
+fi
 
 # run docker container to perform all actions inside.
 # $( pwd ) is mounted on /srv to enable grabbing packages
@@ -19,7 +20,7 @@ set -e
 # and therefore as LOCAL_PACKAGES_PATH will refer to path
 # inside the docker container it should be `/srv/*`
 echo "Run docker container with action logic inside"
-docker run --rm \
+docker run --platform linux/amd64 --rm \
         --name=infrastructure-publish-action\
         --security-opt apparmor:unconfined \
         --device /dev/fuse \
@@ -42,6 +43,7 @@ docker run --rm \
         -e ARTIFACTS_SRC_FOLDER=/home/gha/assets \
         -e SCHEMA \
         -e SCHEMA_URL \
+        -e SCHEMA_PATH=$( realpath --canonicalize-missing "$SCHEMA_PATH" | sed -e "s|$PWD|/srv|" ) \
         -e GPG_PRIVATE_KEY_BASE64 \
         -e GPG_PASSPHRASE \
         -e DISABLE_LOCK \
@@ -55,4 +57,5 @@ docker run --rm \
         -e FASTLY_AWS_ATTEMPTS \
         -e FASTLY_TIMEOUT_S3 \
         -e FASTLY_TIMEOUT_CDN \
-        newrelic/infrastructure-publish-action
+        newrelic/infrastructure-publish-action \
+        "$@"

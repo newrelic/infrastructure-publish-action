@@ -40,11 +40,19 @@ ifeq ($(SCHEMA), custom)
 	@echo "Downloaded schema:"
 	@cat ${UPLOAD_SCHEMA_FILE_PATH}
 else
-	@if [[ ! -e "$(WORKDIR)/schemas/$(SCHEMA).yml" ]]; then \
+ifeq ($(SCHEMA), custom-local)
+	@if [[ ! -f "$(SCHEMA_PATH)" ]]; then \
+		echo "Cannot find \"$(SCHEMA_PATH)\""; \
+		exit 1; \
+	fi
+	$(eval UPLOAD_SCHEMA_FILE_PATH := "$(SCHEMA_PATH)")
+else
+	@if [[ ! -f "$(WORKDIR)/schemas/$(SCHEMA).yml" ]]; then \
 		echo "Cannot find $(SCHEMA).yml file in $(WORKDIR)/schemas/"; \
 		exit 1; \
 	fi
 	$(eval UPLOAD_SCHEMA_FILE_PATH := "$(WORKDIR)/schemas/$(SCHEMA).yml")
+endif
 endif
 
 mount-s3:
