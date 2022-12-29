@@ -4,13 +4,14 @@ package main
 
 import (
 	"fmt"
+	"log"
+	"net/http"
+
 	"github.com/newrelic/infrastructure-publish-action/publisher/config"
 	"github.com/newrelic/infrastructure-publish-action/publisher/download"
 	"github.com/newrelic/infrastructure-publish-action/publisher/fastly"
 	"github.com/newrelic/infrastructure-publish-action/publisher/lock"
 	"github.com/newrelic/infrastructure-publish-action/publisher/upload"
-	"log"
-	"net/http"
 )
 
 const (
@@ -98,6 +99,17 @@ func main() {
 		conf.ArtifactsSrcFolder = conf.LocalPackagesPath
 	}
 
+	err = UploadAndClean(conf, uploadSchemas, bucketLock)
+	if err != nil {
+		l.Fatal(err)
+	}
+}
+
+// UploadAndClean uploads file to the bucket and cleans Fastly cache
+// S3 bucket lock required
+func UploadAndClean(conf config.Config, uploadSchemas config.UploadArtifactSchemas, bucketLock lock.BucketLock) (err error) {
+
+	// lock the bucket
 	if err = bucketLock.Lock(); err != nil {
 		return
 	}
@@ -111,22 +123,16 @@ func main() {
 		return
 	}()
 
+	// upload assets to S3
 	err = upload.UploadArtifacts(conf, uploadSchemas)
 	if err != nil {
-		l.Fatal(err)
+		return err
 	}
 	l.Println("🎉 upload phase complete")
 
-	if conf.FastlyApiKey != "" {
-		err = fastly.PurgeCache(
-			conf.FastlyApiKey,
-			conf.FastlyPurgeTag,
-			conf.FastlyAwsBucket,
-			conf.FastlyAwsRegion,
-			conf.FastlyAwsAttempts,
-			conf.FastlyTimeoutS3,
-			conf.FastlyTimeoutCDN,
-			l)
+	// clean fastly cache
+	if conf.FastlyConfig.FastlyApiKey != "" {
+		err = fastly.PurgeCache(conf.FastlyConfig, l)
 
 		if err != nil {
 			l.Printf("❌ Fastly cache cleaning failed, retry manually.\n%s\n", err.Error())
@@ -134,4 +140,6 @@ func main() {
 			l.Println("🧹 Fastly cache cleaned")
 		}
 	}
+
+	return
 }
