@@ -93,6 +93,7 @@ AWS_S3_LOCK_BUCKET_NAME="$AWS_S3_LOCK_BUCKET_NAME" \
 AWS_ROLE_SESSION_NAME="$AWS_ROLE_SESSION_NAME" \
 AWS_ROLE_ARN="$AWS_ROLE_ARN" \
 DEST_PREFIX="$DEST_PREFIX" \
+CI="${CI:-false}" \
 "${ROOT_DIR}/action-run.sh"
 
 printf "\n * Action run finished.\n"
