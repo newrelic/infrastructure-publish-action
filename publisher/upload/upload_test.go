@@ -1,12 +1,13 @@
 package upload
 
 import (
-	"github.com/newrelic/infrastructure-publish-action/publisher/config"
-	"github.com/stretchr/testify/assert"
 	"io/ioutil"
 	"os"
 	"path"
 	"testing"
+
+	"github.com/newrelic/infrastructure-publish-action/publisher/config"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestReplacePlaceholders(t *testing.T) {
