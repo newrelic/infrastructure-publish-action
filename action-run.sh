@@ -54,6 +54,7 @@ docker run --platform linux/amd64 --rm \
         -e FASTLY_API_KEY \
         -e FASTLY_AWS_ATTEMPTS \
         -e FASTLY_TIMEOUT_S3 \
+        -e FASTLY_PURGE_TAG \
         -e FASTLY_TIMEOUT_CDN \
         newrelic/infrastructure-publish-action \
         "$@"
