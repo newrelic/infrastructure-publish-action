@@ -4,13 +4,14 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"net/http"
 	"path"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
+
+	"github.com/fastly/go-fastly/v7/fastly"
 )
 
 // Usage:
@@ -36,8 +37,8 @@ type result struct {
 }
 
 const (
-	// more keys could be added if issues arise
-	fastlyPurgeBaseURL         = "https://api.fastly.com/service/2RMeBJ1ZTGnNJYvrWMgQhk/"
+	// https://developer.fastly.com/reference/api/purging/
+	infraServiceID             = "2RMeBJ1ZTGnNJYvrWMgQhk"
 	replicationStatusCompleted = "COMPLETED" // in s3.ReplicationStatusComplete is set to COMPLETE, which is wrong
 	aptDistributionsPath       = "infrastructure_agent/linux/apt/dists/"
 	aptDistributionPackageFile = "main/binary-amd64/Packages.bz2"
@@ -77,10 +78,10 @@ func PurgeCache(c Config, logger *log.Logger) error {
 
 	logger.Println("Fastly: replica is ✅")
 	logger.Println("Fastly: purging cache...")
-
-	if err := purgeCDN(ctx, c.FastlyApiKey, c.FastlyPurgeTag, c.FastlyTimeoutS3); err != nil {
+	if err := purgeCDN(ctx, c.FastlyApiKey, c.FastlyPurgeTag, c.FastlyTimeoutCDN); err != nil {
 		return fmt.Errorf("cannot purge CDN, error: %v", err)
 	}
+
 	logger.Println("Fastly: cache purged ✅")
 	return nil
 }
@@ -145,36 +146,25 @@ func waitForKeyReplication(ctx context.Context, bucket, key string, cl *s3.S3, t
 }
 
 func purgeCDN(ctx context.Context, fastlyKey, purgeTag string, timeoutCDN time.Duration) error {
-	ctxT := ctx
-	var cancelFn func()
-	if timeoutCDN > 0 {
-		ctxT, cancelFn = context.WithTimeout(ctx, timeoutCDN)
-	}
-	if cancelFn != nil {
-		defer cancelFn()
+	client, err := fastly.NewClient(fastlyKey)
+	if err != nil {
+		return err
 	}
 
-	var req *http.Request
-	var err error
+	if timeoutCDN > 0 {
+		client.HTTPClient.Timeout = timeoutCDN
+	}
+
+	var result *fastly.Purge
 
 	if purgeTag == "" || purgeTag == "purge_all" {
-		req, err = http.NewRequestWithContext(ctxT, http.MethodPost, fastlyPurgeBaseURL+"purge_all", nil)
+		result, err = client.PurgeAll(&fastly.PurgeAllInput{ServiceID: infraServiceID})
 	} else {
-		req, err = http.NewRequestWithContext(ctxT, http.MethodPost, fastlyPurgeBaseURL+purgeTag, nil)
+		result, err = client.PurgeKey(&fastly.PurgeKeyInput{ServiceID: infraServiceID, Key: purgeTag})
 	}
 
-	if err != nil {
-		return err
-	}
-	req.Header.Set("Fastly-Key", fastlyKey)
-
-	res, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return err
-	}
-
-	if res.StatusCode < 200 || res.StatusCode >= 400 {
-		return fmt.Errorf("unexpected Fastly status: %s", res.Status)
+	if err != nil || result.Status != "ok" {
+		return fmt.Errorf("unexpected Fastly purge error: %w status: %s", err, result.Status)
 	}
 
 	return nil
