@@ -131,7 +131,7 @@ func UploadAndClean(conf config.Config, uploadSchemas config.UploadArtifactSchem
 	l.Println("🎉 upload phase complete")
 
 	// clean fastly cache
-	if conf.FastlyConfig.FastlyApiKey != "" {
+	if conf.FastlyConfig.ApiKey != "" {
 		err = fastly.PurgeCache(conf.FastlyConfig, l)
 
 		if err != nil {

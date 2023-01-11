@@ -152,13 +152,13 @@ func LoadConfig() Config {
 
 		FastlyConfig: fastly.Config{
 
-			FastlyApiKey:      viper.GetString("fastly_api_key"),
-			FastlyPurgeTag:    viper.GetString("fastly_purge_tag"),
-			FastlyAwsBucket:   viper.GetString("aws_s3_bucket_name"),
-			FastlyAwsRegion:   viper.GetString("aws_region"),
-			FastlyAwsAttempts: viper.GetInt("fastly_aws_attempts"),
-			FastlyTimeoutS3:   viper.GetDuration("fastly_timeout_s3") * time.Second,
-			FastlyTimeoutCDN:  viper.GetDuration("fastly_timeout_cdn") * time.Second,
+			ApiKey:      viper.GetString("fastly_api_key"),
+			PurgeTag:    viper.GetString("fastly_purge_tag"),
+			AwsBucket:   viper.GetString("aws_s3_bucket_name"),
+			AwsRegion:   viper.GetString("aws_region"),
+			AwsAttempts: viper.GetInt("fastly_aws_attempts"),
+			TimeoutS3:   viper.GetDuration("fastly_timeout_s3") * time.Second,
+			TimeoutCDN:  viper.GetDuration("fastly_timeout_cdn") * time.Second,
 		},
 	}
 }

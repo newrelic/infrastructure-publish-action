@@ -47,13 +47,13 @@ const (
 )
 
 type Config struct {
-	FastlyApiKey      string
-	FastlyPurgeTag    string
-	FastlyAwsBucket   string
-	FastlyAwsRegion   string
-	FastlyAwsAttempts int
-	FastlyTimeoutS3   time.Duration
-	FastlyTimeoutCDN  time.Duration
+	ApiKey      string
+	PurgeTag    string
+	AwsBucket   string
+	AwsRegion   string
+	AwsAttempts int
+	TimeoutS3   time.Duration
+	TimeoutCDN  time.Duration
 }
 
 func PurgeCache(c Config, logger *log.Logger) error {
@@ -61,16 +61,16 @@ func PurgeCache(c Config, logger *log.Logger) error {
 	ctx := context.Background()
 
 	sess := session.Must(session.NewSession())
-	cl := s3.New(sess, aws.NewConfig().WithRegion(c.FastlyAwsRegion))
+	cl := s3.New(sess, aws.NewConfig().WithRegion(c.AwsRegion))
 
-	keys, err := getDefaultKeys(cl, c.FastlyAwsBucket)
+	keys, err := getDefaultKeys(cl, c.AwsBucket)
 	if err != nil {
 		return fmt.Errorf("cannot get default keys, error: %v", err)
 	}
 
 	for _, key := range keys {
 		if key != "" {
-			if err := waitForKeyReplication(ctx, c.FastlyAwsBucket, key, cl, c.FastlyTimeoutS3, c.FastlyAwsAttempts); err != nil {
+			if err := waitForKeyReplication(ctx, c.AwsBucket, key, cl, c.TimeoutS3, c.AwsAttempts); err != nil {
 				return fmt.Errorf("unsucessful replication, error: %v", err)
 			}
 		}
@@ -78,7 +78,7 @@ func PurgeCache(c Config, logger *log.Logger) error {
 
 	logger.Println("Fastly: replica is ✅")
 	logger.Println("Fastly: purging cache...")
-	if err := purgeCDN(ctx, c.FastlyApiKey, c.FastlyPurgeTag, c.FastlyTimeoutCDN); err != nil {
+	if err := purgeCDN(ctx, c.ApiKey, c.PurgeTag, c.TimeoutCDN); err != nil {
 		return fmt.Errorf("cannot purge CDN, error: %v", err)
 	}
 
