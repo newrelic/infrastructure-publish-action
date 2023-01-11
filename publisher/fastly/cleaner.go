@@ -4,13 +4,14 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"net/http"
 	"path"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
+
+	"github.com/fastly/go-fastly/v7/fastly"
 )
 
 // Usage:
@@ -36,63 +37,52 @@ type result struct {
 }
 
 const (
-	defaultBucket = "nr-downloads-ohai-staging"
-	defaultRegion = "us-east-1"
-	// more keys could be added if issues arise
-	fastlyPurgeAllBaseURL      = "https://api.fastly.com/service/2RMeBJ1ZTGnNJYvrWMgQhk/"
-	fastlyPurgeTagBaseURL      = "https://api.fastly.com/service/2RMeBJ1ZTGnNJYvrWMgQhk/" // TODO update with the correct service ID
-	replicationStatusCompleted = "COMPLETED"                                              // in s3.ReplicationStatusComplete is set to COMPLETE, which is wrong
+	// https://developer.fastly.com/reference/api/purging/
+	infraServiceID             = "2RMeBJ1ZTGnNJYvrWMgQhk"
+	replicationStatusCompleted = "COMPLETED" // in s3.ReplicationStatusComplete is set to COMPLETE, which is wrong
 	aptDistributionsPath       = "infrastructure_agent/linux/apt/dists/"
 	aptDistributionPackageFile = "main/binary-amd64/Packages.bz2"
 	rhDistributionsPath        = "infrastructure_agent/linux/yum/"
 	zypperDistributionsPath    = "infrastructure_agent/linux/zypp/"
 )
 
-//var (
-//	bucket, region, keysStr, fastlyKey string
-//	timeoutS3, timeoutCDN              time.Duration
-//	attempts                           int
-//	verbose                            bool
-//)
+type Config struct {
+	ApiKey      string
+	PurgeTag    string
+	AwsBucket   string
+	AwsRegion   string
+	AwsAttempts int
+	TimeoutS3   time.Duration
+	TimeoutCDN  time.Duration
+}
 
-//func init() {
-//	flag.BoolVar(&verbose, "v", false, "Verbose output.")
-//	flag.StringVar(&bucket, "b", defaultBucket, "Bucket name.")
-//	flag.StringVar(&region, "r", defaultRegion, "Region name.")
-//	flag.StringVar(&keysStr, "k", "", "Keys separated by comma.")
-//	flag.IntVar(&attempts, "a", 5, "Retry attempts per key.")
-//	flag.DurationVar(&timeoutS3, "t", 10*time.Second, "Timeout to fetch an S3 object.")
-//	flag.DurationVar(&timeoutCDN, "c", 30*time.Second, "Timeout to request CDN purge.")
-//}
-
-func PurgeCache(fastlyKey, purgeTag, bucket, region string, attempts int, timeoutS3, timeoutCDN time.Duration, l *log.Logger) error {
-
-	l.Println("Fastly: check for replica status...")
+func PurgeCache(c Config, logger *log.Logger) error {
+	logger.Println("Fastly: check for replica status...")
 	ctx := context.Background()
 
 	sess := session.Must(session.NewSession())
-	cl := s3.New(sess, aws.NewConfig().WithRegion(region))
+	cl := s3.New(sess, aws.NewConfig().WithRegion(c.AwsRegion))
 
-	keys, err := getDefaultKeys(cl, bucket)
+	keys, err := getDefaultKeys(cl, c.AwsBucket)
 	if err != nil {
 		return fmt.Errorf("cannot get default keys, error: %v", err)
 	}
 
 	for _, key := range keys {
 		if key != "" {
-			if err := waitForKeyReplication(ctx, bucket, key, cl, timeoutS3, attempts); err != nil {
+			if err := waitForKeyReplication(ctx, c.AwsBucket, key, cl, c.TimeoutS3, c.AwsAttempts); err != nil {
 				return fmt.Errorf("unsucessful replication, error: %v", err)
 			}
 		}
 	}
 
-	l.Println("Fastly: replica is ✅")
-	l.Println("Fastly: purging cache...")
-
-	if err := purgeCDN(ctx, fastlyKey, purgeTag, timeoutCDN); err != nil {
+	logger.Println("Fastly: replica is ✅")
+	logger.Println("Fastly: purging cache...")
+	if err := purgeCDN(ctx, c.ApiKey, c.PurgeTag, c.TimeoutCDN); err != nil {
 		return fmt.Errorf("cannot purge CDN, error: %v", err)
 	}
-	l.Println("Fastly: cache purged ✅")
+
+	logger.Println("Fastly: cache purged ✅")
 	return nil
 }
 
@@ -156,36 +146,25 @@ func waitForKeyReplication(ctx context.Context, bucket, key string, cl *s3.S3, t
 }
 
 func purgeCDN(ctx context.Context, fastlyKey, purgeTag string, timeoutCDN time.Duration) error {
-	ctxT := ctx
-	var cancelFn func()
-	if timeoutCDN > 0 {
-		ctxT, cancelFn = context.WithTimeout(ctx, timeoutCDN)
-	}
-	if cancelFn != nil {
-		defer cancelFn()
+	client, err := fastly.NewClient(fastlyKey)
+	if err != nil {
+		return err
 	}
 
-	var req *http.Request
-	var err error
+	if timeoutCDN > 0 {
+		client.HTTPClient.Timeout = timeoutCDN
+	}
+
+	var result *fastly.Purge
 
 	if purgeTag == "" || purgeTag == "purge_all" {
-		req, err = http.NewRequestWithContext(ctxT, http.MethodPost, fastlyPurgeAllBaseURL+"purge_all", nil)
+		result, err = client.PurgeAll(&fastly.PurgeAllInput{ServiceID: infraServiceID})
 	} else {
-		req, err = http.NewRequestWithContext(ctxT, http.MethodPost, fastlyPurgeTagBaseURL+purgeTag, nil)
+		result, err = client.PurgeKey(&fastly.PurgeKeyInput{ServiceID: infraServiceID, Key: purgeTag})
 	}
 
-	if err != nil {
-		return err
-	}
-	req.Header.Set("Fastly-Key", fastlyKey)
-
-	res, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return err
-	}
-
-	if res.StatusCode < 200 || res.StatusCode >= 400 {
-		return fmt.Errorf("unexpected Fastly status: %s", res.Status)
+	if err != nil || result.Status != "ok" {
+		return fmt.Errorf("unexpected Fastly purge error: %w status: %s", err, result.Status)
 	}
 
 	return nil
