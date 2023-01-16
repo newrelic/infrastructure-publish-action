@@ -371,8 +371,8 @@ func uploadFileArtifact(conf config.Config, schema config.UploadArtifactSchema, 
 		conf.DestPrefix,
 		osVersion)
 
-	srcPath = path.Join(conf.ArtifactsSrcFolder, srcPath)
-	destPath = path.Join(conf.ArtifactsDestFolder, destPath)
+	srcPath = utils.JoinPaths(conf.ArtifactsSrcFolder, srcPath)
+	destPath = utils.JoinPaths(conf.ArtifactsDestFolder, destPath)
 
 	err = utils.CopyFile(srcPath, destPath, upload.Override, commandTimeout)
 	if err != nil {

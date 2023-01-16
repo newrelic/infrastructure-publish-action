@@ -27,6 +27,18 @@ func TestReplacePlaceholders(t *testing.T) {
 		destPrefix   string
 		osVersion    string
 	}{
+		"dst src replacement without src": {
+			"{app_name}-{version}.{arch}.rpm.sum",
+			"/{dest_prefix}/{app_name}/{version}/{arch}/",
+			"newrelic/nri-foobar",
+			"nri-foobar",
+			"1.2.3",
+			"amd64",
+			"nri-foobar-1.2.3.amd64.rpm.sum",
+			"/tmp/nri-foobar/1.2.3/amd64/",
+			"tmp",
+			"",
+		},
 		"dst no file replacement": {
 			"{app_name}-{arch}-{version}",
 			"/{dest_prefix}/{arch}/{app_name}/{version}/file",
