@@ -5,17 +5,56 @@ import (
 	"fmt"
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/s3"
 )
 
-func handler(ctx context.Context, s3Event events.S3Event) {
+const (
+	surrogateKey    = "infrastructure_metadata"
+	fastlySurrogate = "x-amz-meta-surrogate-key"
+)
+
+func handler(ctx context.Context, s3Event events.S3Event) error {
+	// debugging
+	//data, err := json.Marshal(s3Event)
+	//if err != nil {
+	//	return err
+	//}
+	//fmt.Printf("%s\f", data)
+
+	sess, err := session.NewSession(&aws.Config{
+		Region: aws.String("us-east-1")},
+	)
+	if err != nil {
+		return fmt.Errorf("error getting s3 session: %w", err)
+	}
+
+	s3 := s3.New(sess)
 	for _, record := range s3Event.Records {
-		s3 := record.S3
-		fmt.Printf("[%s - %s] Bucket = %s, Key = %s \n", record.EventSource, record.EventTime, s3.Bucket.Name, s3.Object.Key)
+		s3Record := record.S3
+		_, err := s3.CopyObject(modifyMetadata(s3Record))
+		if err != nil {
+			return fmt.Errorf("error while coping metadata to s3 object: %w", err)
+		}
+		fmt.Printf("Modified object file %s\n", s3Record.Object.Key)
+	}
+
+	fmt.Println("SUCCEED: All S3 Objects metadata updated")
+	return nil
+}
+
+func modifyMetadata(record events.S3Entity) *s3.CopyObjectInput {
+	return &s3.CopyObjectInput{
+		Bucket:            aws.String(record.Bucket.Name),
+		Key:               aws.String(record.Object.Key),
+		CopySource:        aws.String(record.Bucket.Name + "/" + record.Object.Key),
+		Metadata:          map[string]*string{fastlySurrogate: aws.String(surrogateKey)},
+		MetadataDirective: aws.String("REPLACE"),
 	}
 }
 
 func main() {
 	fmt.Printf("starting aws s3 metadata rewrite tool\n")
-	// Make the handler available for Remote Procedure Call by AWS Lambda
 	lambda.Start(handler)
 }
