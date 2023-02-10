@@ -4,22 +4,63 @@ variable "function_name" {
 variable "handler_name" {
   default = "lambda"
 }
+
 variable "runtime" {
-  default = "gp1.x"
+  default = "go1.x"
 }
+
 variable "timeout" {
   default = "10"
 }
+
 variable "aws_s3_bucket_id" {
-  default = ""
+  default = "caos-fastly-lambda-test"
+}
+
+variable "aws_s3_bucket_arn" {
+  default = "arn:aws:s3:::caos-fastly-lambda-test"
+}
+
+variable "s3_notifications" {
+  default = {
+    bucket = {
+        name            = "caos-fastly-lambda-test"
+        filters = [
+            {
+                name            = "infrastructure agent apt"
+                filter_prefix   = "/infrastructure_agent/linux/apt"
+                filter_suffix   = ""
+            },
+            {
+                name            = "rpm data"
+                filter_prefix   = "/infrastructure/linux/rpm"
+                filter_suffix   = ".repodata"
+            }
+        ]
+    }
+    }
+}
+
+
+#########################################
+# Set AWS Provider region
+#########################################
+
+provider "aws" {
+    region = "us-east-1"
 }
 
 
 
-#resource "aws_cloudwatch_log_group" "example" {
-#  name              = "/aws/lambda/${var.function_name}"
-#  retention_in_days = 14
-#}
+resource "aws_cloudwatch_log_group" "lambda_log_group" {
+  name              = "/aws/lambda/${var.function_name}"
+  retention_in_days = 14
+}
+
+resource "aws_iam_role_policy_attachment" "function_logging_policy_attachment" {
+  role       = aws_iam_role.lambda_iam.id
+  policy_arn = aws_iam_policy.lambda_function_policy.arn
+}
 
 
 #########################################
@@ -45,9 +86,8 @@ resource "aws_iam_role" "lambda_iam" {
 EOF
 }
 
-resource "aws_iam_role_policy" "revoke_keys_role_policy" {
+resource "aws_iam_policy" "lambda_function_policy" {
   name = "${var.function_name}-policy"
-  role = aws_iam_role.lambda_iam.id
 
   policy = <<EOF
 {
@@ -70,8 +110,8 @@ resource "aws_iam_role_policy" "revoke_keys_role_policy" {
         "logs:CreateLogStream",
         "logs:PutLogEvents"
       ],
-      "Resource": ${cloudwatch_log-group}
-    },
+      "Resource": "arn:aws:logs:*:*:*"
+    }
   ]
 }
 EOF
@@ -100,19 +140,52 @@ resource "aws_lambda_function" "test_lambda" {
   timeout          = var.timeout
   filename         = "../lambda.zip"
   source_code_hash = filebase64sha256("../lambda.zip")
+  depends_on = [aws_cloudwatch_log_group.lambda_log_group]
   tags = {
     owning_team = "CAOS"
   }
 }
 
-# Adding S3 bucket as trigger to my lambda and giving the permissions
-resource "aws_s3_bucket_notification" "aws-lambda-trigger" {
-  for_each = toset( ["infrastructure_agent/linux/apt/dists/"] )
+resource "aws_lambda_permission" "allow_bucket" {
+  statement_id  = "AllowExecutionFromS3Bucket"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.test_lambda.arn
+  principal     = "s3.amazonaws.com"
+  source_arn    = var.aws_s3_bucket_arn
+}
 
-  bucket = var.aws_s3_bucket_id
-  lambda_function {
-    lambda_function_arn = aws_lambda_function.test_lambda.arn
-    events              = ["s3:ObjectCreated:Put", "s3:ObjectCreated:Post"]
-    filter_prefix       = each.key
+# Adding S3 bucket as trigger
+resource "aws_s3_bucket_notification" "aws-lambda-trigger-post" {
+  for_each                         = {for item in var.s3_notifications:  item.name => item}
+  bucket                           = each.value.name
+
+  dynamic "lambda_function" {
+      for_each = [for item in each.value.filters: {
+      suffix = item.filter_suffix
+      prefix = item.filter_prefix
+    }]
+
+    content {
+      lambda_function_arn = aws_lambda_function.test_lambda.arn
+      events              = ["s3:ObjectCreated:Put"]
+      filter_prefix       = lambda_function.value.prefix
+      filter_suffix       = lambda_function.value.suffix
+    }
   }
+
+  dynamic "lambda_function" {
+      for_each = [for item in each.value.filters: {
+      suffix = item.filter_suffix
+      prefix = item.filter_prefix
+    }]
+
+    content {
+      lambda_function_arn = aws_lambda_function.test_lambda.arn
+      events              = ["s3:ObjectCreated:Post"]
+      filter_prefix       = lambda_function.value.prefix
+      filter_suffix       = lambda_function.value.suffix
+    }
+  }
+
+  depends_on = [aws_lambda_permission.allow_bucket]
 }
