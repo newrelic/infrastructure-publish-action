@@ -21,24 +21,60 @@ variable "aws_s3_bucket_arn" {
   default = "arn:aws:s3:::caos-fastly-lambda-test"
 }
 
+
 variable "s3_notifications" {
   default = {
     bucket = {
-        name            = "caos-fastly-lambda-test"
-        filters = [
-            {
-                name            = "infrastructure agent apt"
-                filter_prefix   = "/infrastructure_agent/linux/apt"
-                filter_suffix   = ""
-            },
-            {
-                name            = "rpm data"
-                filter_prefix   = "/infrastructure/linux/rpm"
-                filter_suffix   = ".repodata"
-            }
-        ]
+      name    = "caos-fastly-lambda-test"
+      filters = [
+        {
+          name          = "apt metadata"
+          filter_prefix = "infrastructure_agent/linux/apt/dists/"
+          filter_suffix = ""
+        },
+        {
+          name          = "yum rpm data xml"
+          filter_prefix = "infrastructure_agent/linux/yum/"
+          filter_suffix = "xml"
+        },
+        {
+          name          = "yum rpm data xml.asc"
+          filter_prefix = "infrastructure_agent/linux/yum/"
+          filter_suffix = "asc"
+        },
+        {
+          name          = "yum rpm data bz2"
+          filter_prefix = "infrastructure_agent/linux/yum/"
+          filter_suffix = "bz2"
+        },
+        {
+          name          = "yum rpm data bz2"
+          filter_prefix = "infrastructure_agent/linux/yum/"
+          filter_suffix = "gz"
+        },
+        {
+          name          = "zypp rpm data xml"
+          filter_prefix = "infrastructure_agent/linux/zypp/"
+          filter_suffix = "xml"
+        },
+        {
+          name          = "zypp rpm data xml.asc"
+          filter_prefix = "infrastructure_agent/linux/zypp/"
+          filter_suffix = "asc"
+        },
+        {
+          name          = "zypp rpm data bz2"
+          filter_prefix = "infrastructure_agent/linux/zypp/"
+          filter_suffix = "bz2"
+        },
+        {
+          name          = "zypp rpm data bz2"
+          filter_prefix = "infrastructure_agent/linux/zypp/"
+          filter_suffix = "gz"
+        },
+      ]
     }
-    }
+  }
 }
 
 
@@ -47,9 +83,8 @@ variable "s3_notifications" {
 #########################################
 
 provider "aws" {
-    region = "us-east-1"
+  region = "us-east-1"
 }
-
 
 
 resource "aws_cloudwatch_log_group" "lambda_log_group" {
@@ -102,6 +137,7 @@ resource "aws_iam_policy" "lambda_function_policy" {
       ],
       "Effect": "Allow",
       "Resource": "*"
+
     },
     {
       "Sid": "VisualEditor1",
@@ -135,13 +171,13 @@ terraform {
 resource "aws_lambda_function" "test_lambda" {
   function_name    = var.function_name
   role             = aws_iam_role.lambda_iam.arn
-  handler          = "src/${var.handler_name}.lambda_handler"
+  handler          = var.handler_name
   runtime          = var.runtime
   timeout          = var.timeout
   filename         = "../lambda.zip"
   source_code_hash = filebase64sha256("../lambda.zip")
-  depends_on = [aws_cloudwatch_log_group.lambda_log_group]
-  tags = {
+  depends_on       = [aws_cloudwatch_log_group.lambda_log_group]
+  tags             = {
     owning_team = "CAOS"
   }
 }
@@ -156,14 +192,16 @@ resource "aws_lambda_permission" "allow_bucket" {
 
 # Adding S3 bucket as trigger
 resource "aws_s3_bucket_notification" "aws-lambda-trigger-post" {
-  for_each                         = {for item in var.s3_notifications:  item.name => item}
-  bucket                           = each.value.name
+  for_each = {for item in var.s3_notifications :  item.name => item}
+  bucket   = each.value.name
 
   dynamic "lambda_function" {
-      for_each = [for item in each.value.filters: {
+    for_each = [
+    for item in each.value.filters : {
       suffix = item.filter_suffix
       prefix = item.filter_prefix
-    }]
+    }
+    ]
 
     content {
       lambda_function_arn = aws_lambda_function.test_lambda.arn
@@ -174,10 +212,12 @@ resource "aws_s3_bucket_notification" "aws-lambda-trigger-post" {
   }
 
   dynamic "lambda_function" {
-      for_each = [for item in each.value.filters: {
+    for_each = [
+    for item in each.value.filters : {
       suffix = item.filter_suffix
       prefix = item.filter_prefix
-    }]
+    }
+    ]
 
     content {
       lambda_function_arn = aws_lambda_function.test_lambda.arn
