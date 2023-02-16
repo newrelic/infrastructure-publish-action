@@ -136,8 +136,7 @@ resource "aws_iam_policy" "lambda_function_policy" {
         "s3:ListBucket"
       ],
       "Effect": "Allow",
-      "Resource": "*"
-
+      "Resource": "${var.aws_s3_bucket_arn}/infrastructure_agent/linux/*"
     },
     {
       "Sid": "VisualEditor1",
@@ -146,7 +145,7 @@ resource "aws_iam_policy" "lambda_function_policy" {
         "logs:CreateLogStream",
         "logs:PutLogEvents"
       ],
-      "Resource": "arn:aws:logs:*:*:*"
+      "Resource": "${aws_cloudwatch_log_group.lambda_log_group.arn}:*"
     }
   ]
 }
