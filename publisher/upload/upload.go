@@ -79,7 +79,6 @@ func UploadArtifacts(conf config.Config, schema config.UploadArtifactSchemas, bu
 		} else if errRelease != nil {
 			err = fmt.Errorf("got 2 errors: uploading: \"%v\", releasing lock: \"%v\"", err, errRelease)
 		}
-		return
 	}()
 
 	for _, artifactSchema := range schema {

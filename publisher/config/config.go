@@ -1,14 +1,22 @@
 package config
 
 import (
+	"encoding/base64"
 	"fmt"
-	"github.com/spf13/viper"
+	"io/fs"
+	"os"
 	"strings"
+	"time"
+
+	"github.com/newrelic/infrastructure-publish-action/publisher/utils"
+	"github.com/spf13/viper"
+	"go.uber.org/multierr"
 )
 
 const (
 	defaultAptlyFolder = "/root/.aptly"
 	defaultLockgroup   = "lockgroup"
+	defaultLockRetries = 30
 
 	//Access points
 	accessPointStaging               = "http://nr-downloads-ohai-staging.s3-website-us-east-1.amazonaws.com"
@@ -18,6 +26,47 @@ const (
 	placeholderAccessPointStaging    = "staging"
 	placeholderAccessPointTesting    = "testing"
 	placeholderAccessPointProduction = "production"
+
+	// env vars
+	repoNameFlag             = "repo_name"
+	appNameFlag              = "app_name"
+	appVersionFlag           = "app_version"
+	tagFlag                  = "tag"
+	accessPointHostFlag      = "access_point_host"
+	runIDFlag                = "run_id"
+	artifactsDestFolderFlag  = "artifacts_dest_folder"
+	artifactsSrcFolderFlag   = "artifacts_src_folder"
+	aptlyFolderFlag          = "aptly_folder"
+	uploadSchemaFilePathFlag = "upload_schema_file_path"
+	destPrefixFlag           = "dest_prefix"
+	aptSkipMirrorFlag        = "apt_skip_mirror"
+	awsTagsFlag              = "aws_tags"
+
+	disableGpgSigningFlag = "disable_gpg_signing"
+	gpgPassphraseFlag     = "gpg_passphrase"
+	gpgKeyRingFlag        = "gpg_key_ring"
+
+	awsS3BucketNameFlag     = "aws_s3_bucket_name"
+	awsS3LockBucketNameFlag = "aws_s3_lock_bucket_name"
+	disableLockFlag         = "disable_lock"
+	lockRetriesFlag         = "lock_retries"
+	lockGroupFlag           = "lock_group"
+	localPackagesPathFlag   = "local_packages_path"
+
+	// AWS lock resource tags
+	defaultTagOwningTeam = "CAOS"
+	defaultTagProduct    = "integrations"
+	defaultTagProject    = "infrastructure-publish-action"
+	defaultTagEnv        = "us-development"
+)
+
+var (
+	defaultTags = fmt.Sprintf("department=product&product=%s&project=%s&owning_team=%s&environment=%s",
+		defaultTagProduct,
+		defaultTagProject,
+		defaultTagOwningTeam,
+		defaultTagEnv,
+	)
 )
 
 type Config struct {
@@ -33,19 +82,20 @@ type Config struct {
 	ArtifactsSrcFolder   string
 	AptlyFolder          string
 	UploadSchemaFilePath string
-	GpgPassphrase        string
-	GpgKeyRing           string
-	AwsRegion            string
-	AwsRoleARN           string
+	LocalPackagesPath    string
+	AptSkipMirror        bool
+
+	// GPG Signing
+	DisableGpgSigning bool
+	GpgPassphrase     string
+	GpgKeyRing        string
+
 	// locking properties (candidate for factoring)
-	AwsLockBucket     string
-	AwsTags           string
-	LockGroup         string
-	DisableLock       bool
-	LockRetries       uint
-	UseDefLockRetries bool
-	LocalPackagesPath string
-	AptSkipMirror     bool
+	DisableLock   bool
+	AwsLockBucket string
+	AwsTags       string
+	LockGroup     string
+	LockRetries   uint
 }
 
 func (c *Config) LockOwner() string {
@@ -70,72 +120,133 @@ func parseAccessPointHost(accessPointHost string) (string, string) {
 	}
 }
 
-func LoadConfig() Config {
-	// TODO: make all the config required
-	viper.BindEnv("repo_name")
-	viper.BindEnv("app_name")
-	viper.BindEnv("app_version")
-	viper.BindEnv("tag")
-	viper.BindEnv("access_point_host")
-	viper.BindEnv("run_id")
-	viper.BindEnv("artifacts_dest_folder")
-	viper.BindEnv("artifacts_src_folder")
-	viper.BindEnv("aptly_folder")
-	viper.BindEnv("upload_schema_file_path")
-	viper.BindEnv("dest_prefix")
-	viper.BindEnv("gpg_passphrase")
-	viper.BindEnv("gpg_key_ring")
-	viper.BindEnv("aws_s3_bucket_name")
-	viper.BindEnv("aws_s3_lock_bucket_name")
-	viper.BindEnv("aws_role_arn")
-	viper.BindEnv("aws_region")
-	viper.BindEnv("disable_lock")
-	viper.BindEnv("lock_retries")
-	viper.BindEnv("lock_group")
-	viper.BindEnv("local_packages_path")
-	viper.BindEnv("apt_skip_mirror")
+func LoadConfig() (Config, error) {
+	var errs error
 
-	aptlyF := viper.GetString("aptly_folder")
+	// TODO: make all the config required
+	viper.BindEnv(repoNameFlag)
+	viper.BindEnv(appNameFlag)
+	viper.BindEnv(appVersionFlag)
+	viper.BindEnv(tagFlag)
+	viper.BindEnv(accessPointHostFlag)
+	viper.BindEnv(runIDFlag)
+	viper.BindEnv(artifactsDestFolderFlag)
+	viper.BindEnv(artifactsSrcFolderFlag)
+	viper.BindEnv(aptlyFolderFlag)
+	viper.BindEnv(uploadSchemaFilePathFlag)
+	viper.BindEnv(destPrefixFlag)
+	viper.BindEnv(localPackagesPathFlag)
+	viper.BindEnv(aptSkipMirrorFlag)
+
+	viper.BindEnv(disableGpgSigningFlag)
+	viper.BindEnv(gpgPassphraseFlag)
+	viper.BindEnv(gpgKeyRingFlag)
+
+	viper.BindEnv(disableLockFlag)
+	viper.BindEnv(awsS3LockBucketNameFlag)
+	viper.BindEnv(awsS3BucketNameFlag)
+	viper.BindEnv(awsTagsFlag)
+	viper.BindEnv(lockRetriesFlag)
+	viper.BindEnv(lockGroupFlag)
+
+	aptlyF := viper.GetString(aptlyFolderFlag)
 	if aptlyF == "" {
 		aptlyF = defaultAptlyFolder
 	}
 
-	lockGroup := viper.GetString("lock_group")
+	lockGroup := viper.GetString(lockGroupFlag)
 	if lockGroup == "" {
 		lockGroup = defaultLockgroup
 	}
 
-	version := viper.GetString("app_version")
+	version := viper.GetString(appVersionFlag)
 	if version == "" {
-		version = strings.Replace(viper.GetString("tag"), "v", "", -1)
+		version = strings.Replace(viper.GetString(tagFlag), "v", "", -1)
 	}
 
-	accessPointHost, mirrorHost := parseAccessPointHost(viper.GetString("access_point_host"))
+	accessPointHost, mirrorHost := parseAccessPointHost(viper.GetString(accessPointHostFlag))
 
-	return Config{
-		DestPrefix:           viper.GetString("dest_prefix"),
-		RepoName:             viper.GetString("repo_name"),
-		AppName:              viper.GetString("app_name"),
-		Tag:                  viper.GetString("tag"),
+	awsTags := viper.GetString(awsTagsFlag)
+	if awsTags == "" {
+		awsTags = defaultTags
+	}
+
+	lockRetries := viper.GetUint(lockRetriesFlag)
+	if !viper.IsSet(lockRetriesFlag) {
+		lockRetries = defaultLockRetries
+	}
+
+	c := Config{
+		DestPrefix:           viper.GetString(destPrefixFlag),
+		RepoName:             viper.GetString(repoNameFlag),
+		AppName:              viper.GetString(appNameFlag),
+		Tag:                  viper.GetString(tagFlag),
 		MirrorHost:           mirrorHost,
 		AccessPointHost:      accessPointHost,
-		RunID:                viper.GetString("run_id"),
+		RunID:                viper.GetString(runIDFlag),
 		Version:              version,
-		ArtifactsDestFolder:  viper.GetString("artifacts_dest_folder"),
-		ArtifactsSrcFolder:   viper.GetString("artifacts_src_folder"),
+		ArtifactsDestFolder:  viper.GetString(artifactsDestFolderFlag),
+		ArtifactsSrcFolder:   viper.GetString(artifactsSrcFolderFlag),
 		AptlyFolder:          aptlyF,
-		UploadSchemaFilePath: viper.GetString("upload_schema_file_path"),
-		GpgPassphrase:        viper.GetString("gpg_passphrase"),
-		GpgKeyRing:           viper.GetString("gpg_key_ring"),
-		LockGroup:            lockGroup,
-		AwsLockBucket:        viper.GetString("aws_s3_lock_bucket_name"),
-		AwsRoleARN:           viper.GetString("aws_role_arn"),
-		AwsRegion:            viper.GetString("aws_region"),
-		AwsTags:              viper.GetString("aws_tags"),
-		DisableLock:          viper.GetBool("disable_lock"),
-		LockRetries:          viper.GetUint("lock_retries"),
-		LocalPackagesPath:    viper.GetString("local_packages_path"),
-		UseDefLockRetries:    !viper.IsSet("lock_retries"),     // when non set: use default value
-		AptSkipMirror:        viper.GetBool("apt_skip_mirror"), // when non set: use default value
+		UploadSchemaFilePath: viper.GetString(uploadSchemaFilePathFlag),
+
+		DisableGpgSigning: viper.GetBool(disableGpgSigningFlag),
+		GpgPassphrase:     viper.GetString(gpgPassphraseFlag),
+		GpgKeyRing:        viper.GetString(gpgKeyRingFlag),
+
+		DisableLock:       viper.GetBool(disableLockFlag),
+		LockGroup:         lockGroup,
+		AwsLockBucket:     viper.GetString(awsS3LockBucketNameFlag),
+		AwsTags:           awsTags,
+		LockRetries:       lockRetries,
+		LocalPackagesPath: viper.GetString(localPackagesPathFlag),
+
+		AptSkipMirror: viper.GetBool(aptSkipMirrorFlag),
 	}
+
+	if c.DisableLock {
+		if !viper.IsSet(awsS3LockBucketNameFlag) {
+			multierr.Append(errs, fmt.Errorf("missing 'aws_s3_lock_bucket_name' value"))
+		}
+		if !viper.IsSet(runIDFlag) {
+			multierr.Append(errs, fmt.Errorf("missing 'run_id' value"))
+		}
+	}
+
+	if c.DisableGpgSigning {
+		if viper.IsSet(gpgPassphraseFlag) {
+			multierr.Append(errs, fmt.Errorf("'gpg_passphrase' should not be set with GPG signing disabled"))
+		}
+		if viper.IsSet(gpgKeyRingFlag) {
+			multierr.Append(errs, fmt.Errorf("'gpg_key_ring' should not be set with GPG signing disabled"))
+		}
+	} else {
+		gpgKey, err := base64.RawStdEncoding.DecodeString(c.GpgPassphrase)
+		if err != nil {
+			multierr.Append(errs, err)
+		}
+
+		tmp := os.TempDir()
+		defer os.RemoveAll(tmp)
+		if err := os.WriteFile(tmp+"/gpg.key", gpgKey, fs.FileMode(0x700)); err != nil {
+			multierr.Append(errs, err)
+		}
+
+		gpgArgs := []string{
+			"--batch",
+			"--import",
+			"--no-default-keyring",
+			"--keyring",
+			c.GpgKeyRing,
+			tmp + "/gpg.key",
+		}
+		if err := utils.ExecLogOutput(utils.Logger, "gpg", time.Minute, gpgArgs...); err != nil {
+			multierr.Append(errs, err)
+		}
+	}
+
+	if errs != nil {
+		return Config{}, nil
+	}
+	return c, nil
 }

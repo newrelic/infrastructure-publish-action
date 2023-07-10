@@ -3,32 +3,13 @@
 package main
 
 import (
-	"fmt"
+	"log"
+	"net/http"
+
 	"github.com/newrelic/infrastructure-publish-action/publisher/config"
 	"github.com/newrelic/infrastructure-publish-action/publisher/download"
 	"github.com/newrelic/infrastructure-publish-action/publisher/lock"
 	"github.com/newrelic/infrastructure-publish-action/publisher/upload"
-	"log"
-	"net/http"
-)
-
-const (
-	defaultLockRetries = 30
-
-	// AWS lock resource tags
-	defaultTagOwningTeam = "CAOS"
-	defaultTagProduct    = "integrations"
-	defaultTagProject    = "infrastructure-publish-action"
-	defaultTagEnv        = "us-development"
-)
-
-var (
-	defaultTags = fmt.Sprintf("department=product&product=%s&project=%s&owning_team=%s&environment=%s",
-		defaultTagProduct,
-		defaultTagProject,
-		defaultTagOwningTeam,
-		defaultTagEnv,
-	)
 )
 
 var (
@@ -36,36 +17,17 @@ var (
 )
 
 func main() {
-	conf := config.LoadConfig()
+	conf, err := config.LoadConfig()
+	if err != nil {
+		l.Fatal(err)
+	}
 
 	var bucketLock lock.BucketLock
 	if conf.DisableLock {
 		bucketLock = lock.NewNoop()
 	} else {
-		if conf.AwsRegion == "" {
-			l.Fatal("missing 'aws_region' value")
-		}
-		if conf.AwsLockBucket == "" {
-			l.Fatal("missing 'aws_s3_lock_bucket_name' value")
-		}
-		if conf.AwsRoleARN == "" {
-			l.Fatal("missing 'aws_role_arn' value")
-		}
-		if conf.RunID == "" {
-			l.Fatal("missing 'run_id' value")
-		}
-
-		if conf.AwsTags == "" {
-			conf.AwsTags = defaultTags
-		}
-
-		if conf.UseDefLockRetries {
-			conf.LockRetries = defaultLockRetries
-		}
 		cfg := lock.NewS3Config(
 			conf.AwsLockBucket,
-			conf.AwsRoleARN,
-			conf.AwsRegion,
 			conf.AwsTags,
 			conf.LockGroup,
 			conf.LockOwner(),
@@ -73,7 +35,7 @@ func main() {
 			lock.DefaultRetryBackoff,
 			lock.DefaultTTL,
 		)
-		var err error
+
 		bucketLock, err = lock.NewS3(cfg, l.Printf)
 		// fail fast when lacking required AWS credentials
 		if err != nil {

@@ -41,7 +41,6 @@ RUN chmod +x /bin/publisher
 
 WORKDIR /home/gha
 ADD schemas ./schemas
-ADD scripts/Makefile .
 ADD scripts/mount-s3.sh .
 RUN chmod +x ./mount-s3.sh
 RUN mkdir ./assets

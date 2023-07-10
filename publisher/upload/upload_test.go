@@ -1,7 +1,6 @@
 package upload
 
 import (
-	"io/ioutil"
 	"os"
 	"path"
 	"sync"
@@ -113,18 +112,26 @@ func TestUploadArtifacts(t *testing.T) {
 		{
 			name: "AppName, arch and app version expansion",
 			schema: []config.UploadArtifactSchema{
-				{"{app_name}-{arch}-{version}.txt", []string{"amd64", "386"}, []config.Upload{
-					{
-						Type: "file",
-						Dest: "{arch}/{app_name}/{src}",
+				{
+					Src:  "{app_name}-{arch}-{version}.txt",
+					Arch: []string{"amd64", "386"},
+					Uploads: []config.Upload{
+						{
+							Type: "file",
+							Dest: "{arch}/{app_name}/{src}",
+						},
 					},
-				}},
-				{"{app_name}-{arch}-{version}.txt", nil, []config.Upload{
-					{
-						Type: "file",
-						Dest: "{arch}/{app_name}/{src}",
+				},
+				{
+					Src:  "{app_name}-{arch}-{version}.txt",
+					Arch: nil,
+					Uploads: []config.Upload{
+						{
+							Type: "file",
+							Dest: "{arch}/{app_name}/{src}",
+						},
 					},
-				}},
+				},
 			},
 			dummyFiles:    []string{"nri-foobar-amd64-2.0.0.txt", "nri-foobar-386-2.0.0.txt"},
 			expectedFiles: []string{"amd64/nri-foobar/nri-foobar-amd64-2.0.0.txt", "386/nri-foobar/nri-foobar-386-2.0.0.txt"},
@@ -132,23 +139,25 @@ func TestUploadArtifacts(t *testing.T) {
 		{
 			name: "AppName, arch, app version and os version expansion",
 			schema: []config.UploadArtifactSchema{
-				{"{app_name}-{version}-1.amazonlinux-{os_version}.{arch}.rpm.sum", []string{"x86_64"}, []config.Upload{
-					{
-						Type:      "file",
-						Dest:      "{arch}/{app_name}/{os_version}/{src}",
-						OsVersion: []string{"2", "2022"},
+				{
+					Src:  "{app_name}-{version}-1.amazonlinux-{os_version}.{arch}.rpm.sum",
+					Arch: []string{"x86_64"},
+					Uploads: []config.Upload{
+						{
+							Type:      "file",
+							Dest:      "{arch}/{app_name}/{os_version}/{src}",
+							OsVersion: []string{"2", "2022"},
+						},
 					},
-				}},
+				},
 			},
 			dummyFiles:    []string{"nri-foobar-2.0.0-1.amazonlinux-2.x86_64.rpm.sum", "nri-foobar-2.0.0-1.amazonlinux-2022.x86_64.rpm.sum"},
 			expectedFiles: []string{"x86_64/nri-foobar/2/nri-foobar-2.0.0-1.amazonlinux-2.x86_64.rpm.sum", "x86_64/nri-foobar/2022/nri-foobar-2.0.0-1.amazonlinux-2022.x86_64.rpm.sum"},
 		},
 	}
 
-	dest, err := ioutil.TempDir("", "")
-	assert.NoError(t, err)
-	src, err := ioutil.TempDir("", "")
-	assert.NoError(t, err)
+	dest := t.TempDir()
+	src := t.TempDir()
 
 	cfg := config.Config{
 		Version:              "2.0.0",
@@ -178,18 +187,26 @@ func TestUploadArtifacts(t *testing.T) {
 
 func TestUploadArtifacts_cantBeRunInParallel(t *testing.T) {
 	schema := []config.UploadArtifactSchema{
-		{"{app_name}-{arch}-{version}.txt", []string{"amd64"}, []config.Upload{
-			{
-				Type: "file",
-				Dest: "{arch}/{app_name}/{src}",
+		{
+			Src:  "{app_name}-{arch}-{version}.txt",
+			Arch: []string{"amd64"},
+			Uploads: []config.Upload{
+				{
+					Type: "file",
+					Dest: "{arch}/{app_name}/{src}",
+				},
 			},
-		}},
-		{"{app_name}-{arch}-{version}.txt", nil, []config.Upload{
-			{
-				Type: "file",
-				Dest: "{arch}/{app_name}/{src}",
+		},
+		{
+			Src:  "{app_name}-{arch}-{version}.txt",
+			Arch: nil,
+			Uploads: []config.Upload{
+				{
+					Type: "file",
+					Dest: "{arch}/{app_name}/{src}",
+				},
 			},
-		}},
+		},
 	}
 
 	dest := os.TempDir()
@@ -240,23 +257,31 @@ func TestUploadArtifacts_errorsIfAnyArchFails(t *testing.T) {
 		{
 			name: "no error uploading file",
 			schema: []config.UploadArtifactSchema{
-				{"{app_name}-{arch}-{version}.txt", []string{"amd64", "386"}, []config.Upload{
-					{
-						Type: "file",
-						Dest: "{arch}/{app_name}/{src}",
+				{
+					Src:  "{app_name}-{arch}-{version}.txt",
+					Arch: []string{"amd64", "386"},
+					Uploads: []config.Upload{
+						{
+							Type: "file",
+							Dest: "{arch}/{app_name}/{src}",
+						},
 					},
-				}},
+				},
 			},
 		},
 		{
 			name: "error uploading file",
 			schema: []config.UploadArtifactSchema{
-				{"{app_name}-{arch}-{version}.txt", []string{"amd64", "NOT_VALID", "386"}, []config.Upload{
-					{
-						Type: "file",
-						Dest: "{arch}/{app_name}/{src}",
+				{
+					Src:  "{app_name}-{arch}-{version}.txt",
+					Arch: []string{"amd64", "NOT_VALID", "386"},
+					Uploads: []config.Upload{
+						{
+							Type: "file",
+							Dest: "{arch}/{app_name}/{src}",
+						},
 					},
-				}},
+				},
 			},
 			expectsError: true,
 		},

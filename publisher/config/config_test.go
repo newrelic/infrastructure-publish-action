@@ -1,9 +1,10 @@
 package config
 
 import (
-	"github.com/stretchr/testify/assert"
 	"os"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func Test_parseAccessPointHost(t *testing.T) {
@@ -41,13 +42,14 @@ func Test_loadConfig(t *testing.T) {
 				"TAG": "vFooBar",
 			},
 			want: Config{
-				Tag:               "vFooBar",
-				Version:           "FooBar",
-				AccessPointHost:   accessPointProduction,
-				MirrorHost:        mirrorProduction,
-				AptlyFolder:       defaultAptlyFolder,
-				LockGroup:         defaultLockgroup,
-				UseDefLockRetries: true,
+				Tag:             "vFooBar",
+				Version:         "FooBar",
+				AccessPointHost: accessPointProduction,
+				MirrorHost:      mirrorProduction,
+				AptlyFolder:     defaultAptlyFolder,
+				LockGroup:       defaultLockgroup,
+				AwsTags:         defaultTags,
+				LockRetries:     defaultLockRetries,
 			},
 		},
 		{
@@ -61,13 +63,13 @@ func Test_loadConfig(t *testing.T) {
 				"LOCK_RETRIES":      "false",
 			},
 			want: Config{
-				Tag:               "vFooBar",
-				Version:           "Baz",
-				AccessPointHost:   "FooAPH",
-				MirrorHost:        "FooAPH",
-				AptlyFolder:       "FooFolder",
-				LockGroup:         "FooGroup",
-				UseDefLockRetries: false,
+				Tag:             "vFooBar",
+				Version:         "Baz",
+				AccessPointHost: "FooAPH",
+				MirrorHost:      "FooAPH",
+				AptlyFolder:     "FooFolder",
+				LockGroup:       "FooGroup",
+				AwsTags:         defaultTags,
 			},
 		},
 	}
@@ -76,7 +78,9 @@ func Test_loadConfig(t *testing.T) {
 			for k, v := range tt.env {
 				os.Setenv(k, v)
 			}
-			assert.Equal(t, tt.want, LoadConfig(), "Case failed:", tt.name, tt.env)
+			c, err := LoadConfig()
+			assert.Equal(t, tt.want, c, "Case failed:", tt.name, tt.env)
+			assert.NoError(t, err)
 		})
 	}
 }

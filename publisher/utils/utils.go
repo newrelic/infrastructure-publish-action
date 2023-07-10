@@ -26,11 +26,11 @@ const (
 	PlaceholderForAccessPointHost = "{access_point_host}"
 
 	s3RetrySleepTimeout = 3 * time.Second
-	s3Retries = 10
+	s3Retries           = 10
 )
 
 var (
-	Logger           = log.New(log.Writer(), "", 0)
+	Logger = log.New(log.Writer(), "", 0)
 )
 
 func ReadFileContent(filePath string) ([]byte, error) {
@@ -111,7 +111,7 @@ func CopyFile(srcPath string, destPath string, override bool, commandTimeout tim
 
 	Logger.Println("[ ] Create " + destDirectory)
 
-	if err = ExecWithRetries(s3Retries, S3RemountFn,  Logger, "mkdir", commandTimeout,"-p", destDirectory); err != nil {
+	if err = ExecWithRetries(s3Retries, S3RemountFn, Logger, "mkdir", commandTimeout, "-p", destDirectory); err != nil {
 		return err
 	}
 
@@ -120,10 +120,10 @@ func CopyFile(srcPath string, destPath string, override bool, commandTimeout tim
 	Logger.Println("[ ] Copy " + srcPath + " into " + destPath)
 
 	if override {
-		if err = ExecWithRetries(s3Retries, S3RemountFn,  Logger, "cp", commandTimeout,"-f", srcPath, destPath); err != nil {
+		if err = ExecWithRetries(s3Retries, S3RemountFn, Logger, "cp", commandTimeout, "-f", srcPath, destPath); err != nil {
 			return err
 		}
-	}else{
+	} else {
 		// Note: we are not doing retries here as this command is not
 		// idempotent. If one copy fails, retry will skip and leave corrupted
 		// file in the repo
@@ -154,7 +154,7 @@ func ExecWithRetries(retries int, s3Remount RetryCallback, l *log.Logger, cmdNam
 type RetryCallback func(l *log.Logger, commandTimeout time.Duration)
 
 func S3RemountFn(l *log.Logger, commandTimeout time.Duration) {
-	err := ExecLogOutput(l, "make", commandTimeout ,"unmount-s3")
+	err := ExecLogOutput(l, "make", commandTimeout, "unmount-s3")
 	if err != nil {
 		l.Printf("unmounting s3 failed %v", err)
 	}

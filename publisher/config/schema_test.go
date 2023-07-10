@@ -2,9 +2,10 @@ package config
 
 import (
 	"errors"
-	"github.com/stretchr/testify/assert"
 	"log"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 const (
@@ -128,6 +129,7 @@ func TestSchema(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			uploadSchema, err := ParseUploadSchemasFile(tt.schemaPath)

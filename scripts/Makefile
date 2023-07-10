@@ -64,15 +64,12 @@ mount-s3-check: mount-s3
 	@mount |grep $(AWS_S3_MOUNT_DIRECTORY)
 
 DEST_PREFIX ?= "infrastructure_agent/"
-publish-artifacts: import-GPG-key mount-s3-check
+publish-artifacts: mount-s3-check
 	@echo "Publish artifacts"
 	@UPLOAD_SCHEMA_FILE_PATH=$(UPLOAD_SCHEMA_FILE_PATH) DEST_PREFIX=$(DEST_PREFIX) /bin/publisher
 
 unmount-s3:
 	@echo "Unmounting S3..."
 	@umount $(AWS_S3_MOUNT_DIRECTORY)
-
-import-GPG-key:
-	@printf %s $(GPG_PRIVATE_KEY_BASE64) | base64 --decode | gpg --batch --import --no-default-keyring --keyring $(GPG_KEY_RING) -
 
 .PHONY: mount-s3 mount-s3-check publish-artifacts prepare-schema unmount-s3 import-GPG-key

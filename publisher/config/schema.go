@@ -2,11 +2,12 @@ package config
 
 import (
 	"fmt"
+	"os"
+
 	"gopkg.in/yaml.v2"
-	"io/ioutil"
 )
 
-//Errors
+// Errors
 const (
 	noDestinationError = "no uploads were provided for the schema"
 )
@@ -31,7 +32,7 @@ type UploadArtifactSchemas []UploadArtifactSchema
 // config struct
 func ParseUploadSchemasFile(cfgPath string) (UploadArtifactSchemas, error) {
 
-	uploadSchemaContent, err := ioutil.ReadFile(cfgPath)
+	uploadSchemaContent, err := os.ReadFile(cfgPath)
 	if err != nil {
 		return nil, err
 	}

@@ -1,11 +1,15 @@
 #!/bin/bash
-set -e
+set -euo pipefail
+
 # build docker image form Dockerfile
 echo "Build fresh docker image for newrelic/infrastructure-publish-action"
-# @TODO add --no-cache
-docker build --platform linux/amd64 -t newrelic/infrastructure-publish-action -f $GITHUB_ACTION_PATH/Dockerfile $GITHUB_ACTION_PATH
 
-if [ "${CI}" = "true" ]; then
+# Enable debug
+set -x
+
+docker build --platform linux/amd64 -t newrelic/infrastructure-publish-action -f ${GITHUB_ACTION_PATH:=$PWD}/Dockerfile $GITHUB_ACTION_PATH
+
+if [ "${CI:=false}" = "true" ]; then
   # avoid container network errors in GHA runners
   set +e
   echo "Creating iptables rule to drop invalid packages"

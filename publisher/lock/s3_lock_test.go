@@ -1,5 +1,6 @@
 // Copyright 2021 New Relic Corporation. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
+//go:build ci
 // +build ci
 
 package lock
@@ -14,9 +15,7 @@ import (
 
 // AWS testing config
 const (
-	roleARN = "arn:aws:iam::017663287629:role/caos_testing"
-	bucket  = "onhost-ci-lock-testing"
-	region  = "us-east-1"
+	bucket = "onhost-ci-lock-testing"
 )
 
 func TestNewS3(t *testing.T) {
@@ -97,5 +96,5 @@ func TestS3_retry(t *testing.T) {
 }
 
 func newTestConf(lockgroup, owner string) S3Config {
-	return NewS3Config(bucket, roleARN, region, "", lockgroup, owner, 0, DefaultRetryBackoff, DefaultTTL)
+	return NewS3Config(bucket, "", lockgroup, owner, 0, DefaultRetryBackoff, DefaultTTL)
 }

@@ -11,7 +11,7 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
-	"github.com/aws/aws-sdk-go/aws/credentials/stscreds"
+	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
 )
@@ -19,8 +19,6 @@ import (
 // S3Config S3 lock config DTO.
 type S3Config struct {
 	Bucket       string
-	RoleARN      string
-	Region       string
 	Tags         string
 	Filepath     string
 	Owner        string
@@ -54,11 +52,9 @@ func (l *lockData) isExpired(ttl time.Duration, t time.Time) bool {
 	return l.CreatedAt.Add(ttl).Before(t)
 }
 
-func NewS3Config(bucketName, roleARN, awsRegion, tags, lockGroup, owner string, maxRetries uint, retryBackoff, ttl time.Duration) S3Config {
+func NewS3Config(bucketName, tags, lockGroup, owner string, maxRetries uint, retryBackoff, ttl time.Duration) S3Config {
 	return S3Config{
 		Bucket:       bucketName,
-		RoleARN:      roleARN,
-		Region:       awsRegion,
 		Tags:         tags,
 		Filepath:     lockGroup,
 		Owner:        owner,
@@ -70,15 +66,16 @@ func NewS3Config(bucketName, roleARN, awsRegion, tags, lockGroup, owner string, 
 
 // NewS3 creates a lock instance ready to be used validating required AWS credentials.
 func NewS3(c S3Config, logfn Logf) (*S3, error) {
-	sess, err := session.NewSession()
+	sess, err := session.NewSessionWithOptions(session.Options{
+		SharedConfigState: session.SharedConfigEnable,
+	})
 	if err != nil {
 		return nil, err
 	}
 
-	creds := stscreds.NewCredentials(sess, c.RoleARN, func(p *stscreds.AssumeRoleProvider) {})
+	creds := credentials.NewSharedCredentials("", "") // Default file and default profile
 	awsCfg := aws.Config{
 		Credentials: creds,
-		Region:      aws.String(c.Region),
 	}
 
 	return &S3{
