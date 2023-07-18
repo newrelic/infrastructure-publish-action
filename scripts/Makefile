@@ -1,7 +1,7 @@
 SHELL := /bin/bash
 WORKDIR := /home/gha
 
-default: check-env mount-s3 mount-s3-check prepare-schema import-GPG-key publish-artifacts unmount-s3
+default: check-env mount-s3 mount-s3-check prepare-schema import-GPG-key publish-artifacts unmount-s3 log-space
 
 check-env:
 ifndef GPG_PRIVATE_KEY_BASE64
@@ -75,4 +75,10 @@ unmount-s3:
 import-GPG-key:
 	@printf %s $(GPG_PRIVATE_KEY_BASE64) | base64 --decode | gpg --batch --import --no-default-keyring --keyring $(GPG_KEY_RING) -
 
-.PHONY: mount-s3 mount-s3-check publish-artifacts prepare-schema unmount-s3 import-GPG-key
+log-space:
+	# Verifying how much space is still available
+	@echo "After running the upload command this is the current status"
+	@df -ih
+	@df -h
+
+.PHONY: mount-s3 mount-s3-check publish-artifacts prepare-schema unmount-s3 import-GPG-key log-space

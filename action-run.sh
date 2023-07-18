@@ -64,8 +64,3 @@ docker run --platform linux/amd64 --rm \
         -e APT_SKIP_MIRROR \
         newrelic/infrastructure-publish-action \
         "$@"
-
-# Verifying how much space is still available
-echo "After running the upload command this is the current status"
-df -ih
-df -h
