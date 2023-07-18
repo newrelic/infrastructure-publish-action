@@ -16,10 +16,12 @@ fi
 
 ## Freeing space since 14GB are not enough anymore
 df -ih
+df -h
 if [ "${CI}" = "true" ]; then
   echo "Deleting android, dotnet, haskell, CodeQL, Python, swift to free up space"
   sudo rm -rf /usr/local/lib/android /usr/share/dotnet /usr/local/.ghcup /opt/hostedtoolcache/CodeQL /opt/hostedtoolcache/Python /usr/share/swift
   df -ih
+  df -h
 fi
 
 
@@ -66,3 +68,4 @@ docker run --platform linux/amd64 --rm \
 # Verifying how much space is still available
 echo "After running the upload command this is the current status"
 df -ih
+df -h
