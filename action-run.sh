@@ -14,6 +14,17 @@ if [ "${CI}" = "true" ]; then
   set -e
 fi
 
+## Freeing space since 14GB are not enough anymore
+df -ih
+df -h
+if [ "${CI}" = "true" ]; then
+  echo "Deleting android, dotnet, haskell, CodeQL, Python, swift to free up space"
+  sudo rm -rf /usr/local/lib/android /usr/share/dotnet /usr/local/.ghcup /opt/hostedtoolcache/CodeQL /opt/hostedtoolcache/Python /usr/share/swift
+  df -ih
+  df -h
+fi
+
+
 # run docker container to perform all actions inside.
 # $( pwd ) is mounted on /srv to enable grabbing packages
 # from the host machine instead of downloading them from GH,
@@ -53,3 +64,8 @@ docker run --platform linux/amd64 --rm \
         -e APT_SKIP_MIRROR \
         newrelic/infrastructure-publish-action \
         "$@"
+
+# Verifying how much space is still available
+echo "After running the upload command this is the current status"
+df -ih
+df -h
