@@ -76,8 +76,7 @@ import-GPG-key:
 	@printf %s $(GPG_PRIVATE_KEY_BASE64) | base64 --decode | gpg --batch --import --no-default-keyring --keyring $(GPG_KEY_RING) -
 
 log-space:
-	# Verifying how much space is still available
-	@echo "After running the upload command this is the current status"
+	@echo "Printing storage/inodes information"
 	@df -ih
 	@df -h
 
