@@ -15,8 +15,8 @@ if [ "${CI}" = "true" ]; then
 fi
 
 ## Freeing space since 14GB are not enough anymore
+df -ih
 if [ "${CI}" = "true" ]; then
-  df -ih
   echo "Deleting android, dotnet, haskell, CodeQL, Python, swift to free up space"
   sudo rm -rf /usr/local/lib/android /usr/share/dotnet /usr/local/.ghcup /opt/hostedtoolcache/CodeQL /opt/hostedtoolcache/Python /usr/share/swift
   df -ih
