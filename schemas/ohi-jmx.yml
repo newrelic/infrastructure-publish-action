@@ -48,6 +48,7 @@
         - groovy
         - hirsute
         - bullseye
+        - bookworm
 
 - src: "{app_name}-{version}-1.{arch}.rpm"
   arch:
