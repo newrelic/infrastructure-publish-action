@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/newrelic/infrastructure-publish-action/publisher/config"
 	"github.com/newrelic/infrastructure-publish-action/publisher/download"
+	"github.com/newrelic/infrastructure-publish-action/publisher/fastly"
 	"github.com/newrelic/infrastructure-publish-action/publisher/lock"
 	"github.com/newrelic/infrastructure-publish-action/publisher/upload"
 	"log"
@@ -97,9 +98,40 @@ func main() {
 		conf.ArtifactsSrcFolder = conf.LocalPackagesPath
 	}
 
-	err = upload.UploadArtifacts(conf, uploadSchemas, bucketLock)
+	if err = bucketLock.Lock(); err != nil {
+		return
+	}
+	defer func() {
+		errRelease := bucketLock.Release()
+		if err == nil {
+			err = errRelease
+		} else if errRelease != nil {
+			err = fmt.Errorf("got 2 errors: uploading: \"%v\", releasing lock: \"%v\"", err, errRelease)
+		}
+		return
+	}()
+
+	err = upload.UploadArtifacts(conf, uploadSchemas)
 	if err != nil {
 		l.Fatal(err)
 	}
 	l.Println("🎉 upload phase complete")
+
+	if conf.FastlyApiKey != "" {
+		err = fastly.PurgeCache(
+			conf.FastlyApiKey,
+			conf.FastlyPurgeTag,
+			conf.FastlyAwsBucket,
+			conf.FastlyAwsRegion,
+			conf.FastlyAwsAttempts,
+			conf.FastlyTimeoutS3,
+			conf.FastlyTimeoutCDN,
+			l)
+
+		if err != nil {
+			l.Printf("❌ Fastly cache cleaning failed, retry manually.\n%s\n", err.Error())
+		} else {
+			l.Println("🧹 Fastly cache cleaned")
+		}
+	}
 }
