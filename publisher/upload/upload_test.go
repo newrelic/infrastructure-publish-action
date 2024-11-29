@@ -1,16 +1,12 @@
 package upload
 
 import (
+	"github.com/newrelic/infrastructure-publish-action/publisher/config"
+	"github.com/stretchr/testify/assert"
 	"io/ioutil"
 	"os"
 	"path"
-	"sync"
 	"testing"
-	"time"
-
-	"github.com/newrelic/infrastructure-publish-action/publisher/config"
-	"github.com/newrelic/infrastructure-publish-action/publisher/lock"
-	"github.com/stretchr/testify/assert"
 )
 
 func TestReplacePlaceholders(t *testing.T) {
@@ -164,7 +160,7 @@ func TestUploadArtifacts(t *testing.T) {
 				err := writeDummyFile(path.Join(src, dummyFile))
 				assert.NoError(t, err)
 			}
-			err := UploadArtifacts(cfg, artifact.schema, lock.NewInMemory())
+			err := UploadArtifacts(cfg, artifact.schema)
 			assert.NoError(t, err)
 
 			for _, expectedFile := range artifact.expectedFiles {
@@ -174,61 +170,6 @@ func TestUploadArtifacts(t *testing.T) {
 		})
 	}
 
-}
-
-func TestUploadArtifacts_cantBeRunInParallel(t *testing.T) {
-	schema := []config.UploadArtifactSchema{
-		{"{app_name}-{arch}-{version}.txt", []string{"amd64"}, []config.Upload{
-			{
-				Type: "file",
-				Dest: "{arch}/{app_name}/{src}",
-			},
-		}},
-		{"{app_name}-{arch}-{version}.txt", nil, []config.Upload{
-			{
-				Type: "file",
-				Dest: "{arch}/{app_name}/{src}",
-			},
-		}},
-	}
-
-	dest := os.TempDir()
-	src := os.TempDir()
-	cfg := config.Config{
-		Version:              "2.0.0",
-		ArtifactsDestFolder:  dest,
-		ArtifactsSrcFolder:   src,
-		UploadSchemaFilePath: "",
-		AppName:              "nri-foobar",
-	}
-
-	err := writeDummyFile(path.Join(src, "nri-foobar-amd64-2.0.0.txt"))
-	assert.NoError(t, err)
-
-	ready := make(chan struct{})
-	wg := sync.WaitGroup{}
-	wg.Add(2)
-	var err1, err2 error
-	l := lock.NewInMemory()
-	go func() {
-		<-ready
-		err1 = UploadArtifacts(cfg, schema, l)
-		wg.Done()
-	}()
-	go func() {
-		<-ready
-		time.Sleep(1 * time.Millisecond)
-		err2 = UploadArtifacts(cfg, schema, l)
-		wg.Done()
-	}()
-
-	close(ready)
-	wg.Wait()
-	assert.NoError(t, err1)
-	assert.Equal(t, lock.ErrLockBusy, err2, "2nd upload should fail because, 1st one got the lock")
-
-	_, err = os.Stat(path.Join(dest, "amd64/nri-foobar/nri-foobar-amd64-2.0.0.txt"))
-	assert.NoError(t, err)
 }
 
 func TestUploadArtifacts_errorsIfAnyArchFails(t *testing.T) {
@@ -279,7 +220,7 @@ func TestUploadArtifacts_errorsIfAnyArchFails(t *testing.T) {
 			err = writeDummyFile(path.Join(src, "nri-foobar-386-2.0.0.txt"))
 			assert.NoError(t, err)
 
-			err = UploadArtifacts(cfg, tc.schema, lock.NewNoop())
+			err = UploadArtifacts(cfg, tc.schema)
 			if tc.expectsError {
 				assert.Error(t, err)
 			} else {
