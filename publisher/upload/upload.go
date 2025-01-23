@@ -242,6 +242,7 @@ func uploadApt(conf config.Config, srcTemplate string, upload config.Upload, arc
 
 			srcPath := path.Join(conf.ArtifactsSrcFolder, fileName)
 			destPath = path.Join(conf.ArtifactsDestFolder, dest, aptDists)
+			// path where the package will be located expected by aplty (write metadata with this path)
 			filePath := path.Join(conf.ArtifactsDestFolder, dest, aptPoolMain, string(fileName[0]), "/", conf.AppName, fileName)
 
 			utils.Logger.Printf("[ ] Add package %s into deb repo for %s/%s", srcPath, osVersion, arch)

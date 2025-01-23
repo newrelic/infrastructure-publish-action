@@ -2,8 +2,9 @@ package config
 
 import (
 	"fmt"
-	"github.com/spf13/viper"
 	"strings"
+
+	"github.com/spf13/viper"
 )
 
 const (
@@ -19,6 +20,8 @@ const (
 	placeholderAccessPointTesting    = "testing"
 	placeholderAccessPointProduction = "production"
 )
+
+var ErrMissingConfig = fmt.Errorf("missing required config")
 
 type Config struct {
 	DestPrefix           string
@@ -70,7 +73,7 @@ func parseAccessPointHost(accessPointHost string) (string, string) {
 	}
 }
 
-func LoadConfig() Config {
+func LoadConfig() (Config, error) {
 	// TODO: make all the config required
 	viper.BindEnv("repo_name")
 	viper.BindEnv("app_name")
@@ -94,6 +97,10 @@ func LoadConfig() Config {
 	viper.BindEnv("lock_group")
 	viper.BindEnv("local_packages_path")
 	viper.BindEnv("apt_skip_mirror")
+
+	if viper.GetString("app_name") == "" {
+		return Config{}, fmt.Errorf("%w: app_name", ErrMissingConfig)
+	}
 
 	aptlyF := viper.GetString("aptly_folder")
 	if aptlyF == "" {
@@ -137,5 +144,5 @@ func LoadConfig() Config {
 		LocalPackagesPath:    viper.GetString("local_packages_path"),
 		UseDefLockRetries:    !viper.IsSet("lock_retries"),     // when non set: use default value
 		AptSkipMirror:        viper.GetBool("apt_skip_mirror"), // when non set: use default value
-	}
+	}, nil
 }
