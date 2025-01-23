@@ -1,9 +1,10 @@
 package config
 
 import (
-	"github.com/stretchr/testify/assert"
 	"os"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func Test_parseAccessPointHost(t *testing.T) {
@@ -28,7 +29,10 @@ func Test_parseAccessPointHost(t *testing.T) {
 		})
 	}
 }
-
+func Test_requiredValues(t *testing.T) {
+	_, err := LoadConfig()
+	assert.ErrorIs(t, err, ErrMissingConfig)
+}
 func Test_loadConfig(t *testing.T) {
 	tests := []struct {
 		name string
@@ -38,9 +42,11 @@ func Test_loadConfig(t *testing.T) {
 		{
 			name: "defaults are applied",
 			env: map[string]string{
-				"TAG": "vFooBar",
+				"APP_NAME": "foo",
+				"TAG":      "vFooBar",
 			},
 			want: Config{
+				AppName:           "foo",
 				Tag:               "vFooBar",
 				Version:           "FooBar",
 				AccessPointHost:   accessPointProduction,
@@ -54,6 +60,7 @@ func Test_loadConfig(t *testing.T) {
 			name: "custom values",
 			env: map[string]string{
 				"TAG":               "vFooBar",
+				"APP_NAME":          "foo",
 				"APP_VERSION":       "Baz",
 				"APTLY_FOLDER":      "FooFolder",
 				"LOCK_GROUP":        "FooGroup",
@@ -61,6 +68,7 @@ func Test_loadConfig(t *testing.T) {
 				"LOCK_RETRIES":      "false",
 			},
 			want: Config{
+				AppName:           "foo",
 				Tag:               "vFooBar",
 				Version:           "Baz",
 				AccessPointHost:   "FooAPH",
@@ -76,7 +84,9 @@ func Test_loadConfig(t *testing.T) {
 			for k, v := range tt.env {
 				os.Setenv(k, v)
 			}
-			assert.Equal(t, tt.want, LoadConfig(), "Case failed:", tt.name, tt.env)
+			config, err := LoadConfig()
+			assert.NoError(t, err)
+			assert.Equal(t, tt.want, config, "Case failed:", tt.name, tt.env)
 		})
 	}
 }

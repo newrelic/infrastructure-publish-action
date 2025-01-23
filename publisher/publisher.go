@@ -4,12 +4,13 @@ package main
 
 import (
 	"fmt"
+	"log"
+	"net/http"
+
 	"github.com/newrelic/infrastructure-publish-action/publisher/config"
 	"github.com/newrelic/infrastructure-publish-action/publisher/download"
 	"github.com/newrelic/infrastructure-publish-action/publisher/lock"
 	"github.com/newrelic/infrastructure-publish-action/publisher/upload"
-	"log"
-	"net/http"
 )
 
 const (
@@ -36,7 +37,10 @@ var (
 )
 
 func main() {
-	conf := config.LoadConfig()
+	conf, err := config.LoadConfig()
+	if err != nil {
+		l.Fatal("loading config: " + err.Error())
+	}
 
 	var bucketLock lock.BucketLock
 	if conf.DisableLock {

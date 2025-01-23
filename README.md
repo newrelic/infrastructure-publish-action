@@ -101,10 +101,14 @@ jobs:
           gpg_private_key_base64: ${{ env.GPG_PRIVATE_KEY_BASE64 }}
 ```
 
-## Consistency
+## Consistency (lock)
 
 As GitHub Actions can run many workflows in parallel, once a publish-action is called it execute a lock mechanism in S3 to avoid conflicts. 
 In the current implementation only one publish action with the same lock will be executed, all other concurrent jobs will be terminated by the lock file check.
+
+The locking mechanism is based on the existance of a file in a defined `aws_s3_lock_bucket_name`. The file contains the `tag` and time of the lock creation.
+
+NOTE: Currently in case of an interrupted job, the lock file will not be removed and it would be necessary to remove it manually from the bucket.
 
 ## Support
 
