@@ -346,9 +346,10 @@ func mirrorAPTRepo(conf config.Config, repoUrl string, osVersion string) (err er
 	utils.Logger.Printf("[✔] Mirror create succesfully APT repo for %s", osVersion)
 
 	utils.Logger.Printf("[ ] Mirror update APT repo for %s", osVersion)
-	if err = utils.ExecLogOutput(utils.Logger, "aptly", commandTimeout, "mirror", "update", "-max-tries", strconv.Itoa(s3Retries), "-keyring", conf.GpgKeyRing, "mirror-"+osVersion); err != nil {
+	if err = utils.ExecWithRetries(s3Retries, utils.S3RemountFn, utils.Logger, "aptly", commandTimeout, "mirror", "update", "-max-tries", strconv.Itoa(s3Retries), "-keyring", conf.GpgKeyRing, "mirror-"+osVersion); err != nil {
 		return err
 	}
+
 	utils.Logger.Printf("[✔] Mirror update succesfully APT repo for %s", osVersion)
 
 	// The last parameter is `Name` that means a query matches all the packages (as it means “package name is not empty”).
