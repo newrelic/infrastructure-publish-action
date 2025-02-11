@@ -89,6 +89,10 @@ func main() {
 	if err != nil {
 		l.Fatal(err)
 	}
+	// validate schemas
+	if err = config.ValidateSchemas(conf.AppName, uploadSchemas); err != nil {
+		l.Fatal(err)
+	}
 
 	if conf.LocalPackagesPath == "" {
 		d := download.NewDownloader(http.DefaultClient)
