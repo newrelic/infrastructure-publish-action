@@ -1,6 +1,7 @@
 package config
 
 import (
+	"errors"
 	"fmt"
 	"gopkg.in/yaml.v2"
 	"io/ioutil"
@@ -18,6 +19,12 @@ const (
 )
 
 var fileTypes = []string{TypeFile, TypeZypp, TypeYum, TypeApt}
+
+// Define specific error types
+var (
+	ErrInvalidAppName = errors.New("invalid app name")
+	ErrInvalidType    = errors.New("invalid upload type")
+)
 
 type UploadArtifactSchema struct {
 	Src     string   `yaml:"src"`
@@ -82,27 +89,34 @@ func parseUploadSchema(fileContent []byte) (UploadArtifactSchemas, error) {
 //     which will break the apt repository as you'll receive a 404 when trying to install the package.
 func ValidateSchemas(appName string, schemas UploadArtifactSchemas) error {
 	for _, schema := range schemas {
-		if !isValidAppName(appName, schema) {
-			return fmt.Errorf("invalid app name: %s", appName)
+		if err := validateName(appName, schema.Src); err != nil {
+			return fmt.Errorf("invalid app name %s for schema %s: %w", appName, schema.Src, err)
 		}
 		for _, upload := range schema.Uploads {
-			if !isValidType(upload.Type) {
-				return fmt.Errorf("invalid upload type: %s", upload.Type)
+			if err := validateType(upload.Type); err != nil {
+				return fmt.Errorf("invalid uploadType %s for schema %s err: %w", upload.Type, schema.Src, err)
 			}
 		}
 	}
 	return nil
 }
 
-func isValidType(uploadType string) bool {
+// validateType checks if the upload type is in the list of valid types fileTypes
+func validateType(uploadType string) error {
 	for _, validType := range fileTypes {
 		if uploadType == validType {
-			return true
+			return nil
 		}
 	}
-	return false
+	return fmt.Errorf("%w: '%s' (valid types: %s)", ErrInvalidType, uploadType, strings.Join(fileTypes, ", "))
 }
 
-func isValidAppName(appName string, schemas UploadArtifactSchema) bool {
-	return strings.HasPrefix(schemas.Src, appName)
+func validateName(appName string, src string) error {
+	if appName == "" {
+		return fmt.Errorf("%w: appName cannot be empty", ErrInvalidAppName)
+	}
+	if !strings.HasPrefix(src, appName) {
+		return fmt.Errorf("%w: %s should prefix %s", ErrInvalidAppName, appName, src)
+	}
+	return nil
 }
