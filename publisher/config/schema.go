@@ -3,6 +3,7 @@ package config
 import (
 	"errors"
 	"fmt"
+	"github.com/newrelic/infrastructure-publish-action/publisher/utils"
 	"gopkg.in/yaml.v2"
 	"io/ioutil"
 	"strings"
@@ -114,6 +115,9 @@ func validateType(uploadType string) error {
 func validateName(appName string, src string) error {
 	if appName == "" {
 		return fmt.Errorf("%w: appName cannot be empty", ErrInvalidAppName)
+	}
+	if strings.HasPrefix(src, utils.PlaceholderForAppName) {
+		return nil
 	}
 	if !strings.HasPrefix(src, appName) {
 		return fmt.Errorf("%w: %s should prefix %s", ErrInvalidAppName, appName, src)
