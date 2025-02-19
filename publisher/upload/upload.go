@@ -18,11 +18,6 @@ import (
 )
 
 const (
-	//FileTypes
-	typeFile         = "file"
-	typeZypp         = "zypp"
-	typeYum          = "yum"
-	typeApt          = "apt"
 	repodataRpmPath  = "/repodata/repomd.xml"
 	signatureRpmPath = "/repodata/repomd.xml.asc"
 	aptPoolMain      = "pool/main/"
@@ -33,7 +28,7 @@ const (
 )
 
 func uploadArtifact(conf config.Config, schema config.UploadArtifactSchema, upload config.Upload) (err error) {
-	if upload.Type == typeFile {
+	if upload.Type == config.TypeFile {
 		utils.Logger.Println("Uploading file artifact")
 		for _, arch := range schema.Arch {
 			if len(upload.OsVersion) == 0 {
@@ -50,7 +45,7 @@ func uploadArtifact(conf config.Config, schema config.UploadArtifactSchema, uplo
 				}
 			}
 		}
-	} else if upload.Type == typeYum || upload.Type == typeZypp {
+	} else if upload.Type == config.TypeYum || upload.Type == config.TypeZypp {
 		utils.Logger.Println("Uploading rpm as yum or zypp")
 		for _, arch := range schema.Arch {
 			err = uploadRpm(conf, schema.Src, upload, arch)
@@ -58,7 +53,7 @@ func uploadArtifact(conf config.Config, schema config.UploadArtifactSchema, uplo
 				return err
 			}
 		}
-	} else if upload.Type == typeApt {
+	} else if upload.Type == config.TypeApt {
 		utils.Logger.Println("Uploading apt")
 		err = uploadApt(conf, schema.Src, upload, schema.Arch)
 		if err != nil {
