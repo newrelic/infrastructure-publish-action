@@ -146,6 +146,7 @@ func TestValidateSchemas(t *testing.T) {
 		schemas       UploadArtifactSchemas
 		expectedError error
 	}{
+		{name: "valid app name with placeholder", appName: "some-app-name", schemas: UploadArtifactSchemas{{Src: "{app_name}_linux_{version}_{arch}.deb", Uploads: []Upload{{Type: TypeApt}}}}, expectedError: nil},
 		{name: "valid app name with pkg suffix", appName: "some-app-name", schemas: UploadArtifactSchemas{{Src: "some-app-name_some_suffix_0.0.1_amd64.deb", Uploads: []Upload{{Type: TypeApt}}}}, expectedError: nil},
 		{name: "valid app name exactly as pkg name", appName: "some-app-name", schemas: UploadArtifactSchemas{{Src: "some-app-name_0.0.1_amd64.deb", Uploads: []Upload{{Type: TypeApt}}}}, expectedError: nil},
 		{name: "invalid app name", appName: "some-app-name", schemas: UploadArtifactSchemas{{Src: "some-other-name_0.0.1_amd64.deb", Uploads: []Upload{{Type: TypeFile}}}}, expectedError: ErrInvalidAppName},
