@@ -2,6 +2,7 @@ package upload
 
 import (
 	"fmt"
+	"github.com/newrelic/infrastructure-publish-action/publisher/release"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -64,11 +65,22 @@ func uploadArtifact(conf config.Config, schema config.UploadArtifactSchema, uplo
 	return nil
 }
 
-func UploadArtifacts(conf config.Config, schema config.UploadArtifactSchemas, bucketLock lock.BucketLock) (err error) {
+func UploadArtifacts(conf config.Config, schema config.UploadArtifactSchemas, bucketLock lock.BucketLock, releaseMarker release.Marker) (err error) {
 	if err = bucketLock.Lock(); err != nil {
 		return
 	}
+	// Write the release marker
+	mark, err := releaseMarker.Start(conf.AppName, conf.Tag, conf.RunID, conf.RepoName, conf.Schema, conf.SchemaURL)
+	if err != nil {
+		return fmt.Errorf("cannot start release marker: %w", err)
+	}
+
 	defer func() {
+		markerErr := releaseMarker.End(mark)
+		if markerErr != nil {
+			utils.Logger.Printf("ERROR: cannot end release marker %v", markerErr)
+		}
+
 		errRelease := bucketLock.Release()
 		if err == nil {
 			err = errRelease

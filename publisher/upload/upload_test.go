@@ -1,6 +1,9 @@
 package upload
 
 import (
+	"errors"
+	"github.com/newrelic/infrastructure-publish-action/publisher/release"
+	"github.com/stretchr/testify/mock"
 	"io/ioutil"
 	"os"
 	"path"
@@ -164,7 +167,13 @@ func TestUploadArtifacts(t *testing.T) {
 				err := writeDummyFile(path.Join(src, dummyFile))
 				assert.NoError(t, err)
 			}
-			err := UploadArtifacts(cfg, artifact.schema, lock.NewInMemory())
+
+			marker := &MarkerMock{}
+			mark := release.Mark{}
+			marker.ShouldStart(cfg.AppName, cfg.Tag, cfg.RunID, cfg.RepoName, cfg.Schema, cfg.SchemaURL, mark)
+			marker.ShouldEnd(mark)
+
+			err := UploadArtifacts(cfg, artifact.schema, lock.NewInMemory(), marker)
 			assert.NoError(t, err)
 
 			for _, expectedFile := range artifact.expectedFiles {
@@ -174,6 +183,131 @@ func TestUploadArtifacts(t *testing.T) {
 		})
 	}
 
+}
+
+func TestUploadArtifactsShouldFailIfMarkerCannotBeStarted(t *testing.T) {
+	var testArtifacts = []struct {
+		name          string
+		schema        []config.UploadArtifactSchema
+		dummyFiles    []string
+		expectedFiles []string
+	}{
+		{
+			name: "AppName, arch and app version expansion",
+			schema: []config.UploadArtifactSchema{
+				{"{app_name}-{arch}-{version}.txt", []string{"amd64", "386"}, []config.Upload{
+					{
+						Type: "file",
+						Dest: "{arch}/{app_name}/{src}",
+					},
+				}},
+				{"{app_name}-{arch}-{version}.txt", nil, []config.Upload{
+					{
+						Type: "file",
+						Dest: "{arch}/{app_name}/{src}",
+					},
+				}},
+			},
+			dummyFiles:    []string{"nri-foobar-amd64-2.0.0.txt", "nri-foobar-386-2.0.0.txt"},
+			expectedFiles: []string{"amd64/nri-foobar/nri-foobar-amd64-2.0.0.txt", "386/nri-foobar/nri-foobar-386-2.0.0.txt"},
+		},
+	}
+
+	cfg := config.Config{
+		Version:              "2.0.0",
+		UploadSchemaFilePath: "",
+		AppName:              "nri-foobar",
+	}
+
+	for _, artifact := range testArtifacts {
+		t.Run(artifact.name, func(t *testing.T) {
+			markerErr := errors.New("some error")
+			marker := &MarkerMock{}
+			marker.ShouldFailOnStart(cfg.AppName, cfg.Tag, cfg.RunID, cfg.RepoName, cfg.Schema, cfg.SchemaURL, markerErr)
+
+			err := UploadArtifacts(cfg, artifact.schema, lock.NewInMemory(), marker)
+			assert.ErrorIs(t, err, markerErr)
+		})
+	}
+}
+
+func TestUploadArtifactsShouldNotFailIfMarkerCannotBeEnded(t *testing.T) {
+	var testArtifacts = []struct {
+		name          string
+		schema        []config.UploadArtifactSchema
+		dummyFiles    []string
+		expectedFiles []string
+	}{
+		{
+			name: "AppName, arch and app version expansion",
+			schema: []config.UploadArtifactSchema{
+				{"{app_name}-{arch}-{version}.txt", []string{"amd64", "386"}, []config.Upload{
+					{
+						Type: "file",
+						Dest: "{arch}/{app_name}/{src}",
+					},
+				}},
+				{"{app_name}-{arch}-{version}.txt", nil, []config.Upload{
+					{
+						Type: "file",
+						Dest: "{arch}/{app_name}/{src}",
+					},
+				}},
+			},
+			dummyFiles:    []string{"nri-foobar-amd64-2.0.0.txt", "nri-foobar-386-2.0.0.txt"},
+			expectedFiles: []string{"amd64/nri-foobar/nri-foobar-amd64-2.0.0.txt", "386/nri-foobar/nri-foobar-386-2.0.0.txt"},
+		},
+		{
+			name: "AppName, arch, app version and os version expansion",
+			schema: []config.UploadArtifactSchema{
+				{"{app_name}-{version}-1.amazonlinux-{os_version}.{arch}.rpm.sum", []string{"x86_64"}, []config.Upload{
+					{
+						Type:      "file",
+						Dest:      "{arch}/{app_name}/{os_version}/{src}",
+						OsVersion: []string{"2", "2022"},
+					},
+				}},
+			},
+			dummyFiles:    []string{"nri-foobar-2.0.0-1.amazonlinux-2.x86_64.rpm.sum", "nri-foobar-2.0.0-1.amazonlinux-2022.x86_64.rpm.sum"},
+			expectedFiles: []string{"x86_64/nri-foobar/2/nri-foobar-2.0.0-1.amazonlinux-2.x86_64.rpm.sum", "x86_64/nri-foobar/2022/nri-foobar-2.0.0-1.amazonlinux-2022.x86_64.rpm.sum"},
+		},
+	}
+
+	dest, err := ioutil.TempDir("", "")
+	assert.NoError(t, err)
+	src, err := ioutil.TempDir("", "")
+	assert.NoError(t, err)
+
+	cfg := config.Config{
+		Version:              "2.0.0",
+		ArtifactsDestFolder:  dest,
+		ArtifactsSrcFolder:   src,
+		UploadSchemaFilePath: "",
+		AppName:              "nri-foobar",
+	}
+
+	for _, artifact := range testArtifacts {
+		t.Run(artifact.name, func(t *testing.T) {
+			for _, dummyFile := range artifact.dummyFiles {
+				err := writeDummyFile(path.Join(src, dummyFile))
+				assert.NoError(t, err)
+			}
+
+			markerErr := errors.New("some error")
+			marker := &MarkerMock{}
+			mark := release.Mark{}
+			marker.ShouldStart(cfg.AppName, cfg.Tag, cfg.RunID, cfg.RepoName, cfg.Schema, cfg.SchemaURL, mark)
+			marker.ShouldFailOnEnd(mark, markerErr)
+
+			err := UploadArtifacts(cfg, artifact.schema, lock.NewInMemory(), marker)
+			assert.NoError(t, err)
+
+			for _, expectedFile := range artifact.expectedFiles {
+				_, err = os.Stat(path.Join(dest, expectedFile))
+				assert.NoError(t, err)
+			}
+		})
+	}
 }
 
 func TestUploadArtifacts_cantBeRunInParallel(t *testing.T) {
@@ -212,13 +346,18 @@ func TestUploadArtifacts_cantBeRunInParallel(t *testing.T) {
 	l := lock.NewInMemory()
 	go func() {
 		<-ready
-		err1 = UploadArtifacts(cfg, schema, l)
+		marker := &MarkerMock{}
+		mark := release.Mark{}
+		marker.ShouldStart(cfg.AppName, cfg.Tag, cfg.RunID, cfg.RepoName, cfg.Schema, cfg.SchemaURL, mark)
+		marker.ShouldEnd(mark)
+		err1 = UploadArtifacts(cfg, schema, l, marker)
 		wg.Done()
 	}()
 	go func() {
 		<-ready
 		time.Sleep(1 * time.Millisecond)
-		err2 = UploadArtifacts(cfg, schema, l)
+		marker := &MarkerMock{}
+		err2 = UploadArtifacts(cfg, schema, l, marker)
 		wg.Done()
 	}()
 
@@ -279,7 +418,11 @@ func TestUploadArtifacts_errorsIfAnyArchFails(t *testing.T) {
 			err = writeDummyFile(path.Join(src, "nri-foobar-386-2.0.0.txt"))
 			assert.NoError(t, err)
 
-			err = UploadArtifacts(cfg, tc.schema, lock.NewNoop())
+			marker := &MarkerMock{}
+			mark := release.Mark{}
+			marker.ShouldStart(cfg.AppName, cfg.Tag, cfg.RunID, cfg.RepoName, cfg.Schema, cfg.SchemaURL, mark)
+			marker.ShouldEnd(mark)
+			err = UploadArtifacts(cfg, tc.schema, lock.NewNoop(), marker)
 			if tc.expectsError {
 				assert.Error(t, err)
 			} else {
@@ -308,4 +451,48 @@ func Test_generateRepoFileContent(t *testing.T) {
 
 	assert.Equal(t, expectedContent, repoFileContent)
 
+}
+
+type MarkerMock struct {
+	mock.Mock
+}
+
+func (m *MarkerMock) Start(appName string, tag string, runID string, repoName string, schema string, schemaURL string) (release.Mark, error) {
+	args := m.Called(appName, tag, runID, repoName, schema, schemaURL)
+
+	return args.Get(0).(release.Mark), args.Error(1)
+}
+
+func (m *MarkerMock) End(mark release.Mark) error {
+	args := m.Called(mark)
+
+	return args.Error(0)
+}
+
+func (m *MarkerMock) ShouldStart(appName string, tag string, runID string, repoName string, schema string, schemaURL string, mark release.Mark) {
+	m.
+		On("Start", appName, tag, runID, repoName, schema, schemaURL).
+		Once().
+		Return(mark, nil)
+}
+
+func (m *MarkerMock) ShouldFailOnStart(appName string, tag string, runID string, repoName string, schema string, schemaURL string, err error) {
+	m.
+		On("Start", appName, tag, runID, repoName, schema, schemaURL).
+		Once().
+		Return(release.Mark{}, err)
+}
+
+func (m *MarkerMock) ShouldEnd(mark release.Mark) {
+	m.
+		On("End", mark).
+		Once().
+		Return(nil)
+}
+
+func (m *MarkerMock) ShouldFailOnEnd(mark release.Mark, err error) {
+	m.
+		On("End", mark).
+		Once().
+		Return(err)
 }

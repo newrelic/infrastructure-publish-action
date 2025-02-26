@@ -4,13 +4,14 @@ package main
 
 import (
 	"fmt"
-	"log"
-	"net/http"
-
 	"github.com/newrelic/infrastructure-publish-action/publisher/config"
 	"github.com/newrelic/infrastructure-publish-action/publisher/download"
 	"github.com/newrelic/infrastructure-publish-action/publisher/lock"
+	"github.com/newrelic/infrastructure-publish-action/publisher/release"
 	"github.com/newrelic/infrastructure-publish-action/publisher/upload"
+	"log"
+	"net/http"
+	"strings"
 )
 
 const (
@@ -40,6 +41,11 @@ func main() {
 	conf, err := config.LoadConfig()
 	if err != nil {
 		l.Fatal("loading config: " + err.Error())
+	}
+
+	releaseMarker, err := newReleaseMarker(conf)
+	if err != nil {
+		l.Fatal("creating release marker: " + err.Error())
 	}
 
 	var bucketLock lock.BucketLock
@@ -105,9 +111,25 @@ func main() {
 		conf.ArtifactsSrcFolder = conf.LocalPackagesPath
 	}
 
-	err = upload.UploadArtifacts(conf, uploadSchemas, bucketLock)
+	err = upload.UploadArtifacts(conf, uploadSchemas, bucketLock, releaseMarker)
 	if err != nil {
 		l.Fatal(err)
 	}
 	l.Println("🎉 upload phase complete")
+}
+
+func newReleaseMarker(conf config.Config) (release.Marker, error) {
+	// We'll leave the release marker file in the root of the repository
+	// i.e.
+	// repo = /infrastructure_agent/linux/apt/
+	// release marker = /infrastructure_agent/releases.json
+	repoRootDir := strings.Split(strings.TrimPrefix(conf.DestPrefix, "/"), "/")[0]
+	markerS3Conf := release.S3Config{
+		Bucket:    conf.AwsBucket,
+		RoleARN:   conf.AwsRoleARN,
+		Region:    conf.AwsRegion,
+		Directory: repoRootDir,
+	}
+
+	return release.NewMarkerAWS(markerS3Conf, l.Printf)
 }
