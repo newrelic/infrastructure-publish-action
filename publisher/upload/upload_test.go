@@ -169,8 +169,16 @@ func TestUploadArtifacts(t *testing.T) {
 			}
 
 			marker := &MarkerMock{}
+			releaseInfo := release.ReleaseInfo{
+				AppName:   cfg.AppName,
+				Tag:       cfg.Tag,
+				RunID:     cfg.RunID,
+				RepoName:  cfg.RepoName,
+				Schema:    cfg.Schema,
+				SchemaURL: cfg.SchemaURL,
+			}
 			mark := release.Mark{}
-			marker.ShouldStart(cfg.AppName, cfg.Tag, cfg.RunID, cfg.RepoName, cfg.Schema, cfg.SchemaURL, mark)
+			marker.ShouldStart(releaseInfo, mark)
 			marker.ShouldEnd(mark)
 
 			err := UploadArtifacts(cfg, artifact.schema, lock.NewInMemory(), marker)
@@ -223,7 +231,14 @@ func TestUploadArtifactsShouldFailIfMarkerCannotBeStarted(t *testing.T) {
 		t.Run(artifact.name, func(t *testing.T) {
 			markerErr := errors.New("some error")
 			marker := &MarkerMock{}
-			marker.ShouldFailOnStart(cfg.AppName, cfg.Tag, cfg.RunID, cfg.RepoName, cfg.Schema, cfg.SchemaURL, markerErr)
+			marker.ShouldFailOnStart(release.ReleaseInfo{
+				AppName:   cfg.AppName,
+				Tag:       cfg.Tag,
+				RunID:     cfg.RunID,
+				RepoName:  cfg.RepoName,
+				Schema:    cfg.Schema,
+				SchemaURL: cfg.SchemaURL,
+			}, markerErr)
 
 			err := UploadArtifacts(cfg, artifact.schema, lock.NewInMemory(), marker)
 			assert.ErrorIs(t, err, markerErr)
@@ -295,8 +310,16 @@ func TestUploadArtifactsShouldNotFailIfMarkerCannotBeEnded(t *testing.T) {
 
 			markerErr := errors.New("some error")
 			marker := &MarkerMock{}
+			releaseInfo := release.ReleaseInfo{
+				AppName:   cfg.AppName,
+				Tag:       cfg.Tag,
+				RunID:     cfg.RunID,
+				RepoName:  cfg.RepoName,
+				Schema:    cfg.Schema,
+				SchemaURL: cfg.SchemaURL,
+			}
 			mark := release.Mark{}
-			marker.ShouldStart(cfg.AppName, cfg.Tag, cfg.RunID, cfg.RepoName, cfg.Schema, cfg.SchemaURL, mark)
+			marker.ShouldStart(releaseInfo, mark)
 			marker.ShouldFailOnEnd(mark, markerErr)
 
 			err := UploadArtifacts(cfg, artifact.schema, lock.NewInMemory(), marker)
@@ -347,8 +370,16 @@ func TestUploadArtifacts_cantBeRunInParallel(t *testing.T) {
 	go func() {
 		<-ready
 		marker := &MarkerMock{}
+		releaseInfo := release.ReleaseInfo{
+			AppName:   cfg.AppName,
+			Tag:       cfg.Tag,
+			RunID:     cfg.RunID,
+			RepoName:  cfg.RepoName,
+			Schema:    cfg.Schema,
+			SchemaURL: cfg.SchemaURL,
+		}
 		mark := release.Mark{}
-		marker.ShouldStart(cfg.AppName, cfg.Tag, cfg.RunID, cfg.RepoName, cfg.Schema, cfg.SchemaURL, mark)
+		marker.ShouldStart(releaseInfo, mark)
 		marker.ShouldEnd(mark)
 		err1 = UploadArtifacts(cfg, schema, l, marker)
 		wg.Done()
@@ -419,8 +450,16 @@ func TestUploadArtifacts_errorsIfAnyArchFails(t *testing.T) {
 			assert.NoError(t, err)
 
 			marker := &MarkerMock{}
+			releaseInfo := release.ReleaseInfo{
+				AppName:   cfg.AppName,
+				Tag:       cfg.Tag,
+				RunID:     cfg.RunID,
+				RepoName:  cfg.RepoName,
+				Schema:    cfg.Schema,
+				SchemaURL: cfg.SchemaURL,
+			}
 			mark := release.Mark{}
-			marker.ShouldStart(cfg.AppName, cfg.Tag, cfg.RunID, cfg.RepoName, cfg.Schema, cfg.SchemaURL, mark)
+			marker.ShouldStart(releaseInfo, mark)
 			marker.ShouldEnd(mark)
 			err = UploadArtifacts(cfg, tc.schema, lock.NewNoop(), marker)
 			if tc.expectsError {
@@ -457,8 +496,8 @@ type MarkerMock struct {
 	mock.Mock
 }
 
-func (m *MarkerMock) Start(appName string, tag string, runID string, repoName string, schema string, schemaURL string) (release.Mark, error) {
-	args := m.Called(appName, tag, runID, repoName, schema, schemaURL)
+func (m *MarkerMock) Start(releaseInfo release.ReleaseInfo) (release.Mark, error) {
+	args := m.Called(releaseInfo)
 
 	return args.Get(0).(release.Mark), args.Error(1)
 }
@@ -469,16 +508,16 @@ func (m *MarkerMock) End(mark release.Mark) error {
 	return args.Error(0)
 }
 
-func (m *MarkerMock) ShouldStart(appName string, tag string, runID string, repoName string, schema string, schemaURL string, mark release.Mark) {
+func (m *MarkerMock) ShouldStart(releaseInfo release.ReleaseInfo, mark release.Mark) {
 	m.
-		On("Start", appName, tag, runID, repoName, schema, schemaURL).
+		On("Start", releaseInfo).
 		Once().
 		Return(mark, nil)
 }
 
-func (m *MarkerMock) ShouldFailOnStart(appName string, tag string, runID string, repoName string, schema string, schemaURL string, err error) {
+func (m *MarkerMock) ShouldFailOnStart(releaseInfo release.ReleaseInfo, err error) {
 	m.
-		On("Start", appName, tag, runID, repoName, schema, schemaURL).
+		On("Start", releaseInfo).
 		Once().
 		Return(release.Mark{}, err)
 }

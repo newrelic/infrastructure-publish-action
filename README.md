@@ -110,6 +110,26 @@ The locking mechanism is based on the existance of a file in a defined `aws_s3_l
 
 NOTE: Currently in case of an interrupted job, the lock file will not be removed and it would be necessary to remove it manually from the bucket.
 
+## Release Markers
+
+In order to track the releases made with the Publish Action, the action appends information about each execution in a file in the S3 bucket.
+The file is persisted in the root of the repository (`/infrastructure-agent/`) and contains the following information:
+
+```json
+[
+  {
+    "app_name": "newrelic-infra",
+    "tag": "1.7.0",
+    "run_id": "13549016185",
+    "start": "2025-02-26T16:57:33Z",
+    "end": "2025-02-26T16:58:47Z",
+    "repo_name": "newrelic/infrastructure-agent",
+    "schema": "custom",
+    "schema_url": "https://raw.githubusercontent.com/newrelic/infrastructure-agent/test_publish_action_markers/build/upload-schema-linux-deb.yml"
+  }
+]
+```
+
 ## Support
 
 If you need assistance with New Relic products, you are in good hands with several support diagnostic tools and support channels.

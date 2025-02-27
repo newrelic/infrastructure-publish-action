@@ -5,23 +5,27 @@ import (
 	"time"
 )
 
+type ReleaseInfo struct {
+	AppName   string `json:"app_name"`
+	Tag       string `json:"tag"`
+	RunID     string `json:"run_id"`
+	RepoName  string `json:"repo_name"`
+	Schema    string `json:"schema"`
+	SchemaURL string `json:"schema_url"`
+}
+
 // Mark represents a release mark. It will contain the name of the release (appName, tag...)
 // and the start and end of a release
 // When the release has been started, the end will be zero
 type Mark struct {
-	AppName   string     `json:"app_name"`
-	Tag       string     `json:"tag"`
-	RunID     string     `json:"run_id"`
-	Start     CustomTime `json:"start"`
-	End       CustomTime `json:"end"`
-	RepoName  string     `json:"repo_name"`
-	Schema    string     `json:"schema"`
-	SchemaURl string     `json:"schema_url"`
+	ReleaseInfo
+	Start CustomTime `json:"start"`
+	End   CustomTime `json:"end"`
 }
 
 // Marker abstracts the persistence of the start and end of a release
 type Marker interface {
-	Start(appName string, tag string, runID string, repoName string, schema string, schemaURL string) (Mark, error)
+	Start(releaseInfo ReleaseInfo) (Mark, error)
 	End(mark Mark) error
 }
 

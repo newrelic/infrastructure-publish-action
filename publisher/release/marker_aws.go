@@ -82,8 +82,8 @@ func NewMarkerAWS(s3Config S3Config, logfn Logf) (Marker, error) {
 // load all the markers from the file
 // append a new started marker
 // write the markers back to the file
-func (s *markerAWS) Start(appName string, tag string, runID string, repoName string, schema string, schemaURL string) (Mark, error) {
-	s.logfn("[marker] starting %s", appName)
+func (s *markerAWS) Start(releaseInfo ReleaseInfo) (Mark, error) {
+	s.logfn("[marker] starting %s", releaseInfo.AppName)
 	markers, err := s.readMarkers()
 	if err != nil {
 		if !isNoSuchKeyError(err) {
@@ -92,13 +92,8 @@ func (s *markerAWS) Start(appName string, tag string, runID string, repoName str
 	}
 
 	mark := Mark{
-		AppName:   appName,
-		Tag:       tag,
-		RunID:     runID,
-		RepoName:  repoName,
-		Schema:    schema,
-		SchemaURl: schemaURL,
-		Start:     CustomTime{s.now()},
+		ReleaseInfo: releaseInfo,
+		Start:       CustomTime{s.now()},
 	}
 
 	markers = append(markers, mark)

@@ -59,35 +59,35 @@ func Test_Start(t *testing.T) {
 		&s3.PutObjectOutput{},
 	)
 
-	appName := "my-app"
-	tag := "v1.2"
-	runID := "run3"
-	repoName := "repo3"
-	schema := "schema3"
-	schemaURL := "url3"
 	markerS3 := &markerAWS{
 		client:       s3ClientMock,
 		conf:         s3Config,
 		timeProvider: timeProviderMock,
 		logfn:        nolog,
 	}
-	marker, err := markerS3.Start(appName, tag, runID, repoName, schema, schemaURL)
+
+	releaseInfo := ReleaseInfo{
+		AppName:   "my-app",
+		Tag:       "v1.2",
+		RunID:     "run3",
+		RepoName:  "repo3",
+		Schema:    "schema3",
+		SchemaURL: "url3",
+	}
+	mark, err := markerS3.Start(releaseInfo)
 	require.NoError(t, err)
-	require.Equal(t, appName, marker.AppName)
-	require.Equal(t, tag, marker.Tag)
-	require.Equal(t, runID, marker.RunID)
-	require.Equal(t, repoName, marker.RepoName)
-	require.Equal(t, schema, marker.Schema)
-	require.Equal(t, schemaURL, marker.SchemaURl)
+	require.Equal(t, releaseInfo, mark.ReleaseInfo)
 }
 
 func Test_StartErrorReadingMarkers(t *testing.T) {
-	appName := "my-app"
-	tag := "v1.2"
-	runID := "run3"
-	repoName := "repo3"
-	schema := "schema3"
-	schemaURL := "url3"
+	releaseInfo := ReleaseInfo{
+		AppName:   "my-app",
+		Tag:       "v1.2",
+		RunID:     "run3",
+		RepoName:  "repo3",
+		Schema:    "schema3",
+		SchemaURL: "url3",
+	}
 	timeProviderMock := &TimeProviderMock{}
 	s3ClientMock := &S3ClientMock{}
 
@@ -103,17 +103,19 @@ func Test_StartErrorReadingMarkers(t *testing.T) {
 		someError)
 
 	markerS3 := &markerAWS{timeProvider: timeProviderMock, conf: s3Config, client: s3ClientMock, logfn: nolog}
-	_, err := markerS3.Start(appName, tag, runID, repoName, schema, schemaURL)
+	_, err := markerS3.Start(releaseInfo)
 	assert.ErrorIs(t, err, someError)
 }
 
 func Test_StartErrorWritingMarkers(t *testing.T) {
-	appName := "my-app"
-	tag := "v1.2"
-	runID := "run3"
-	repoName := "repo3"
-	schema := "schema3"
-	schemaURL := "url3"
+	releaseInfo := ReleaseInfo{
+		AppName:   "my-app",
+		Tag:       "v1.2",
+		RunID:     "run3",
+		RepoName:  "repo3",
+		Schema:    "schema3",
+		SchemaURL: "url3",
+	}
 	timeProviderMock := &TimeProviderMock{}
 	s3ClientMock := &S3ClientMock{}
 
@@ -154,7 +156,7 @@ func Test_StartErrorWritingMarkers(t *testing.T) {
 		someError)
 
 	markerS3 := &markerAWS{timeProvider: timeProviderMock, conf: s3Config, client: s3ClientMock, logfn: nolog}
-	_, err := markerS3.Start(appName, tag, runID, repoName, schema, schemaURL)
+	_, err := markerS3.Start(releaseInfo)
 	assert.ErrorIs(t, err, someError)
 }
 func Test_End(t *testing.T) {
@@ -196,15 +198,18 @@ func Test_End(t *testing.T) {
 		&s3.PutObjectOutput{},
 	)
 
-	startTime := time.Date(2023, 1, 2, 00, 00, 00, 0, time.UTC)
-	mark := Mark{
+	releaseInfo := ReleaseInfo{
 		AppName:   "my-app",
 		Tag:       "v1.2",
 		RunID:     "run3",
 		RepoName:  "repo3",
 		Schema:    "schema3",
-		SchemaURl: "schema_url",
-		Start:     CustomTime{startTime},
+		SchemaURL: "url3",
+	}
+	startTime := time.Date(2023, 1, 2, 00, 00, 00, 0, time.UTC)
+	mark := Mark{
+		ReleaseInfo: releaseInfo,
+		Start:       CustomTime{startTime},
 	}
 
 	markerS3 := &markerAWS{
@@ -215,6 +220,7 @@ func Test_End(t *testing.T) {
 	}
 	err := markerS3.End(mark)
 	require.NoError(t, err)
+	require.Equal(t, releaseInfo, mark.ReleaseInfo)
 }
 
 func Test_End_ErrorOnWriting(t *testing.T) {
@@ -257,14 +263,18 @@ func Test_End_ErrorOnWriting(t *testing.T) {
 		someError)
 
 	startTime := time.Date(2023, 1, 2, 00, 00, 00, 0, time.UTC)
-	mark := Mark{
+
+	releaseInfo := ReleaseInfo{
 		AppName:   "my-app",
 		Tag:       "v1.2",
 		RunID:     "run3",
 		RepoName:  "repo3",
 		Schema:    "schema3",
-		SchemaURl: "schema_url",
-		Start:     CustomTime{startTime},
+		SchemaURL: "url3",
+	}
+	mark := Mark{
+		ReleaseInfo: releaseInfo,
+		Start:       CustomTime{startTime},
 	}
 
 	markerS3 := &markerAWS{
@@ -304,13 +314,15 @@ func Test_End_ErrorIfNoMarkerFound(t *testing.T) {
 
 	startTime := time.Date(2023, 1, 2, 00, 00, 00, 0, time.UTC)
 	mark := Mark{
-		AppName:   "my-app",
-		Tag:       "v1.2",
-		RunID:     "run3",
-		RepoName:  "repo3",
-		Schema:    "schema3",
-		SchemaURl: "schema_url",
-		Start:     CustomTime{startTime},
+		ReleaseInfo: ReleaseInfo{
+			AppName:   "my-app",
+			Tag:       "v1.2",
+			RunID:     "run3",
+			RepoName:  "repo3",
+			Schema:    "schema3",
+			SchemaURL: "url3",
+		},
+		Start: CustomTime{startTime},
 	}
 
 	markerS3 := &markerAWS{
@@ -340,13 +352,15 @@ func Test_End_ErrorOnReadingMarkers(t *testing.T) {
 
 	startTime := time.Date(2023, 1, 2, 00, 00, 00, 0, time.UTC)
 	mark := Mark{
-		AppName:   "my-app",
-		Tag:       "v1.2",
-		RunID:     "run3",
-		RepoName:  "repo3",
-		Schema:    "schema3",
-		SchemaURl: "schema_url",
-		Start:     CustomTime{startTime},
+		ReleaseInfo: ReleaseInfo{
+			AppName:   "my-app",
+			Tag:       "v1.2",
+			RunID:     "run3",
+			RepoName:  "repo3",
+			Schema:    "schema3",
+			SchemaURL: "url3",
+		},
+		Start: CustomTime{startTime},
 	}
 
 	markerS3 := &markerAWS{
@@ -390,13 +404,15 @@ func Test_EndFailsIfLatestMarkerIsEnded(t *testing.T) {
 
 	startTime := time.Date(2023, 1, 2, 00, 00, 00, 0, time.UTC)
 	mark := Mark{
-		AppName:   "my-app",
-		Tag:       "v1.2",
-		RunID:     "run3",
-		RepoName:  "repo3",
-		Schema:    "schema3",
-		SchemaURl: "schema_url",
-		Start:     CustomTime{startTime},
+		ReleaseInfo: ReleaseInfo{
+			AppName:   "my-app",
+			Tag:       "v1.2",
+			RunID:     "run3",
+			RepoName:  "repo3",
+			Schema:    "schema3",
+			SchemaURL: "url3",
+		},
+		Start: CustomTime{startTime},
 	}
 
 	markerS3 := &markerAWS{
@@ -440,13 +456,15 @@ func Test_EndFailsIfMarkerForAppNotFound(t *testing.T) {
 
 	startTime := time.Date(2023, 1, 2, 00, 00, 00, 0, time.UTC)
 	mark := Mark{
-		AppName:   "another-app",
-		Tag:       "v1.2",
-		RunID:     "run3",
-		RepoName:  "repo3",
-		Schema:    "schema3",
-		SchemaURl: "url3",
-		Start:     CustomTime{startTime},
+		ReleaseInfo: ReleaseInfo{
+			AppName:   "another-app",
+			Tag:       "v1.2",
+			RunID:     "run3",
+			RepoName:  "repo3",
+			Schema:    "schema3",
+			SchemaURL: "url3",
+		},
+		Start: CustomTime{startTime},
 	}
 
 	markerS3 := &markerAWS{
@@ -490,13 +508,15 @@ func Test_EndFailsIfMarkerStartTimeIsDifferent(t *testing.T) {
 
 	startTime := time.Date(2023, 1, 2, 00, 00, 00, 0, time.UTC)
 	mark := Mark{
-		AppName:   "my-app",
-		Tag:       "v1.2",
-		RunID:     "run3",
-		RepoName:  "repo3",
-		Schema:    "schema3",
-		SchemaURl: "url3",
-		Start:     CustomTime{startTime},
+		ReleaseInfo: ReleaseInfo{
+			AppName:   "my-app",
+			Tag:       "v1.2",
+			RunID:     "run3",
+			RepoName:  "repo3",
+			Schema:    "schema3",
+			SchemaURL: "url3",
+		},
+		Start: CustomTime{startTime},
 	}
 
 	markerS3 := &markerAWS{
@@ -540,13 +560,15 @@ func Test_EndFailsIfMarkerStartIsZero(t *testing.T) {
 
 	startTime := time.Time{}
 	mark := Mark{
-		AppName:   "my-app",
-		Tag:       "v1.2",
-		RunID:     "run3",
-		RepoName:  "repo3",
-		Schema:    "schema3",
-		SchemaURl: "url3",
-		Start:     CustomTime{startTime},
+		ReleaseInfo: ReleaseInfo{
+			AppName:   "my-app",
+			Tag:       "v1.2",
+			RunID:     "run3",
+			RepoName:  "repo3",
+			Schema:    "schema3",
+			SchemaURL: "url3",
+		},
+		Start: CustomTime{startTime},
 	}
 
 	markerS3 := &markerAWS{

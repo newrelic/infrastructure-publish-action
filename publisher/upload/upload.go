@@ -70,7 +70,16 @@ func UploadArtifacts(conf config.Config, schema config.UploadArtifactSchemas, bu
 		return
 	}
 	// Write the release marker
-	mark, err := releaseMarker.Start(conf.AppName, conf.Tag, conf.RunID, conf.RepoName, conf.Schema, conf.SchemaURL)
+	mark, err := releaseMarker.Start(
+		release.ReleaseInfo{
+			AppName:   conf.AppName,
+			Tag:       conf.Tag,
+			RunID:     conf.RunID,
+			RepoName:  conf.RepoName,
+			Schema:    conf.Schema,
+			SchemaURL: conf.SchemaURL,
+		},
+	)
 	if err != nil {
 		return fmt.Errorf("cannot start release marker: %w", err)
 	}
