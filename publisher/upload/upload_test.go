@@ -188,6 +188,7 @@ func TestUploadArtifacts(t *testing.T) {
 				_, err = os.Stat(path.Join(dest, expectedFile))
 				assert.NoError(t, err)
 			}
+			mock.AssertExpectationsForObjects(t, marker)
 		})
 	}
 
@@ -242,6 +243,7 @@ func TestUploadArtifactsShouldFailIfMarkerCannotBeStarted(t *testing.T) {
 
 			err := UploadArtifacts(cfg, artifact.schema, lock.NewInMemory(), marker)
 			assert.ErrorIs(t, err, markerErr)
+			mock.AssertExpectationsForObjects(t, marker)
 		})
 	}
 }
@@ -329,6 +331,7 @@ func TestUploadArtifactsShouldNotFailIfMarkerCannotBeEnded(t *testing.T) {
 				_, err = os.Stat(path.Join(dest, expectedFile))
 				assert.NoError(t, err)
 			}
+			mock.AssertExpectationsForObjects(t, marker)
 		})
 	}
 }
@@ -382,6 +385,7 @@ func TestUploadArtifacts_cantBeRunInParallel(t *testing.T) {
 		marker.ShouldStart(releaseInfo, mark)
 		marker.ShouldEnd(mark)
 		err1 = UploadArtifacts(cfg, schema, l, marker)
+		mock.AssertExpectationsForObjects(t, marker)
 		wg.Done()
 	}()
 	go func() {
@@ -389,6 +393,7 @@ func TestUploadArtifacts_cantBeRunInParallel(t *testing.T) {
 		time.Sleep(1 * time.Millisecond)
 		marker := &MarkerMock{}
 		err2 = UploadArtifacts(cfg, schema, l, marker)
+		mock.AssertExpectationsForObjects(t, marker)
 		wg.Done()
 	}()
 
@@ -467,6 +472,7 @@ func TestUploadArtifacts_errorsIfAnyArchFails(t *testing.T) {
 			} else {
 				assert.NoError(t, err)
 			}
+			mock.AssertExpectationsForObjects(t, marker)
 		})
 	}
 }

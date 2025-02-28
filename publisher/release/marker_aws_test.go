@@ -77,6 +77,7 @@ func Test_Start(t *testing.T) {
 	mark, err := markerS3.Start(releaseInfo)
 	require.NoError(t, err)
 	require.Equal(t, releaseInfo, mark.ReleaseInfo)
+	mock.AssertExpectationsForObjects(t, s3ClientMock, timeProviderMock)
 }
 
 func Test_StartErrorReadingMarkers(t *testing.T) {
@@ -105,6 +106,7 @@ func Test_StartErrorReadingMarkers(t *testing.T) {
 	markerS3 := &markerAWS{timeProvider: timeProviderMock, conf: s3Config, client: s3ClientMock, logfn: nolog}
 	_, err := markerS3.Start(releaseInfo)
 	assert.ErrorIs(t, err, someError)
+	mock.AssertExpectationsForObjects(t, s3ClientMock, timeProviderMock)
 }
 
 func Test_StartErrorWritingMarkers(t *testing.T) {
@@ -158,6 +160,7 @@ func Test_StartErrorWritingMarkers(t *testing.T) {
 	markerS3 := &markerAWS{timeProvider: timeProviderMock, conf: s3Config, client: s3ClientMock, logfn: nolog}
 	_, err := markerS3.Start(releaseInfo)
 	assert.ErrorIs(t, err, someError)
+	mock.AssertExpectationsForObjects(t, s3ClientMock, timeProviderMock)
 }
 func Test_End(t *testing.T) {
 	s3ClientMock := &S3ClientMock{}
@@ -221,6 +224,7 @@ func Test_End(t *testing.T) {
 	err := markerS3.End(mark)
 	require.NoError(t, err)
 	require.Equal(t, releaseInfo, mark.ReleaseInfo)
+	mock.AssertExpectationsForObjects(t, s3ClientMock, timeProviderMock)
 }
 
 func Test_End_ErrorOnWriting(t *testing.T) {
@@ -285,6 +289,7 @@ func Test_End_ErrorOnWriting(t *testing.T) {
 	}
 	err := markerS3.End(mark)
 	assert.ErrorIs(t, err, someError)
+	mock.AssertExpectationsForObjects(t, s3ClientMock, timeProviderMock)
 }
 
 func Test_End_ErrorIfNoMarkerFound(t *testing.T) {
@@ -308,10 +313,6 @@ func Test_End_ErrorIfNoMarkerFound(t *testing.T) {
 		&s3.GetObjectInput{Bucket: &s3Config.Bucket, Key: aws.String(fmt.Sprintf("%s/%s", s3Config.Directory, markerName))},
 		&s3.GetObjectOutput{Body: readCloser})
 
-	// It should get current time for the end of the started marker
-	endTime := time.Date(2025, 3, 4, 11, 12, 13, 0, time.UTC)
-	timeProviderMock.ShouldProvideNow(endTime)
-
 	startTime := time.Date(2023, 1, 2, 00, 00, 00, 0, time.UTC)
 	mark := Mark{
 		ReleaseInfo: ReleaseInfo{
@@ -333,6 +334,7 @@ func Test_End_ErrorIfNoMarkerFound(t *testing.T) {
 	}
 	err := markerS3.End(mark)
 	assert.ErrorIs(t, err, ErrNoStartedMarkersFound)
+	mock.AssertExpectationsForObjects(t, s3ClientMock, timeProviderMock)
 }
 func Test_End_ErrorOnReadingMarkers(t *testing.T) {
 	s3ClientMock := &S3ClientMock{}
@@ -371,6 +373,7 @@ func Test_End_ErrorOnReadingMarkers(t *testing.T) {
 	}
 	err := markerS3.End(mark)
 	assert.ErrorIs(t, err, someError)
+	mock.AssertExpectationsForObjects(t, s3ClientMock, timeProviderMock)
 }
 
 func Test_EndFailsIfLatestMarkerIsEnded(t *testing.T) {
@@ -398,10 +401,6 @@ func Test_EndFailsIfLatestMarkerIsEnded(t *testing.T) {
 		&s3.GetObjectInput{Bucket: &s3Config.Bucket, Key: aws.String(fmt.Sprintf("%s/%s", s3Config.Directory, markerName))},
 		&s3.GetObjectOutput{Body: readCloser})
 
-	// It should get current time for the end of the started marker
-	endTime := time.Date(2025, 3, 4, 11, 12, 13, 0, time.UTC)
-	timeProviderMock.ShouldProvideNow(endTime)
-
 	startTime := time.Date(2023, 1, 2, 00, 00, 00, 0, time.UTC)
 	mark := Mark{
 		ReleaseInfo: ReleaseInfo{
@@ -423,6 +422,7 @@ func Test_EndFailsIfLatestMarkerIsEnded(t *testing.T) {
 	}
 	err := markerS3.End(mark)
 	assert.ErrorIs(t, err, ErrLastMarkerEnded)
+	mock.AssertExpectationsForObjects(t, s3ClientMock, timeProviderMock)
 }
 
 func Test_EndFailsIfMarkerForAppNotFound(t *testing.T) {
@@ -450,10 +450,6 @@ func Test_EndFailsIfMarkerForAppNotFound(t *testing.T) {
 		&s3.GetObjectInput{Bucket: &s3Config.Bucket, Key: aws.String(fmt.Sprintf("%s/%s", s3Config.Directory, markerName))},
 		&s3.GetObjectOutput{Body: readCloser})
 
-	// It should get current time for the end of the started marker
-	endTime := time.Date(2025, 3, 4, 11, 12, 13, 0, time.UTC)
-	timeProviderMock.ShouldProvideNow(endTime)
-
 	startTime := time.Date(2023, 1, 2, 00, 00, 00, 0, time.UTC)
 	mark := Mark{
 		ReleaseInfo: ReleaseInfo{
@@ -475,6 +471,7 @@ func Test_EndFailsIfMarkerForAppNotFound(t *testing.T) {
 	}
 	err := markerS3.End(mark)
 	assert.ErrorIs(t, err, ErrNoStartedMarkerFoundForApp)
+	mock.AssertExpectationsForObjects(t, s3ClientMock, timeProviderMock)
 }
 
 func Test_EndFailsIfMarkerStartTimeIsDifferent(t *testing.T) {
@@ -502,10 +499,6 @@ func Test_EndFailsIfMarkerStartTimeIsDifferent(t *testing.T) {
 		&s3.GetObjectInput{Bucket: &s3Config.Bucket, Key: aws.String(fmt.Sprintf("%s/%s", s3Config.Directory, markerName))},
 		&s3.GetObjectOutput{Body: readCloser})
 
-	// It should get current time for the end of the started marker
-	endTime := time.Date(2025, 3, 4, 11, 12, 13, 0, time.UTC)
-	timeProviderMock.ShouldProvideNow(endTime)
-
 	startTime := time.Date(2023, 1, 2, 00, 00, 00, 0, time.UTC)
 	mark := Mark{
 		ReleaseInfo: ReleaseInfo{
@@ -527,6 +520,7 @@ func Test_EndFailsIfMarkerStartTimeIsDifferent(t *testing.T) {
 	}
 	err := markerS3.End(mark)
 	assert.ErrorIs(t, err, ErrNoStartedMarkerFoundForApp)
+	mock.AssertExpectationsForObjects(t, s3ClientMock, timeProviderMock)
 }
 
 func Test_EndFailsIfMarkerStartIsZero(t *testing.T) {
@@ -539,24 +533,6 @@ func Test_EndFailsIfMarkerStartIsZero(t *testing.T) {
 		Region:    "region",
 		Directory: "directory",
 	}
-
-	// It should read existing markers
-	existingMarkers := `
-	[
-		{"app_name": "app1", "tag": "v1.0", "run_id": "run1", "start": "2023-01-01T00:00:00Z", "end": "2023-01-01T01:00:00Z", "repo_name": "repo1", "schema": "schema1", "schema_url": "url1"},
-		{"app_name": "my-app", "tag": "v1.2", "run_id": "run3", "start": "2023-01-02T11:00:00Z", "end": "0001-01-01T00:00:00Z", "repo_name": "repo3", "schema": "schema3", "schema_url": "url3"}
-	]`
-
-	reader := bytes.NewReader([]byte(existingMarkers))
-	readCloser := io.NopCloser(reader)
-
-	s3ClientMock.ShouldGetObject(
-		&s3.GetObjectInput{Bucket: &s3Config.Bucket, Key: aws.String(fmt.Sprintf("%s/%s", s3Config.Directory, markerName))},
-		&s3.GetObjectOutput{Body: readCloser})
-
-	// It should get current time for the end of the started marker
-	endTime := time.Date(2025, 3, 4, 11, 12, 13, 0, time.UTC)
-	timeProviderMock.ShouldProvideNow(endTime)
 
 	startTime := time.Time{}
 	mark := Mark{
@@ -579,6 +555,7 @@ func Test_EndFailsIfMarkerStartIsZero(t *testing.T) {
 	}
 	err := markerS3.End(mark)
 	assert.ErrorIs(t, err, ErrNotStartedMark)
+	mock.AssertExpectationsForObjects(t, s3ClientMock, timeProviderMock)
 }
 
 ///////////////////////////////////////////////////////////////
