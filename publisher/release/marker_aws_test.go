@@ -162,6 +162,7 @@ func Test_StartErrorWritingMarkers(t *testing.T) {
 	assert.ErrorIs(t, err, someError)
 	mock.AssertExpectationsForObjects(t, s3ClientMock, timeProviderMock)
 }
+
 func Test_End(t *testing.T) {
 	s3ClientMock := &S3ClientMock{}
 	timeProviderMock := &TimeProviderMock{}
@@ -336,6 +337,7 @@ func Test_End_ErrorIfNoMarkerFound(t *testing.T) {
 	assert.ErrorIs(t, err, ErrNoStartedMarkersFound)
 	mock.AssertExpectationsForObjects(t, s3ClientMock, timeProviderMock)
 }
+
 func Test_End_ErrorOnReadingMarkers(t *testing.T) {
 	s3ClientMock := &S3ClientMock{}
 	timeProviderMock := &TimeProviderMock{}
