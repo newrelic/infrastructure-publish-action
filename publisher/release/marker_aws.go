@@ -86,6 +86,7 @@ func (s *markerAWS) Start(releaseInfo ReleaseInfo) (Mark, error) {
 	s.logfn("[marker] starting %s", releaseInfo.AppName)
 	markers, err := s.readMarkers()
 	if err != nil {
+		// Do not return error if the file does not exist. The first time we will create a new one.
 		if !isNoSuchKeyError(err) {
 			return Mark{}, err
 		}
