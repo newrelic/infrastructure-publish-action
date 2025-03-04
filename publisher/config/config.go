@@ -35,6 +35,8 @@ type Config struct {
 	ArtifactsDestFolder  string // s3 mounted folder
 	ArtifactsSrcFolder   string
 	AptlyFolder          string
+	SchemaURL            string
+	Schema               string
 	UploadSchemaFilePath string
 	GpgPassphrase        string
 	GpgKeyRing           string
@@ -42,6 +44,7 @@ type Config struct {
 	AwsRoleARN           string
 	// locking properties (candidate for factoring)
 	AwsLockBucket     string
+	AwsBucket         string
 	AwsTags           string
 	LockGroup         string
 	DisableLock       bool
@@ -85,6 +88,8 @@ func LoadConfig() (Config, error) {
 	viper.BindEnv("artifacts_src_folder")
 	viper.BindEnv("aptly_folder")
 	viper.BindEnv("upload_schema_file_path")
+	viper.BindEnv("schema_url")
+	viper.BindEnv("schema")
 	viper.BindEnv("dest_prefix")
 	viper.BindEnv("gpg_passphrase")
 	viper.BindEnv("gpg_key_ring")
@@ -132,10 +137,13 @@ func LoadConfig() (Config, error) {
 		ArtifactsSrcFolder:   viper.GetString("artifacts_src_folder"),
 		AptlyFolder:          aptlyF,
 		UploadSchemaFilePath: viper.GetString("upload_schema_file_path"),
+		SchemaURL:            viper.GetString("schema_url"),
+		Schema:               viper.GetString("schema"),
 		GpgPassphrase:        viper.GetString("gpg_passphrase"),
 		GpgKeyRing:           viper.GetString("gpg_key_ring"),
 		LockGroup:            lockGroup,
 		AwsLockBucket:        viper.GetString("aws_s3_lock_bucket_name"),
+		AwsBucket:            viper.GetString("aws_s3_bucket_name"),
 		AwsRoleARN:           viper.GetString("aws_role_arn"),
 		AwsRegion:            viper.GetString("aws_region"),
 		AwsTags:              viper.GetString("aws_tags"),
