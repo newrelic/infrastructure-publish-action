@@ -123,7 +123,7 @@ func newReleaseMarker(conf config.Config) (release.Marker, error) {
 	// i.e.
 	// repo = /infrastructure_agent/linux/apt/
 	// release marker = /infrastructure_agent/releases.json
-	repoRootDir := strings.Split(strings.TrimPrefix(conf.DestPrefix, "/"), "/")[0]
+	repoRootDir := strings.TrimPrefix(conf.DestPrefix, "/")
 	markerS3Conf := release.S3Config{
 		Bucket:    conf.AwsBucket,
 		RoleARN:   conf.AwsRoleARN,
