@@ -2,8 +2,11 @@ package utils
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	"io"
 	"io/ioutil"
 	"log"
@@ -55,18 +58,17 @@ func reader(content string) io.ReadCloser {
 	return ioutil.NopCloser(bytes.NewReader([]byte(content)))
 }
 
-
 func Test_ExecWithRetries_Ok(t *testing.T) {
 	var output, outputRetry bytes.Buffer
 	l := log.New(&output, "", 0)
 	lRetry := log.New(&outputRetry, "", 0)
 
-	err := ExecLogOutput(l, "ls", time.Millisecond * 50, "/")
+	err := ExecLogOutput(l, "ls", time.Millisecond*50, "/")
 	assert.Nil(t, err)
 	retryCallback := func(l *log.Logger, commandTimeout time.Duration) {
 		l.Print("remounting")
 	}
-	err = ExecWithRetries(3, retryCallback, lRetry, "ls", time.Millisecond * 50, "/")
+	err = ExecWithRetries(3, retryCallback, lRetry, "ls", time.Millisecond*50, "/")
 	assert.Nil(t, err)
 
 	assert.Equal(t, output.String(), outputRetry.String())
@@ -78,13 +80,13 @@ func Test_ExecWithRetries_Fail(t *testing.T) {
 	lRetry := log.New(&outputRetry, "", 0)
 	retries := 3
 
-	err := ExecLogOutput(l, "ls", time.Millisecond * 50, "/non_existing_path")
+	err := ExecLogOutput(l, "ls", time.Millisecond*50, "/non_existing_path")
 	assert.Error(t, err, "exit status 1")
 
 	retryCallback := func(l *log.Logger, commandTimeout time.Duration) {
 		l.Print("remounting")
 	}
-	err = ExecWithRetries(retries, retryCallback, lRetry, "ls", time.Millisecond * 50, "/non_existing_path")
+	err = ExecWithRetries(retries, retryCallback, lRetry, "ls", time.Millisecond*50, "/non_existing_path")
 	assert.Error(t, err, "exit status 1")
 
 	var expectedOutput string
@@ -94,4 +96,58 @@ func Test_ExecWithRetries_Fail(t *testing.T) {
 		expectedOutput += fmt.Sprintf("[attempt %v] error executing command ls /non_existing_path\n", i)
 	}
 	assert.Equal(t, expectedOutput, outputRetry.String())
+}
+
+// A simple mock service to assert on retry functionality
+type Service struct {
+	mock.Mock
+}
+
+func (s *Service) Do() error {
+	args := s.Called()
+	return args.Error(0)
+}
+
+func Test_RetrySuccessWithErrors(t *testing.T) {
+	service := &Service{}
+	var err = errors.New("some error")
+	service.On("Do", mock.Anything).Times(2).Return(err)
+	service.On("Do", mock.Anything).Times(1).Return(nil)
+
+	anotherService := &Service{}
+	anotherService.On("Do", mock.Anything).Times(2).Return(nil)
+
+	// We will execute service 3 times. First + 2 retries
+	err = Retry(service.Do, 5, time.Millisecond, func() { _ = anotherService.Do() })
+
+	require.NoError(t, err)
+	mock.AssertExpectationsForObjects(t, service, anotherService)
+}
+
+func Test_RetryNoError(t *testing.T) {
+	service := &Service{}
+	service.On("Do", mock.Anything).Times(1).Return(nil)
+
+	anotherService := &Service{}
+
+	// We will execute service 1 time. No retries
+	err := Retry(service.Do, 5, time.Millisecond, func() { _ = anotherService.Do() })
+
+	require.NoError(t, err)
+	mock.AssertExpectationsForObjects(t, service, anotherService)
+}
+
+func Test_RetryError(t *testing.T) {
+	service := &Service{}
+	var err = errors.New("some error")
+	service.On("Do", mock.Anything).Times(5).Return(err)
+
+	anotherService := &Service{}
+	anotherService.On("Do", mock.Anything).Times(5).Return(nil)
+
+	// We will execute service all the retries and error will be returned
+	actualErr := Retry(service.Do, 5, time.Millisecond, func() { _ = anotherService.Do() })
+
+	assert.ErrorIs(t, actualErr, err)
+	mock.AssertExpectationsForObjects(t, service, anotherService)
 }

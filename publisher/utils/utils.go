@@ -164,3 +164,17 @@ func S3RemountFn(l *log.Logger, commandTimeout time.Duration) {
 		l.Printf("mounting s3 failed %v", err)
 	}
 }
+
+// Retry executes the provided function fn until it succeeds or the maximum number of retries is reached.
+// It waits for the specified delay between each retry.
+func Retry(fn func() error, retries int, delay time.Duration, onErr func()) error {
+	var err error
+	for i := 0; i < retries; i++ {
+		if err = fn(); err == nil {
+			return nil
+		}
+		onErr()
+		time.Sleep(delay)
+	}
+	return err
+}
