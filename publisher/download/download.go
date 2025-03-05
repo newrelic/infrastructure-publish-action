@@ -9,13 +9,14 @@ import (
 	"os"
 	"path"
 	"strings"
+	"time"
 )
 
 const (
-	urlTemplate = "https://github.com/{repo_name}/releases/download/{tag}/{src}"
+	urlTemplate        = "https://github.com/{repo_name}/releases/download/{tag}/{src}"
+	retries            = 5
+	durationAfterRetry = 2 * time.Second
 )
-
-
 
 func (d *downloader) downloadArtifact(conf config.Config, src, arch, osVersion string) error {
 
@@ -28,7 +29,16 @@ func (d *downloader) downloadArtifact(conf config.Config, src, arch, osVersion s
 
 	utils.Logger.Println(fmt.Sprintf("[ ] Download %s into %s", url, destPath))
 
-	err := d.downloadFile(url, destPath)
+	err := utils.Retry(
+		func() error {
+			return d.downloadFile(url, destPath)
+		},
+		retries,
+		durationAfterRetry,
+		func() {
+			utils.Logger.Printf("retrying downloadFile %s\n", url)
+		})
+
 	if err != nil {
 		return err
 	}
