@@ -2,7 +2,6 @@ package upload
 
 import (
 	"fmt"
-	"github.com/newrelic/infrastructure-publish-action/publisher/release"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -11,6 +10,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/newrelic/infrastructure-publish-action/publisher/release"
 
 	"github.com/newrelic/infrastructure-publish-action/publisher/config"
 	"github.com/newrelic/infrastructure-publish-action/publisher/download"
@@ -223,7 +224,6 @@ func uploadRpm(conf config.Config, srcTemplate string, uploadConf config.Upload,
 }
 
 func uploadApt(conf config.Config, srcTemplate string, upload config.Upload, archs []string) (err error) {
-
 	// the dest path for apt is the same for each distribution since it does not depend on it
 	var destPath string
 	for _, osVersion := range upload.OsVersion {
@@ -232,9 +232,13 @@ func uploadApt(conf config.Config, srcTemplate string, upload config.Upload, arc
 		utils.Logger.Printf("[ ] Create local repo for os %s", osVersion)
 		// aptly repo create --distribution=${DISTRO} ${DISTRO}
 		if err = utils.ExecLogOutput(utils.Logger, "aptly", commandTimeout, "repo", "create", "--distribution="+osVersion, osVersion); err != nil {
-			return err
+			// Ignore error if repo already exists
+			if !strings.Contains(err.Error(), "local repo with name") {
+				return err
+			}
+			utils.Logger.Printf("[ ] Repository already exists, continuing")
 		}
-		utils.Logger.Printf("[✔] Local repo created for os %s", osVersion)
+		utils.Logger.Printf("[✔] Local repo ready for os %s", osVersion)
 
 		if !conf.AptSkipMirror {
 			// Mirror repo start
@@ -277,9 +281,30 @@ func uploadApt(conf config.Config, srcTemplate string, upload config.Upload, arc
 			}
 		}
 
-		utils.Logger.Printf("[ ] Publish deb repo for %s", osVersion)
-		if err = utils.ExecLogOutput(utils.Logger, "aptly", commandTimeout, "publish", "repo", "-origin=New Relic", "-keyring", conf.GpgKeyRing, "-passphrase", conf.GpgPassphrase, "-batch", osVersion); err != nil {
-			return err
+		// First try to drop any existing publication
+		utils.Logger.Printf("[ ] Attempting to drop any existing publication for %s", osVersion)
+		_ = utils.ExecLogOutput(utils.Logger, "aptly", commandTimeout, "publish", "drop", osVersion)
+		// Ignore error if publication doesn't exist
+
+		// Now publish with force-overwrite
+		utils.Logger.Printf("[ ] Publishing deb repo for %s with force-overwrite", osVersion)
+		if err = utils.ExecLogOutput(utils.Logger, "aptly", commandTimeout, "publish", "repo",
+			"-force-overwrite",
+			"-origin=New Relic",
+			"-keyring", conf.GpgKeyRing,
+			"-passphrase", conf.GpgPassphrase,
+			"-batch",
+			osVersion); err != nil {
+			// If initial publish fails, try update as fallback
+			utils.Logger.Printf("[!] Initial publish failed, trying update: %v", err)
+			if err = utils.ExecLogOutput(utils.Logger, "aptly", commandTimeout, "publish", "update",
+				"-force-overwrite",
+				"-keyring", conf.GpgKeyRing,
+				"-passphrase", conf.GpgPassphrase,
+				"-batch",
+				osVersion); err != nil {
+				return err
+			}
 		}
 
 		utils.Logger.Printf("[✔] Published successfully deb repo for %s", osVersion)
