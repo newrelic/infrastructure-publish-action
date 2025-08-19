@@ -174,6 +174,7 @@ func uploadRpm(conf config.Config, srcTemplate string, uploadConf config.Upload,
 		}
 
 		// create .repo file
+		utils.Logger.Printf("[DEBUG satya] conf.DestPrefix: %s", conf.DestPrefix)
 		utils.Logger.Println(fmt.Sprintf("creating 'newrelic-infra.repo' file in %s", s3RepoPath))
 		repoFileContent := generateRepoFileContent(conf.AccessPointHost, destPath)
 		err = ioutil.WriteFile(s3DotRepoFilepath, []byte(repoFileContent), 0644)
@@ -417,14 +418,18 @@ func generateRepoFileContent(accessPointHost, destPath string) (repoFileContent 
 
 	contentTemplate := `[newrelic-infra]
 name=New Relic Infrastructure
-baseurl=%s
+baseurl=%s/%s
 gpgkey=https://download.newrelic.com/infrastructure_agent/keys/newrelic_rpm_key_current.gpg
 gpgcheck=1
 repo_gpgcheck=1`
 
-	repoFileContent = fmt.Sprintf(contentTemplate, accessPointHost)
-	fmt.Printf("[DEBUG Satya] generateDestinationAssetsPath: destPath=%s and accessPointHost=%s\n", destPath, accessPointHost)
+	// Debug print variables
+	utils.Logger.Printf("[DEBUG satya] accessPointHost: %s", accessPointHost)
+	utils.Logger.Printf("[DEBUG satya] destPath: %s", destPath)
 
+	// Simply remove '/testing-pre-releases/satya-rhel10' from accessPointHost
+	accessPointHostTrimmed := strings.Replace(accessPointHost, "/testing-pre-releases/satya-rhel10", "", 1)
+	repoFileContent = fmt.Sprintf(contentTemplate, accessPointHostTrimmed, destPath)
 	return
 }
 
