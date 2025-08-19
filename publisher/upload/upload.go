@@ -2,7 +2,6 @@ package upload
 
 import (
 	"fmt"
-	"github.com/newrelic/infrastructure-publish-action/publisher/release"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -11,6 +10,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/newrelic/infrastructure-publish-action/publisher/release"
 
 	"github.com/newrelic/infrastructure-publish-action/publisher/config"
 	"github.com/newrelic/infrastructure-publish-action/publisher/download"
@@ -416,12 +417,13 @@ func generateRepoFileContent(accessPointHost, destPath string) (repoFileContent 
 
 	contentTemplate := `[newrelic-infra]
 name=New Relic Infrastructure
-baseurl=%s/%s
+baseurl=%s
 gpgkey=https://download.newrelic.com/infrastructure_agent/keys/newrelic_rpm_key_current.gpg
 gpgcheck=1
 repo_gpgcheck=1`
 
-	repoFileContent = fmt.Sprintf(contentTemplate, accessPointHost, destPath)
+	repoFileContent = fmt.Sprintf(contentTemplate, accessPointHost)
+	fmt.Printf("[DEBUG Satya] generateDestinationAssetsPath: destPath=%s and accessPointHost=%s\n", destPath, accessPointHost)
 
 	return
 }
