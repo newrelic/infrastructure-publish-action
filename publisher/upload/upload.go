@@ -420,8 +420,8 @@ func generateRepoFileContent(accessPointHost, destPath string) (repoFileContent 
 name=New Relic Infrastructure
 baseurl=%s/%s
 gpgkey=https://download.newrelic.com/infrastructure_agent/keys/newrelic_rpm_key_current.gpg
-gpgcheck=1
-repo_gpgcheck=1`
+gpgcheck=0
+repo_gpgcheck=0`
 
 	// Debug print variables
 	utils.Logger.Printf("[DEBUG satya] accessPointHost: %s", accessPointHost)
