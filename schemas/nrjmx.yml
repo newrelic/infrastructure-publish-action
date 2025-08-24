@@ -13,7 +13,6 @@
   arch:
     - noarch
 
-
 - src: "{app_name}-{arch}.{version}.msi"
   uploads:
     - type: file
