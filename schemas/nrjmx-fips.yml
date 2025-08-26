@@ -6,9 +6,11 @@
   arch:
     - noarch
 
-- src: "{app_name}_{version}-1_{arch}.deb"
+- src: "{app_name}_{version}-1_noarch.deb"
   arch:
-    - noarch
+    - x86_64
+    - arm
+    - arm64
   uploads:
     - type: apt
       src_repo: "{access_point_host}/infrastructure_agent/linux/apt"
@@ -30,9 +32,11 @@
         - bullseye
         - bookworm
 
-- src: "{app_name}-{version}-1.{arch}.rpm"
+- src: "{app_name}-{version}-1.noarch.rpm"
   arch:
-    - noarch
+    - x86_64
+    - arm
+    - arm64
   uploads:
     - type: yum
       dest: "{dest_prefix}linux/yum/el/{os_version}/{arch}/"
