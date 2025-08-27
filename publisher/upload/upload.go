@@ -420,7 +420,8 @@ func generateRepoFileContent(accessPointHost, destPath string) (repoFileContent 
 name=New Relic Infrastructure
 baseurl=%s/%s
 gpgkey=https://download.newrelic.com/infrastructure_agent/keys/newrelic_rpm_key_current.gpg
-gpgcheck=0
+       https://download.newrelic.com/infrastructure_agent/keys/newrelic_rpm_key_sha256.gpg
+gpgcheck=1
 repo_gpgcheck=1`
 
 	// Debug print variables
