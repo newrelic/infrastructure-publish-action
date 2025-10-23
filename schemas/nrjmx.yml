@@ -47,6 +47,7 @@
         - hirsute
         - bullseye
         - bookworm
+        - trixie
 
 - src: "{app_name}-{version}-1.noarch.rpm"
   arch:
