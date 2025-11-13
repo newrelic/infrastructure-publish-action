@@ -2,7 +2,6 @@ package upload
 
 import (
 	"fmt"
-	"github.com/newrelic/infrastructure-publish-action/publisher/release"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -11,6 +10,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/newrelic/infrastructure-publish-action/publisher/release"
 
 	"github.com/newrelic/infrastructure-publish-action/publisher/config"
 	"github.com/newrelic/infrastructure-publish-action/publisher/download"
@@ -414,14 +415,22 @@ func generateAptSrcRepoUrl(template, accessPointHost string) (url string) {
 
 func generateRepoFileContent(accessPointHost, destPath string) (repoFileContent string) {
 
+	// Use different GPG key for EL 10 based on the destPath
+	var gpgKeyUrl string
+	if strings.Contains(destPath, "el/10") {
+		gpgKeyUrl = "http://nr-downloads-ohai-staging.s3-website-us-east-1.amazonaws.com/infrastructure_agent/keys/newrelic_rpm_key_sha256.gpg"
+	} else {
+		gpgKeyUrl = "https://download.newrelic.com/infrastructure_agent/keys/newrelic_rpm_key_current.gpg"
+	}
+
 	contentTemplate := `[newrelic-infra]
 name=New Relic Infrastructure
 baseurl=%s/%s
-gpgkey=https://download.newrelic.com/infrastructure_agent/keys/newrelic_rpm_key_current.gpg
+gpgkey=%s
 gpgcheck=1
 repo_gpgcheck=1`
 
-	repoFileContent = fmt.Sprintf(contentTemplate, accessPointHost, destPath)
+	repoFileContent = fmt.Sprintf(contentTemplate, accessPointHost, destPath, gpgKeyUrl)
 
 	return
 }
