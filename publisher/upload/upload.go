@@ -418,7 +418,7 @@ func generateRepoFileContent(accessPointHost, destPath string) (repoFileContent 
 	// Use different GPG key for EL 10 based on the destPath
 	var gpgKeyUrl string
 	if strings.Contains(destPath, "el/10") {
-		gpgKeyUrl = "http://nr-downloads-ohai-staging.s3-website-us-east-1.amazonaws.com/infrastructure_agent/keys/newrelic_rpm_key_sha256.gpg"
+		gpgKeyUrl = "https://download.newrelic.com/infrastructure_agent/keys/newrelic_rpm_key_sha256.gpg"
 	} else {
 		gpgKeyUrl = "https://download.newrelic.com/infrastructure_agent/keys/newrelic_rpm_key_current.gpg"
 	}
