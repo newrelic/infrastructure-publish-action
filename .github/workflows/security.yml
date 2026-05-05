@@ -2,6 +2,10 @@ name: Security Scan
 
 on: [push]
 
+
+permissions:
+  contents: read
+
 jobs:
   security:
     runs-on: ubuntu-latest
