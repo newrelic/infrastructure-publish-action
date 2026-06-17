@@ -63,7 +63,7 @@ env:
 jobs:
   publishing-to-s3-linux:
     name: Publish linux artifacts into s3 bucket
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
 
     steps:
       - name: Login to DockerHub
