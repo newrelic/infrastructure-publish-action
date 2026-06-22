@@ -7,6 +7,10 @@ on:
     tags:
       - '*'
 
+
+permissions:
+  contents: read
+
 env:
   TAG: ${{ github.event.release.tag_name }}
   DOCKER_HUB_ID: ${{ secrets.DOCKER_HUB_ID }}
