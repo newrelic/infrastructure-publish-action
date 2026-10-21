@@ -22,6 +22,9 @@ on:
         default: "infrastructure_agent/batch_poc/"
         required: true
 
+permissions:
+  contents: read
+
 # One POC run at a time.
 concurrency:
   group: batch-publish-poc
