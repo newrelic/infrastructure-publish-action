@@ -1,0 +1,137 @@
+name: Batch publish POC
+
+# POC: publish several integrations in ONE run of this action (batch mode, apps_manifest_path):
+# lock once, then per apt distribution mirror + publish once and per yum/zypp repo createrepo once,
+# with every integration's packages. Download, schemas, archs, paths, signing and .repo files are
+# the action's own code, the same as a single-integration release.
+# Testing bucket only, and only under infrastructure_agent/batch_poc/.
+# Clean up with the "Batch publish POC cleanup" workflow.
+on:
+  workflow_dispatch:
+    inputs:
+      integrations:
+        description: "Releases to batch, space-separated repo@tag[:schema] (schema defaults to ohi)"
+        default: "nri-apache@v1.18.2 nri-kafka@v3.27.0:ohi-jmx nri-mysql@v1.25.0"
+        required: true
+      include_fips:
+        description: "Also publish each integration's -fips packages (ohi-fips schema), like reusable_on_release"
+        type: boolean
+        default: true
+      dest_prefix:
+        description: "Folder to publish into (must be under infrastructure_agent/batch_poc/)"
+        default: "infrastructure_agent/batch_poc/"
+        required: true
+
+# One POC run at a time.
+concurrency:
+  group: batch-publish-poc
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: us-east-1
+  AWS_S3_BUCKET_NAME: nr-downloads-ohai-testing
+  AWS_S3_LOCK_BUCKET_NAME: onhost-ci-lock-testing
+  AWS_ROLE_ARN: arn:aws:iam::017663287629:role/caos_testing
+  AWS_ROLE_SESSION_NAME: caos_testing
+  ACCESS_POINT_HOST: http://nr-downloads-ohai-testing.s3-website-us-east-1.amazonaws.com
+  DEST_PREFIX: ${{ inputs.dest_prefix }}
+  INTEGRATIONS: ${{ inputs.integrations }}
+  INCLUDE_FIPS: ${{ inputs.include_fips }}
+
+jobs:
+  poc:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    steps:
+      - name: Check branch
+        # batch mode only exists on the POC branch; main's action can't run this
+        if: github.ref_name == github.event.repository.default_branch
+        run: |
+          echo "Run this workflow from the batch-publish-poc branch (Run workflow > Use workflow from)"
+          exit 1
+
+      - uses: actions/checkout@v4
+
+      - name: Check destination folder
+        run: |
+          case "$DEST_PREFIX" in
+            *..*) echo "dest_prefix must not contain '..'"; exit 1 ;;
+            infrastructure_agent/batch_poc/*/|infrastructure_agent/batch_poc/) echo "Publishing into $DEST_PREFIX" ;;
+            *) echo "dest_prefix must be under infrastructure_agent/batch_poc/ and end with /"; exit 1 ;;
+          esac
+
+      - name: Build batch manifest
+        run: |
+          echo '[]' > batch-manifest.json
+          add() {
+            jq --arg app "$1" --arg repo "newrelic/$2" --arg tag "$3" --arg schema "$4" \
+              '. + [{app_name: $app, repo_name: $repo, tag: $tag, schema: $schema}]' batch-manifest.json > m.tmp
+            mv m.tmp batch-manifest.json
+          }
+          for item in $INTEGRATIONS; do
+            repo="${item%%@*}"; rest="${item#*@}"
+            tag="${rest%%:*}"; schema="ohi"; [ "$rest" != "$tag" ] && schema="${rest#*:}"
+            add "$repo" "$repo" "$tag" "$schema"
+            if [ "$INCLUDE_FIPS" = "true" ]; then add "$repo-fips" "$repo" "$tag" "ohi-fips"; fi
+          done
+          cat batch-manifest.json
+
+      - name: Batch publish (this branch's action)
+        uses: ./
+        with:
+          disable_lock: false
+          run_id: ${{ github.run_id }}
+          apps_manifest_path: batch-manifest.json
+          access_point_host: testing
+          dest_prefix: ${{ inputs.dest_prefix }}
+          aws_region: ${{ env.AWS_REGION }}
+          aws_role_arn: ${{ env.AWS_ROLE_ARN }}
+          aws_role_session_name: ${{ env.AWS_ROLE_SESSION_NAME }}
+          aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws_s3_bucket_name: ${{ env.AWS_S3_BUCKET_NAME }}
+          aws_s3_lock_bucket_name: ${{ env.AWS_S3_LOCK_BUCKET_NAME }}
+          gpg_passphrase: ${{ secrets.GPG_PASSPHRASE }}
+          gpg_private_key_base64: ${{ secrets.GPG_PRIVATE_KEY_BASE64 }}
+
+      - name: Verify every schema target over HTTP
+        env:
+          GPG_PRIVATE_KEY_BASE64: ${{ secrets.GPG_PRIVATE_KEY_BASE64 }}
+        run: |
+          printf %s "$GPG_PRIVATE_KEY_BASE64" | base64 --decode | gpg --batch --import --no-default-keyring --keyring "$PWD/verify-keyring.gpg" -
+          MANIFEST=batch-manifest.json SCHEMAS_DIR=schemas GPG_KEYRING="$PWD/verify-keyring.gpg" \
+            RESULTS=verify-results.txt bash poc/verify-batch.sh
+
+      - name: Install test from the published POC repo (current distros)
+        run: |
+          BASE="$ACCESS_POINT_HOST/${DEST_PREFIX}linux"
+          PKGS=$(jq -r '.[].app_name' batch-manifest.json | tr '\n' ' ')
+          for IMG in ubuntu:noble ubuntu:jammy ubuntu:focal debian:trixie debian:bookworm debian:bullseye; do
+            c=$(docker run --rm "$IMG" bash -c '. /etc/os-release; echo $VERSION_CODENAME')
+            echo "== apt $c ($IMG)"
+            docker run --rm "$IMG" bash -c "
+              echo 'deb [trusted=yes] $BASE/apt $c main' > /etc/apt/sources.list.d/poc.list &&
+              apt-get update -qq -o Dir::Etc::sourcelist=/etc/apt/sources.list.d/poc.list -o Dir::Etc::sourceparts=- &&
+              cd /tmp && apt-get download $PKGS && ls -la /tmp/*.deb"
+          done
+          for v in 8 9; do
+            echo "== yum el/$v"
+            docker run --rm rockylinux:$v bash -c "
+              printf '[poc]\nname=poc\nbaseurl=$BASE/yum/el/$v/x86_64/\ngpgcheck=0\nrepo_gpgcheck=0\nenabled=1\n' > /etc/yum.repos.d/poc.repo &&
+              cd /tmp && dnf -q -y download --disablerepo='*' --enablerepo=poc $PKGS && ls -la /tmp/*.rpm"
+          done
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "## Batch publish POC"
+            echo "Manifest:"
+            echo '```json'; cat batch-manifest.json 2>/dev/null; echo '```'
+            echo "Browse: $ACCESS_POINT_HOST/index.html?prefix=${DEST_PREFIX}"
+            echo "### Checks"
+            echo "$(grep -c '^PASS' verify-results.txt 2>/dev/null || echo 0) passed, $(grep -c '^FAIL' verify-results.txt 2>/dev/null || echo 0) failed"
+            echo '```'; grep '^FAIL' verify-results.txt 2>/dev/null || echo "no failures"; echo '```'
+            echo "Per-OS timings: search the publish step log for \`[batch]\`."
+            echo "Clean up with the **Batch publish POC cleanup** workflow, path: \`$DEST_PREFIX\`"
+          } >> "$GITHUB_STEP_SUMMARY"
