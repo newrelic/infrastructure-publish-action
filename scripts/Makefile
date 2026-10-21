@@ -33,6 +33,10 @@ ifndef ARTIFACTS_DEST_FOLDER
 endif
 
 prepare-schema: check-env
+ifdef APPS_MANIFEST_PATH
+	@echo "Batch mode: schemas are resolved per app from $(APPS_MANIFEST_PATH)"
+	@cat $(APPS_MANIFEST_PATH)
+else
 	@echo "Prepare schema file for: $(SCHEMA)"
 ifeq ($(SCHEMA), custom)
 	$(eval UPLOAD_SCHEMA_FILE_PATH := "$(WORKDIR)/schemas/custom.yml")
@@ -52,6 +56,7 @@ else
 		exit 1; \
 	fi
 	$(eval UPLOAD_SCHEMA_FILE_PATH := "$(WORKDIR)/schemas/$(SCHEMA).yml")
+endif
 endif
 endif
 

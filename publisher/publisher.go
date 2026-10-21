@@ -11,6 +11,7 @@ import (
 	"github.com/newrelic/infrastructure-publish-action/publisher/upload"
 	"log"
 	"net/http"
+	"os"
 	"strings"
 )
 
@@ -41,6 +42,13 @@ func main() {
 	conf, err := config.LoadConfig()
 	if err != nil {
 		l.Fatal("loading config: " + err.Error())
+	}
+
+	batch := conf.AppsManifestPath != ""
+	if batch {
+		// identifies the batch in the lock owner (app name, tag and run id)
+		conf.AppName = "batch"
+		conf.Tag = "manifest"
 	}
 
 	releaseMarker, err := newReleaseMarker(conf)
@@ -91,6 +99,14 @@ func main() {
 		}
 	}
 
+	if batch {
+		if err = runBatch(conf, bucketLock, releaseMarker); err != nil {
+			l.Fatal(err)
+		}
+		l.Println("🎉 batch upload phase complete")
+		return
+	}
+
 	uploadSchemas, err := config.ParseUploadSchemasFile(conf.UploadSchemaFilePath)
 	if err != nil {
 		l.Fatal(err)
@@ -116,6 +132,47 @@ func main() {
 		l.Fatal(err)
 	}
 	l.Println("🎉 upload phase complete")
+}
+
+// runBatch downloads every app in the manifest the same way a single-app run does,
+// then publishes all of them in one locked upload.
+func runBatch(conf config.Config, bucketLock lock.BucketLock, releaseMarker release.Marker) error {
+	specs, err := config.ParseAppsManifest(conf.AppsManifestPath)
+	if err != nil {
+		return err
+	}
+	l.Printf("batch of %d apps", len(specs))
+
+	d := download.NewDownloader(http.DefaultClient)
+	var jobs []upload.AppUploadJob
+	for _, spec := range specs {
+		appConf := spec.ToConfig(conf)
+
+		schemaFile, err := config.ResolveSchemaFile(spec, conf.SchemasFolder, os.TempDir(), http.DefaultClient)
+		if err != nil {
+			return err
+		}
+		uploadSchemas, err := config.ParseUploadSchemasFile(schemaFile)
+		if err != nil {
+			return fmt.Errorf("%s: %w", spec.AppName, err)
+		}
+		if err = config.ValidateSchemas(appConf.AppName, uploadSchemas); err != nil {
+			return err
+		}
+
+		if conf.LocalPackagesPath == "" {
+			if err = d.DownloadArtifacts(appConf, uploadSchemas); err != nil {
+				return fmt.Errorf("%s: %w", spec.AppName, err)
+			}
+			l.Printf("🎉 download phase complete for %s %s", spec.AppName, spec.Tag)
+		} else {
+			appConf.ArtifactsSrcFolder = conf.LocalPackagesPath
+		}
+
+		jobs = append(jobs, upload.AppUploadJob{Conf: appConf, Schemas: uploadSchemas})
+	}
+
+	return upload.UploadArtifactsBatch(jobs, bucketLock, releaseMarker)
 }
 
 func newReleaseMarker(conf config.Config) (release.Marker, error) {

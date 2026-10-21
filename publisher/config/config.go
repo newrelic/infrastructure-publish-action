@@ -8,8 +8,9 @@ import (
 )
 
 const (
-	defaultAptlyFolder = "/root/.aptly"
-	defaultLockgroup   = "lockgroup"
+	defaultAptlyFolder   = "/root/.aptly"
+	defaultLockgroup     = "lockgroup"
+	defaultSchemasFolder = "/home/gha/schemas"
 
 	//Access points
 	accessPointStaging               = "http://nr-downloads-ohai-staging.s3-website-us-east-1.amazonaws.com"
@@ -52,6 +53,9 @@ type Config struct {
 	UseDefLockRetries bool
 	LocalPackagesPath string
 	AptSkipMirror     bool
+	// batch mode: publish every app listed in the manifest in one run
+	AppsManifestPath string
+	SchemasFolder    string
 }
 
 func (c *Config) LockOwner() string {
@@ -102,8 +106,11 @@ func LoadConfig() (Config, error) {
 	viper.BindEnv("lock_group")
 	viper.BindEnv("local_packages_path")
 	viper.BindEnv("apt_skip_mirror")
+	viper.BindEnv("apps_manifest_path")
+	viper.BindEnv("schemas_folder")
 
-	if viper.GetString("app_name") == "" {
+	// in batch mode every app comes from the manifest
+	if viper.GetString("app_name") == "" && viper.GetString("apps_manifest_path") == "" {
 		return Config{}, fmt.Errorf("%w: app_name", ErrMissingConfig)
 	}
 
@@ -120,6 +127,11 @@ func LoadConfig() (Config, error) {
 	version := viper.GetString("app_version")
 	if version == "" {
 		version = strings.Replace(viper.GetString("tag"), "v", "", -1)
+	}
+
+	schemasFolder := viper.GetString("schemas_folder")
+	if schemasFolder == "" {
+		schemasFolder = defaultSchemasFolder
 	}
 
 	accessPointHost, mirrorHost := parseAccessPointHost(viper.GetString("access_point_host"))
@@ -152,5 +164,7 @@ func LoadConfig() (Config, error) {
 		LocalPackagesPath:    viper.GetString("local_packages_path"),
 		UseDefLockRetries:    !viper.IsSet("lock_retries"),     // when non set: use default value
 		AptSkipMirror:        viper.GetBool("apt_skip_mirror"), // when non set: use default value
+		AppsManifestPath:     viper.GetString("apps_manifest_path"),
+		SchemasFolder:        schemasFolder,
 	}, nil
 }

@@ -30,6 +30,9 @@ fi
 # from the host machine instead of downloading them from GH,
 # and therefore as LOCAL_PACKAGES_PATH will refer to path
 # inside the docker container it should be `/srv/*`
+if [ -n "$APPS_MANIFEST_PATH" ]; then
+  APPS_MANIFEST_PATH=$( realpath --canonicalize-missing "$APPS_MANIFEST_PATH" | sed -e "s|$PWD|/srv|" )
+fi
 echo "Run docker container with action logic inside"
 docker run --platform linux/amd64 --rm \
         --name=infrastructure-publish-action\
@@ -62,5 +65,6 @@ docker run --platform linux/amd64 --rm \
         -e DEST_PREFIX \
         -e LOCAL_PACKAGES_PATH \
         -e APT_SKIP_MIRROR \
+        -e APPS_MANIFEST_PATH \
         newrelic/infrastructure-publish-action \
         "$@"
