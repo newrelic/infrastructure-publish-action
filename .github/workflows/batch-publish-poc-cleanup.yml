@@ -1,0 +1,61 @@
+name: Batch publish POC cleanup
+
+# Deletes a POC folder from the testing bucket. Only paths under infrastructure_agent/batch_poc/
+# are accepted, so it can never touch the shared testing repo.
+on:
+  workflow_dispatch:
+    inputs:
+      path:
+        description: "Folder to delete (must be under infrastructure_agent/batch_poc/)"
+        default: "infrastructure_agent/batch_poc/"
+        required: true
+      dry_run:
+        description: "Only list what would be deleted"
+        type: boolean
+        default: true
+
+# only uses AWS credentials, not the GitHub token
+permissions: {}
+
+concurrency:
+  group: batch-publish-poc
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: us-east-1
+  AWS_S3_BUCKET_NAME: nr-downloads-ohai-testing
+  AWS_ROLE_ARN: arn:aws:iam::017663287629:role/caos_testing
+  AWS_ROLE_SESSION_NAME: caos_testing
+  TARGET: ${{ inputs.path }}
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check path
+        run: |
+          case "$TARGET" in
+            *..*) echo "Path must not contain '..'"; exit 1 ;;
+            infrastructure_agent/batch_poc/*/|infrastructure_agent/batch_poc/) echo "Target: s3://$AWS_S3_BUCKET_NAME/$TARGET" ;;
+            *) echo "Path must be under infrastructure_agent/batch_poc/ and end with /"; exit 1 ;;
+          esac
+
+      - name: ${{ inputs.dry_run && 'List (dry run)' || 'Delete' }}
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          STS=($(aws sts assume-role --role-arn "$AWS_ROLE_ARN" --role-session-name "$AWS_ROLE_SESSION_NAME" \
+            --query '[Credentials.AccessKeyId,Credentials.SecretAccessKey,Credentials.SessionToken]' --output text))
+          export AWS_ACCESS_KEY_ID=${STS[0]} AWS_SECRET_ACCESS_KEY=${STS[1]} AWS_SESSION_TOKEN=${STS[2]}
+          COUNT=$(aws s3 ls --recursive "s3://$AWS_S3_BUCKET_NAME/$TARGET" --region "$AWS_REGION" | wc -l)
+          echo "Objects under $TARGET: $COUNT"
+          if [ "$DRY_RUN" = "true" ]; then
+            aws s3 ls --recursive "s3://$AWS_S3_BUCKET_NAME/$TARGET" --region "$AWS_REGION" | head -50
+            echo "Dry run: nothing deleted. Re-run with dry_run unchecked to delete."
+          else
+            aws s3 rm --recursive --quiet "s3://$AWS_S3_BUCKET_NAME/$TARGET" --region "$AWS_REGION"
+            echo "Deleted $COUNT objects under s3://$AWS_S3_BUCKET_NAME/$TARGET"
+          fi
+          echo "$COUNT objects under \`$TARGET\` ($([ "$DRY_RUN" = true ] && echo listed || echo deleted))" >> "$GITHUB_STEP_SUMMARY"
