@@ -60,9 +60,10 @@ func UploadArtifactsBatch(jobs []AppUploadJob, bucketLock lock.BucketLock, relea
 
 	var marks []release.Mark
 	defer func() {
-		for _, mark := range marks {
-			if markerErr := releaseMarker.End(mark); markerErr != nil {
-				utils.Logger.Printf("ERROR: cannot end release marker %v", markerErr)
+		// all at once: End only ends the last marker of the file, which is just the batch's last app
+		if len(marks) > 0 {
+			if markerErr := releaseMarker.EndBatch(marks); markerErr != nil {
+				utils.Logger.Printf("ERROR: cannot end release markers %v", markerErr)
 			}
 		}
 

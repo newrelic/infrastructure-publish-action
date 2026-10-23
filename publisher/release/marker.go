@@ -27,6 +27,8 @@ type Mark struct {
 type Marker interface {
 	Start(releaseInfo ReleaseInfo) (Mark, error)
 	End(mark Mark) error
+	// EndBatch ends the marks started, in order, by one batch run
+	EndBatch(marks []Mark) error
 }
 
 // CustomTime is a wrapper around time.Time that

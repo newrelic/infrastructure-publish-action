@@ -135,6 +135,7 @@ func TestUploadArtifactsBatch_locksOnceAndMarksEveryApp(t *testing.T) {
 	}
 
 	var jobs []AppUploadJob
+	var marks []release.Mark
 	marker := &MarkerMock{}
 	for _, app := range []string{"nri-apache", "nri-mysql"} {
 		conf := config.Config{AppName: app, RepoName: "newrelic/" + app, Tag: "v2.0.0", Version: "2.0.0", RunID: "42", Schema: "ohi",
@@ -144,8 +145,10 @@ func TestUploadArtifactsBatch_locksOnceAndMarksEveryApp(t *testing.T) {
 
 		mark := release.Mark{ReleaseInfo: release.ReleaseInfo{AppName: app}}
 		marker.ShouldStart(release.ReleaseInfo{AppName: app, Tag: "v2.0.0", RunID: "42", RepoName: "newrelic/" + app, Schema: "ohi"}, mark)
-		marker.ShouldEnd(mark)
+		marks = append(marks, mark)
 	}
+	// one EndBatch for every app, never End one by one
+	marker.ShouldEndBatch(marks)
 
 	bucketLock := &countingLock{}
 	err := UploadArtifactsBatch(jobs, bucketLock, marker)
