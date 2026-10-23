@@ -42,6 +42,8 @@ warn() { echo "WARN  $1"; }
 KEYDIR=$(mktemp -d)
 trap 'rm -rf "$KEYDIR"' EXIT
 curl -sf --retry 3 -o "$KEYDIR/newrelic.asc" "$KEY" || { echo "cannot download $KEY"; exit 1; }
+# apt verifies signatures as the unprivileged _apt user: the mounted key must be world-readable
+chmod 755 "$KEYDIR"; chmod 644 "$KEYDIR/newrelic.asc"
 
 # apt in containers: only the POC repo as source, signed-by the New Relic key.
 #   SIGN=strict  apt verifies InRelease with the key (fails on a bad or missing signature)
@@ -55,9 +57,11 @@ apt_test() {
     . /etc/os-release
     echo \"deb [$opt] $BASE/apt \$VERSION_CODENAME main\" > /etc/apt/sources.list.d/poc.list
     apt-get update -q 2>&1 | tee /tmp/update.log
-    ! grep -qE '$bad' /tmp/update.log
+    # not '! grep': bash -e ignores a negated command's failure
+    if grep -qE '$bad' /tmp/update.log; then echo 'apt-get update reported errors'; exit 1; fi
     # dependencies resolvable from the index (simulation, nothing downloaded)
-    apt-get install -s -q $pkgs >/tmp/deps.log 2>&1 && echo DEPS_OK || { echo DEPS_UNRESOLVED; grep -E '^ |E:' /tmp/deps.log | head -5; }
+    apt-get install -s -q $pkgs >/tmp/deps.log 2>&1 ||
+      echo \"DEPS_UNRESOLVED: \$(grep -E '^ ' /tmp/deps.log | head -5 | tr -s ' \\n' ' ')\"
     cd /tmp && apt-get download -q $pkgs
     for p in $pkgs; do dpkg -i --force-depends \${p}_*.deb >/dev/null 2>&1 || true; done
     for p in $pkgs; do dpkg -s \$p | grep -q '^Status: install ok installed' || { echo \"not installed: \$p\"; exit 1; }; done
@@ -75,8 +79,8 @@ for IMG in ubuntu:noble ubuntu:jammy ubuntu:focal debian:trixie debian:bookworm 
     fi
     if [ $rc -eq 0 ]; then
       pass "apt $IMG: $PKGS"
-      grep -q DEPS_UNRESOLVED <<<"$LOG" &&
-        warn "apt $IMG: dependencies not resolvable from the index: $(grep -A5 DEPS_UNRESOLVED <<<"$LOG" | tail -n +2 | tr -s ' \n' ' ')"
+      grep -q '^DEPS_UNRESOLVED:' <<<"$LOG" &&
+        warn "apt $IMG: dependencies not resolvable from the index:$(sed -n 's/^DEPS_UNRESOLVED://p' <<<"$LOG")"
     else
       fail "apt $IMG: $PKGS"; tail -5 <<<"$LOG" | sed 's/^/      /'
     fi
@@ -85,16 +89,19 @@ done
 
 for V in 8 9; do
   for PKGS in "${SETS[@]}"; do
-    # dnf verifies the repomd.xml signature (repo_gpgcheck); rpm -K every package signature
+    # dnf verifies the repomd.xml signature (repo_gpgcheck); rpm -K every package signature.
+    # Only the POC repo is used (no distribution mirrors): package URLs come from its metadata.
     if LOG=$(docker run --rm --platform linux/amd64 "rockylinux:$V" bash -ec "
-      dnf -q -y install dnf-plugins-core >/dev/null
       printf '[poc]\nname=poc\nbaseurl=$BASE/yum/el/$V/x86_64/\ngpgkey=$RPM_KEY\ngpgcheck=1\nrepo_gpgcheck=1\nenabled=1\n' > /etc/yum.repos.d/poc.repo
       dnf -q -y --disablerepo='*' --enablerepo=poc makecache
-      dnf -q -y --disablerepo='*' --enablerepo=poc download --destdir /tmp/p $PKGS
+      mkdir /tmp/p && cd /tmp/p
+      for url in \$(dnf -q --disablerepo='*' --enablerepo=poc repoquery --location $PKGS); do curl -sfO \"\$url\"; done
+      [ \$(ls *.rpm | wc -l) -eq $(wc -w <<<"$PKGS") ] || { echo 'packages missing from the repo metadata'; exit 1; }
       rpm --import '$RPM_KEY'
-      rpm -K /tmp/p/*.rpm
-      ! rpm -K /tmp/p/*.rpm | grep -vq 'signatures OK'
-      rpm -i --nodeps /tmp/p/*.rpm
+      rpm -K *.rpm
+      # not '! grep': bash -e ignores a negated command's failure
+      if rpm -K *.rpm | grep -v 'signatures OK'; then echo 'unsigned or badly signed package'; exit 1; fi
+      rpm -i --nodeps *.rpm
       rpm -q $PKGS
     " 2>&1); then
       pass "yum el$V: $PKGS"
