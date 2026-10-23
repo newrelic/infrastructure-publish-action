@@ -2,6 +2,7 @@ name: Batch publish POC cleanup
 
 # Deletes a POC folder from the testing bucket. Only paths under infrastructure_agent/batch_poc/
 # are accepted, so it can never touch the shared testing repo.
+# With lock_action it instead shows or deletes the testing lock left behind by a killed POC run.
 on:
   workflow_dispatch:
     inputs:
@@ -13,9 +14,18 @@ on:
         description: "Only list what would be deleted"
         type: boolean
         default: true
+      lock_action:
+        description: "none = clean up the folder; show / delete = the testing lock instead"
+        type: choice
+        options: [none, show, delete]
+        default: none
+      lock_run_id:
+        description: "For lock_action delete: run ID of the killed POC run that owns the lock"
+        required: false
 
-# only uses AWS credentials, not the GitHub token
-permissions: {}
+# AWS credentials only; actions: read to check the lock's run has finished
+permissions:
+  actions: read
 
 concurrency:
   group: batch-publish-poc
@@ -24,12 +34,16 @@ concurrency:
 env:
   AWS_REGION: us-east-1
   AWS_S3_BUCKET_NAME: nr-downloads-ohai-testing
+  AWS_S3_LOCK_BUCKET_NAME: onhost-ci-lock-testing
+  # default lock_group of the action
+  LOCK_KEY: lockgroup
   AWS_ROLE_ARN: arn:aws:iam::017663287629:role/caos_testing
   AWS_ROLE_SESSION_NAME: caos_testing
   TARGET: ${{ inputs.path }}
 
 jobs:
   cleanup:
+    if: inputs.lock_action == 'none'
     runs-on: ubuntu-latest
     steps:
       - name: Check path
@@ -59,3 +73,48 @@ jobs:
             echo "Deleted $COUNT objects under s3://$AWS_S3_BUCKET_NAME/$TARGET"
           fi
           echo "$COUNT objects under \`$TARGET\` ($([ "$DRY_RUN" = true ] && echo listed || echo deleted))" >> "$GITHUB_STEP_SUMMARY"
+
+  lock:
+    if: inputs.lock_action != 'none'
+    runs-on: ubuntu-latest
+    steps:
+      - name: ${{ inputs.lock_action == 'delete' && 'Delete stale lock' || 'Show lock' }}
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          GH_TOKEN: ${{ github.token }}
+          LOCK_ACTION: ${{ inputs.lock_action }}
+          LOCK_RUN_ID: ${{ inputs.lock_run_id }}
+        run: |
+          STS=($(aws sts assume-role --role-arn "$AWS_ROLE_ARN" --role-session-name "$AWS_ROLE_SESSION_NAME" \
+            --query '[Credentials.AccessKeyId,Credentials.SecretAccessKey,Credentials.SessionToken]' --output text))
+          export AWS_ACCESS_KEY_ID=${STS[0]} AWS_SECRET_ACCESS_KEY=${STS[1]} AWS_SESSION_TOKEN=${STS[2]}
+          LOCK="s3://$AWS_S3_LOCK_BUCKET_NAME/$LOCK_KEY"
+
+          if ! DATA=$(aws s3 cp "$LOCK" - --region "$AWS_REGION" 2>/dev/null); then
+            echo "No lock at $LOCK, nothing is holding the testing lock."
+            echo "No lock at \`$LOCK\`" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          echo "Lock at $LOCK: $DATA"
+          echo "Lock at \`$LOCK\`: \`$DATA\`" >> "$GITHUB_STEP_SUMMARY"
+          [ "$LOCK_ACTION" = "show" ] && exit 0
+
+          # Owner is <app_name>_<tag>_<run_id>; a batch run has no app_name/tag, so "__<run_id>".
+          OWNER=$(echo "$DATA" | jq -r .owner)
+          case "$LOCK_RUN_ID" in
+            ''|*[!0-9]*) echo "lock_run_id must be the numeric run ID of the killed run"; exit 1 ;;
+          esac
+          case "$OWNER" in
+            *_"$LOCK_RUN_ID") ;;
+            *) echo "Lock owner '$OWNER' is not run $LOCK_RUN_ID, not deleting it"; exit 1 ;;
+          esac
+          STATUS=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$LOCK_RUN_ID" --jq .status)
+          if [ "$STATUS" != "completed" ]; then
+            echo "Run $LOCK_RUN_ID is '$STATUS', it may still be publishing; not deleting the lock"
+            exit 1
+          fi
+
+          aws s3 rm "$LOCK" --region "$AWS_REGION"
+          echo "Deleted lock owned by $OWNER (run $LOCK_RUN_ID, $STATUS)"
+          echo "Deleted lock owned by \`$OWNER\`" >> "$GITHUB_STEP_SUMMARY"
