@@ -81,6 +81,7 @@ jobs:
           cat batch-manifest.json
 
       - name: Batch publish (this branch's action)
+        id: publish
         uses: ./
         with:
           disable_lock: false
@@ -107,24 +108,12 @@ jobs:
           MANIFEST=batch-manifest.json SCHEMAS_DIR=schemas GPG_KEYRING="$PWD/verify-keyring.gpg" \
             RESULTS=verify-results.txt bash poc/verify-batch.sh
 
-      - name: Install test from the published POC repo (current distros)
-        run: |
-          BASE="$ACCESS_POINT_HOST/${DEST_PREFIX}linux"
-          PKGS=$(jq -r '.[].app_name' batch-manifest.json | tr '\n' ' ')
-          for IMG in ubuntu:noble ubuntu:jammy ubuntu:focal debian:trixie debian:bookworm debian:bullseye; do
-            c=$(docker run --rm "$IMG" bash -c '. /etc/os-release; echo $VERSION_CODENAME')
-            echo "== apt $c ($IMG)"
-            docker run --rm "$IMG" bash -c "
-              echo 'deb [trusted=yes] $BASE/apt $c main' > /etc/apt/sources.list.d/poc.list &&
-              apt-get update -qq -o Dir::Etc::sourcelist=/etc/apt/sources.list.d/poc.list -o Dir::Etc::sourceparts=- &&
-              cd /tmp && apt-get download $PKGS && ls -la /tmp/*.deb"
-          done
-          for v in 8 9; do
-            echo "== yum el/$v"
-            docker run --rm rockylinux:$v bash -c "
-              printf '[poc]\nname=poc\nbaseurl=$BASE/yum/el/$v/x86_64/\ngpgcheck=0\nrepo_gpgcheck=0\nenabled=1\n' > /etc/yum.repos.d/poc.repo &&
-              cd /tmp && dnf -q -y download --disablerepo='*' --enablerepo=poc $PKGS && ls -la /tmp/*.rpm"
-          done
+      - name: Install test with GPG checks (current distros)
+        # runs even when Verify failed, as long as the publish succeeded
+        if: ${{ !cancelled() && steps.publish.outcome == 'success' }}
+        # signed Release / repomd.xml, signed packages, dependencies from the POC repo; fips and
+        # non-fips sets installed separately
+        run: MANIFEST=batch-manifest.json bash poc/install-test-gpg.sh "$DEST_PREFIX"
 
       - name: Summary
         if: always()
