@@ -100,19 +100,18 @@ jobs:
           gpg_private_key_base64: ${{ secrets.GPG_PRIVATE_KEY_BASE64 }}
 
       - name: Verify every schema target over HTTP
-        env:
-          GPG_PRIVATE_KEY_BASE64: ${{ secrets.GPG_PRIVATE_KEY_BASE64 }}
         run: |
-          # the secret is stored with whitespace/line breaks; scripts/Makefile import-GPG-key drops them by not quoting it
-          printf %s "$GPG_PRIVATE_KEY_BASE64" | tr -d "[:space:]" | base64 --decode | gpg --batch --import --no-default-keyring --keyring "$PWD/verify-keyring.gpg" -
+          # signatures are checked with the public key customers use (the testing bucket's copy)
+          curl -sf --retry 3 "$ACCESS_POINT_HOST/infrastructure_agent/keys/newrelic_apt_key_current.gpg" |
+            gpg --batch --import --no-default-keyring --keyring "$PWD/verify-keyring.gpg"
           MANIFEST=batch-manifest.json SCHEMAS_DIR=schemas GPG_KEYRING="$PWD/verify-keyring.gpg" \
             RESULTS=verify-results.txt bash poc/verify-batch.sh
 
       - name: Install test with GPG checks (current distros)
         # runs even when Verify failed, as long as the publish succeeded
         if: ${{ !cancelled() && steps.publish.outcome == 'success' }}
-        # signed Release / repomd.xml, signed packages, dependencies from the POC repo; fips and
-        # non-fips sets installed separately
+        # signed Release / repomd.xml, signed packages, the batch's packages installed; fips and
+        # non-fips sets separately
         run: MANIFEST=batch-manifest.json bash poc/install-test-gpg.sh "$DEST_PREFIX"
 
       - name: Summary
