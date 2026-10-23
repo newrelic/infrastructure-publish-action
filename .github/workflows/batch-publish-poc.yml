@@ -44,7 +44,8 @@ env:
 jobs:
   poc:
     runs-on: ubuntu-latest
-    timeout-minutes: 350
+    # first POC runs: ~2x a single-app publish (17 apt mirrors + ~60 rpm repos) + 30 min lock wait; tighten from the [batch] timings
+    timeout-minutes: 240
     steps:
       - name: Check branch
         # batch mode only exists on the POC branch; main's action can't run this
