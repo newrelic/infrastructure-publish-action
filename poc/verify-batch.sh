@@ -1,7 +1,8 @@
 #!/bin/bash
 # Checks, over HTTP, that every app of a batch manifest was published the way its schema says:
 #   apt:      every distribution's index lists each app's package for every arch, the pool file
-#             is reachable, the mirrored packages are still there and Release is signed
+#             is reachable, every source entry is published unchanged, only the batch adds entries
+#             and Release is signed
 #   yum/zypp: every repository's metadata lists each app's package, the package and the .repo
 #             file are reachable and repomd.xml is signed
 #   file:     every file upload is reachable
@@ -90,7 +91,34 @@ check_apt_distribution() {
     else
       fail "apt $codename: lost mirrored packages ($before in source, $after published)"
     fi
+
+    # The index paths are relative to the repo root, so this metadata is only safe at the real path
+    # if every source entry is published unchanged (same file, size and hash) and the only new
+    # entries are the batch's own packages.
+    stanza_keys "$d/src-Packages" > "$d/src-keys"
+    stanza_keys "$d/Packages" > "$d/keys"
+    local changed added
+    changed=$(comm -23 "$d/src-keys" "$d/keys" | wc -l | tr -d ' ')
+    added=$(comm -13 "$d/src-keys" "$d/keys" | cut -d'|' -f1 | sort -u | grep -vxF -f "$WORK/batch-apps" | tr '\n' ' ')
+    if [ "$changed" -eq 0 ]; then
+      pass "apt $codename: all $(wc -l < "$d/src-keys" | tr -d ' ') source entries published unchanged (filename, size, sha256)"
+    else
+      fail "apt $codename: $changed source entries missing or changed, e.g. $(comm -23 "$d/src-keys" "$d/keys" | head -2 | tr '\n' ' ')"
+    fi
+    if [ -z "${added// /}" ]; then
+      pass "apt $codename: only the batch's packages added"
+    else
+      fail "apt $codename: entries added for packages outside the batch: $added"
+    fi
   fi
+}
+
+# one "package|version|arch|filename|size|sha256" line per index entry; arch "all" entries repeat
+# in every binary-<arch> index, hence the sort -u
+stanza_keys() {
+  awk '/^Package: /{p=$2} /^Version: /{v=$2} /^Architecture: /{a=$2} /^Filename: /{f=$2} /^Size: /{s=$2} /^SHA256: /{h=$2}
+       /^$/ { if (p != "") print p "|" v "|" a "|" f "|" s "|" h; p = v = a = f = s = h = "" }
+       END  { if (p != "") print p "|" v "|" a "|" f "|" s "|" h }' "$1" | sort -u
 }
 
 check_apt_app() {
@@ -143,6 +171,7 @@ check_rpm_repo() {
 }
 
 APPS=$(jq length "$MANIFEST")
+jq -r '.[].app_name' "$MANIFEST" > "$WORK/batch-apps"
 for i in $(seq 0 $((APPS - 1))); do
   APP=$(jq -r ".[$i].app_name" "$MANIFEST")
   REPO=$(jq -r ".[$i].repo_name" "$MANIFEST")
