@@ -54,6 +54,7 @@ func Test_loadConfig(t *testing.T) {
 				AptlyFolder:       defaultAptlyFolder,
 				LockGroup:         defaultLockgroup,
 				UseDefLockRetries: true,
+				SchemasFolder:     defaultSchemasFolder,
 			},
 		},
 		{
@@ -76,6 +77,7 @@ func Test_loadConfig(t *testing.T) {
 				AptlyFolder:       "FooFolder",
 				LockGroup:         "FooGroup",
 				UseDefLockRetries: false,
+				SchemasFolder:     defaultSchemasFolder,
 			},
 		},
 	}

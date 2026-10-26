@@ -34,23 +34,23 @@ inputs:
     description: Name of the S3 bucket
     required: true
   repo_name:
-    description: Combination of organization and repository (i.e. newrelic/nri-redis)
-    required: true
+    description: Combination of organization and repository (i.e. newrelic/nri-redis). Not needed with apps_manifest_path.
+    required: false
   app_name:
-    description: Name of the package (i.e. nri-redis)
-    required: true
+    description: Name of the package (i.e. nri-redis). Not needed with apps_manifest_path.
+    required: false
   app_version:
     description: Version of the package. If not present is extracted from the tag removing trailing v (i.e tag=v1.0.1 -> version=1.0.1)
     required: false
   tag:
-    description: Tag pointing to the release
-    required: true
+    description: Tag pointing to the release. Not needed with apps_manifest_path.
+    required: false
   access_point_host:
     description: Http host to use and AP for .repo files in YUM/ZYPP repos
     required: false
   schema:
-    description: Name of the schema describing the packages to be published (i.e. infra-agent, ohi, nrjmx, custom - requires schema_url, custom-local - requires schema_path)
-    required: true
+    description: Name of the schema describing the packages to be published (i.e. infra-agent, ohi, nrjmx, custom - requires schema_url, custom-local - requires schema_path). Not needed with apps_manifest_path.
+    required: false
   schema_url:
     description: Url to custom schema file
     required: false
@@ -72,6 +72,9 @@ inputs:
     default: "infrastructure_agent/"
   apt_skip_mirror:
     description: skip mirroring apt repo
+    required: false
+  apps_manifest_path:
+    description: Batch mode. Path to a JSON array of apps to publish in one run, each with app_name, repo_name, tag, schema (and optionally app_version, schema_url, schema_path). Replaces app_name, repo_name, tag and schema.
     required: false
 runs:
   using: "composite"
@@ -101,3 +104,4 @@ runs:
         LOCAL_PACKAGES_PATH: ${{ inputs.local_packages_path }}
         DEST_PREFIX: ${{ inputs.dest_prefix }}
         APT_SKIP_MIRROR: ${{ inputs.apt_skip_mirror }}
+        APPS_MANIFEST_PATH: ${{ inputs.apps_manifest_path }}

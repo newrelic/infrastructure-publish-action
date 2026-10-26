@@ -535,6 +535,19 @@ func (m *MarkerMock) ShouldEnd(mark release.Mark) {
 		Return(nil)
 }
 
+func (m *MarkerMock) EndBatch(marks []release.Mark) error {
+	args := m.Called(marks)
+
+	return args.Error(0)
+}
+
+func (m *MarkerMock) ShouldEndBatch(marks []release.Mark) {
+	m.
+		On("EndBatch", marks).
+		Once().
+		Return(nil)
+}
+
 func (m *MarkerMock) ShouldFailOnEnd(mark release.Mark, err error) {
 	m.
 		On("End", mark).

@@ -43,6 +43,8 @@ func main() {
 		l.Fatal("loading config: " + err.Error())
 	}
 
+	batch := conf.AppsManifestPath != ""
+
 	releaseMarker, err := newReleaseMarker(conf)
 	if err != nil {
 		l.Fatal("creating release marker: " + err.Error())
@@ -89,6 +91,14 @@ func main() {
 		if err != nil {
 			l.Fatal("cannot create lock on s3: " + err.Error())
 		}
+	}
+
+	if batch {
+		if err = runBatch(conf, bucketLock, releaseMarker); err != nil {
+			l.Fatal(err)
+		}
+		l.Println("🎉 batch upload phase complete")
+		return
 	}
 
 	uploadSchemas, err := config.ParseUploadSchemasFile(conf.UploadSchemaFilePath)
