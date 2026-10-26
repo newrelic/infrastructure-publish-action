@@ -36,7 +36,8 @@ RUN ./aws/install
 # Prepare action
 WORKDIR /home/gha/publisher
 ADD publisher .
-RUN go build -o /bin/publisher ./publisher.go
+# the whole main package: publisher.go and batch.go
+RUN go build -o /bin/publisher .
 RUN chmod +x /bin/publisher
 
 WORKDIR /home/gha
