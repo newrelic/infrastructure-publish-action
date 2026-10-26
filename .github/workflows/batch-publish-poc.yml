@@ -6,6 +6,8 @@ name: Batch publish POC
 # the action's own code, the same as a single-integration release.
 # Testing bucket only, and only under infrastructure_agent/batch_poc/.
 # Clean up with the "Batch publish POC cleanup" workflow.
+# action_code picks the code that publishes: this branch's (POC) or feat/batch-publish (production
+# candidate). The verify, install and upgrade checks are the same for both.
 on:
   workflow_dispatch:
     inputs:
@@ -21,6 +23,13 @@ on:
         description: "Folder to publish into (must be under infrastructure_agent/batch_poc/)"
         default: "infrastructure_agent/batch_poc/"
         required: true
+      action_code:
+        description: "Code that publishes: this branch's action, or the production-ready feat/batch-publish branch (must be pushed)"
+        type: choice
+        options:
+          - this-branch
+          - feat/batch-publish
+        default: this-branch
 
 permissions:
   contents: read
@@ -82,7 +91,29 @@ jobs:
 
       - name: Batch publish (this branch's action)
         id: publish
+        if: inputs.action_code == 'this-branch'
         uses: ./
+        with:
+          disable_lock: false
+          run_id: ${{ github.run_id }}
+          apps_manifest_path: batch-manifest.json
+          access_point_host: testing
+          dest_prefix: ${{ inputs.dest_prefix }}
+          aws_region: ${{ env.AWS_REGION }}
+          aws_role_arn: ${{ env.AWS_ROLE_ARN }}
+          aws_role_session_name: ${{ env.AWS_ROLE_SESSION_NAME }}
+          aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws_s3_bucket_name: ${{ env.AWS_S3_BUCKET_NAME }}
+          aws_s3_lock_bucket_name: ${{ env.AWS_S3_LOCK_BUCKET_NAME }}
+          gpg_passphrase: ${{ secrets.GPG_PASSPHRASE }}
+          gpg_private_key_base64: ${{ secrets.GPG_PRIVATE_KEY_BASE64 }}
+
+      - name: Batch publish (feat/batch-publish branch)
+        id: publish_feat
+        if: inputs.action_code == 'feat/batch-publish'
+        # the action builds its image from that branch's code; the checks below are this branch's
+        uses: newrelic/infrastructure-publish-action@feat/batch-publish
         with:
           disable_lock: false
           run_id: ${{ github.run_id }}
@@ -109,7 +140,7 @@ jobs:
 
       - name: Install test with GPG checks (current distros)
         # runs even when Verify failed, as long as the publish succeeded
-        if: ${{ !cancelled() && steps.publish.outcome == 'success' }}
+        if: ${{ !cancelled() && (steps.publish.outcome == 'success' || steps.publish_feat.outcome == 'success') }}
         # signed Release / repomd.xml, signed packages, the batch's packages installed; fips and
         # non-fips sets separately
         # shell: bash runs with -eo pipefail, so the tee keeps the script's exit status
@@ -117,7 +148,7 @@ jobs:
         run: MANIFEST=batch-manifest.json bash poc/install-test-gpg.sh "$DEST_PREFIX" | tee install-results.txt
 
       - name: Upgrade test from the shared testing repo to the batch repo
-        if: ${{ !cancelled() && steps.publish.outcome == 'success' }}
+        if: ${{ !cancelled() && (steps.publish.outcome == 'success' || steps.publish_feat.outcome == 'success') }}
         # previous versions installed from infrastructure_agent/linux, host switched to the batch
         # repo, integrations upgraded through its signed metadata
         # shell: bash runs with -eo pipefail, so the tee keeps the script's exit status
@@ -129,6 +160,7 @@ jobs:
         run: |
           {
             echo "## Batch publish POC"
+            echo "Published with: \`${{ inputs.action_code }}\`"
             echo "Manifest:"
             echo '```json'; cat batch-manifest.json 2>/dev/null; echo '```'
             echo "Browse: $ACCESS_POINT_HOST/index.html?prefix=${DEST_PREFIX}"
