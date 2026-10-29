@@ -9,6 +9,10 @@ inputs:
     description: Retries amount when repo is busy. Retry backoff is 1 minute.
     required: false
     default: "30"
+  lock_group:
+    description: Name of the lockfile (S3 key) in the lock bucket. Publishes using different lock groups do not block each other.
+    required: false
+    default: "lockgroup"
   run_id:
     description: Action run identifier. To be provisioned from env-var `GITHUB_RUN_ID`.
     required: false
@@ -97,6 +101,7 @@ runs:
         AWS_REGION: ${{ inputs.aws_region }}
         AWS_ROLE_ARN: ${{ inputs.aws_role_arn }}
         DISABLE_LOCK: ${{ inputs.disable_lock }}
+        LOCK_GROUP: ${{ inputs.lock_group }}
         AWS_ROLE_SESSION_NAME: ${{ inputs.aws_role_session_name }}
         LOCAL_PACKAGES_PATH: ${{ inputs.local_packages_path }}
         DEST_PREFIX: ${{ inputs.dest_prefix }}

@@ -8,6 +8,7 @@ A GitHub Action to publish artifacts from GitHub release assets into an S3 bucke
 | Key                        | Description |
 | ---------------            | ----------- |
 | `disable_lock`             | Disabled locking, for stuff that won't need one, like Windows MSIs. |
+| `lock_group`               | Name of the lockfile (S3 key) in the lock bucket. Publishes with different lock groups can run concurrently. Defaults to `lockgroup`. |
 | `run_id`                   | Action run identifier. To be provisioned from env-var `GITHUB_RUN_ID`. |
 | `aws_s3_lock_bucket_name`  | Name of the S3 bucket for lockfiles. |
 | `aws_role_session_name`    | Name of the S3 role session name. |
@@ -107,6 +108,8 @@ As GitHub Actions can run many workflows in parallel, once a publish-action is c
 In the current implementation only one publish action with the same lock will be executed, all other concurrent jobs will be terminated by the lock file check.
 
 The locking mechanism is based on the existance of a file in a defined `aws_s3_lock_bucket_name`. The file contains the `tag` and time of the lock creation.
+
+Use `lock_group` to keep several independent locks in the same bucket. Only use different groups for publishes that don't modify overlapping repository files.
 
 NOTE: Currently in case of an interrupted job, the lock file will not be removed and it would be necessary to remove it manually from the bucket.
 
