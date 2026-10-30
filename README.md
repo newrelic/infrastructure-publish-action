@@ -8,7 +8,7 @@ A GitHub Action to publish artifacts from GitHub release assets into an S3 bucke
 | Key                        | Description |
 | ---------------            | ----------- |
 | `disable_lock`             | Disabled locking, for stuff that won't need one, like Windows MSIs. |
-| `lock_group`               | Name of the lockfile (S3 key) in the lock bucket. Publishes with different lock groups can run concurrently. Defaults to `lockgroup`. |
+| `lock_group`               | Name of the lockfile (S3 key) in the lock bucket. Publishes with different lock groups can run concurrently. Defaults to `lockgroup` when empty. |
 | `run_id`                   | Action run identifier. To be provisioned from env-var `GITHUB_RUN_ID`. |
 | `aws_s3_lock_bucket_name`  | Name of the S3 bucket for lockfiles. |
 | `aws_role_session_name`    | Name of the S3 role session name. |

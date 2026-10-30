@@ -10,9 +10,9 @@ inputs:
     required: false
     default: "30"
   lock_group:
-    description: Name of the lockfile (S3 key) in the lock bucket. Publishes using different lock groups do not block each other.
+    description: Name of the lockfile (S3 key) in the lock bucket. Publishes using different lock groups do not block each other. Defaults to "lockgroup" when empty.
     required: false
-    default: "lockgroup"
+    default: ""
   run_id:
     description: Action run identifier. To be provisioned from env-var `GITHUB_RUN_ID`.
     required: false
