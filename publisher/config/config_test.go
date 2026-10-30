@@ -57,6 +57,24 @@ func Test_loadConfig(t *testing.T) {
 			},
 		},
 		{
+			name: "explicit empty lock group falls back to default",
+			env: map[string]string{
+				"APP_NAME":   "foo",
+				"TAG":        "vFooBar",
+				"LOCK_GROUP": "",
+			},
+			want: Config{
+				AppName:           "foo",
+				Tag:               "vFooBar",
+				Version:           "FooBar",
+				AccessPointHost:   accessPointProduction,
+				MirrorHost:        mirrorProduction,
+				AptlyFolder:       defaultAptlyFolder,
+				LockGroup:         defaultLockgroup,
+				UseDefLockRetries: true,
+			},
+		},
+		{
 			name: "custom values",
 			env: map[string]string{
 				"TAG":               "vFooBar",
