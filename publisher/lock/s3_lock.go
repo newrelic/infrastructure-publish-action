@@ -29,9 +29,16 @@ type S3Config struct {
 	TTL          time.Duration
 }
 
+// s3API is the subset of the S3 client used by the lock, allowing it to be faked in tests.
+type s3API interface {
+	GetObject(*s3.GetObjectInput) (*s3.GetObjectOutput, error)
+	PutObject(*s3.PutObjectInput) (*s3.PutObjectOutput, error)
+	DeleteObject(*s3.DeleteObjectInput) (*s3.DeleteObjectOutput, error)
+}
+
 // S3 based lock.
 type S3 struct {
-	client *s3.S3
+	client s3API
 	logF   Logf
 	conf   S3Config
 }
@@ -81,11 +88,15 @@ func NewS3(c S3Config, logfn Logf) (*S3, error) {
 		Region:      aws.String(c.Region),
 	}
 
+	return newS3WithClient(s3.New(sess, &awsCfg), c, logfn), nil
+}
+
+func newS3WithClient(client s3API, c S3Config, logfn Logf) *S3 {
 	return &S3{
-		client: s3.New(sess, &awsCfg),
+		client: client,
 		logF:   logfn,
 		conf:   c,
-	}, nil
+	}
 }
 
 // Lock S3 has no compare-and-swap so this is no bulletproof solution, but should be good enough.
