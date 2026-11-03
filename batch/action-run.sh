@@ -1,0 +1,70 @@
+#!/bin/bash
+set -e
+# build docker image form Dockerfile
+echo "Build fresh docker image for newrelic/infrastructure-publish-action (batch)"
+# @TODO add --no-cache
+# the action lives in batch/, the image is built from the root of the repository
+REPO_PATH="$GITHUB_ACTION_PATH/.."
+docker build --platform linux/amd64 -t newrelic/infrastructure-publish-action-batch -f "$REPO_PATH/Dockerfile.batch" "$REPO_PATH"
+
+if [ "${CI}" = "true" ]; then
+  # avoid container network errors in GHA runners
+  set +e
+  echo "Creating iptables rule to drop invalid packages"
+  sudo iptables -D INPUT -i eth0 -m state --state INVALID -j DROP 2>/dev/null
+  sudo iptables -A INPUT -i eth0 -m state --state INVALID -j DROP
+  set -e
+fi
+
+## Freeing space since 14GB are not enough anymore
+df -ih
+df -h
+if [ "${CI}" = "true" ]; then
+  echo "Deleting android, dotnet, haskell, CodeQL, Python, swift to free up space"
+  sudo rm -rf /usr/local/lib/android /usr/share/dotnet /usr/local/.ghcup /opt/hostedtoolcache/CodeQL /opt/hostedtoolcache/Python /usr/share/swift
+  df -ih
+  df -h
+fi
+
+
+# The manifest is read inside the container, so it gets the same `/srv` path as the other mounted files.
+APPS_MANIFEST_PATH=$( realpath --canonicalize-missing "$APPS_MANIFEST_PATH" | sed -e "s|$PWD|/srv|" )
+if [ -n "$BATCH_RESULT_PATH" ]; then
+  BATCH_RESULT_PATH=$( realpath --canonicalize-missing "$BATCH_RESULT_PATH" | sed -e "s|$PWD|/srv|" )
+fi
+
+# run docker container to perform all actions inside.
+# $( pwd ) is mounted on /srv to enable grabbing packages
+# from the host machine instead of downloading them from GH,
+# and therefore as LOCAL_PACKAGES_PATH will refer to path
+# inside the docker container it should be `/srv/*`
+echo "Run docker container with action logic inside"
+docker run --platform linux/amd64 --rm \
+        --name=infrastructure-publish-action-batch \
+        --security-opt apparmor:unconfined \
+        --device /dev/fuse \
+        --cap-add SYS_ADMIN \
+        -v $( pwd ):/srv \
+        -e AWS_REGION \
+        -e AWS_ACCESS_KEY_ID \
+        -e AWS_SECRET_ACCESS_KEY \
+        -e AWS_ROLE_SESSION_NAME \
+        -e AWS_ROLE_ARN \
+        -e AWS_S3_BUCKET_NAME \
+        -e AWS_S3_LOCK_BUCKET_NAME \
+        -e ACCESS_POINT_HOST \
+        -e RUN_ID \
+        -e ARTIFACTS_DEST_FOLDER=/mnt/s3 \
+        -e ARTIFACTS_SRC_FOLDER=/home/gha/assets \
+        -e GPG_PRIVATE_KEY_BASE64 \
+        -e GPG_PASSPHRASE \
+        -e DISABLE_LOCK \
+        -e GPG_KEY_RING=/home/gha/keyring.gpg \
+        -e DEST_PREFIX \
+        -e LOCAL_PACKAGES_PATH \
+        -e APT_SKIP_MIRROR \
+        -e APPS_MANIFEST_PATH \
+        -e SCHEMAS_FOLDER \
+        -e BATCH_RESULT_PATH \
+        newrelic/infrastructure-publish-action-batch \
+        "$@"
