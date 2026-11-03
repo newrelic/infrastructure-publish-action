@@ -19,8 +19,12 @@ inputs:
     description: Name of the S3 role session name
     required: false
   aws_region:
-    description: AWS region for the buckets.
+    description: AWS region for the publish bucket (and for the lock bucket unless aws_s3_lock_bucket_region is set).
     required: false
+  aws_s3_lock_bucket_region:
+    description: AWS region of the lock bucket. Defaults to aws_region when empty.
+    required: false
+    default: ""
   aws_role_arn:
     description: ARN for the IAM role to be used for fetching AWS STS credentials.
     required: true
@@ -95,6 +99,7 @@ runs:
         RUN_ID: ${{ inputs.run_id }}
         AWS_S3_LOCK_BUCKET_NAME: ${{ inputs.aws_s3_lock_bucket_name }}
         AWS_REGION: ${{ inputs.aws_region }}
+        AWS_S3_LOCK_BUCKET_REGION: ${{ inputs.aws_s3_lock_bucket_region }}
         AWS_ROLE_ARN: ${{ inputs.aws_role_arn }}
         DISABLE_LOCK: ${{ inputs.disable_lock }}
         AWS_ROLE_SESSION_NAME: ${{ inputs.aws_role_session_name }}

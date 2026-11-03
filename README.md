@@ -11,7 +11,8 @@ A GitHub Action to publish artifacts from GitHub release assets into an S3 bucke
 | `run_id`                   | Action run identifier. To be provisioned from env-var `GITHUB_RUN_ID`. |
 | `aws_s3_lock_bucket_name`  | Name of the S3 bucket for lockfiles. |
 | `aws_role_session_name`    | Name of the S3 role session name. |
-| `aws_region`               | AWS region for the buckets. |
+| `aws_region`               | AWS region of the publish bucket (and of the lock bucket unless `aws_s3_lock_bucket_region` is set). |
+| `aws_s3_lock_bucket_region`| AWS region of the lock bucket. Defaults to `aws_region` when empty. |
 | `aws_role_arn`             | ARN for the IAM role to be used for fetching AWS STS credentials. |
 | `aws_secret_access_key`    | AWS secret access key. |
 | `aws_access_key_id`        | AWS access key id. |

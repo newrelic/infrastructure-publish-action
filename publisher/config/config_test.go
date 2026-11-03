@@ -90,3 +90,44 @@ func Test_loadConfig(t *testing.T) {
 		})
 	}
 }
+
+func Test_loadConfig_lockBucketRegion(t *testing.T) {
+	tests := []struct {
+		name           string
+		env            map[string]string
+		wantRegion     string
+		wantLockRegion string
+	}{
+		{
+			name:           "defaults to the publish bucket region",
+			env:            map[string]string{"AWS_REGION": "us-east-2"},
+			wantRegion:     "us-east-2",
+			wantLockRegion: "us-east-2",
+		},
+		{
+			name:           "explicit empty lock region falls back to the publish bucket region",
+			env:            map[string]string{"AWS_REGION": "us-east-2", "AWS_S3_LOCK_BUCKET_REGION": ""},
+			wantRegion:     "us-east-2",
+			wantLockRegion: "us-east-2",
+		},
+		{
+			name:           "lock bucket in a different region",
+			env:            map[string]string{"AWS_REGION": "us-east-2", "AWS_S3_LOCK_BUCKET_REGION": "us-east-1"},
+			wantRegion:     "us-east-2",
+			wantLockRegion: "us-east-1",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv("APP_NAME", "foo")
+			t.Setenv("TAG", "vFooBar")
+			for k, v := range tt.env {
+				t.Setenv(k, v)
+			}
+			config, err := LoadConfig()
+			assert.NoError(t, err)
+			assert.Equal(t, tt.wantRegion, config.AwsRegion)
+			assert.Equal(t, tt.wantLockRegion, config.AwsLockBucketRegion)
+		})
+	}
+}

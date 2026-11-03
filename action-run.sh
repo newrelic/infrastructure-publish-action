@@ -38,6 +38,7 @@ docker run --platform linux/amd64 --rm \
         --cap-add SYS_ADMIN \
         -v $( pwd ):/srv \
         -e AWS_REGION \
+        -e AWS_S3_LOCK_BUCKET_REGION \
         -e AWS_ACCESS_KEY_ID \
         -e AWS_SECRET_ACCESS_KEY \
         -e AWS_ROLE_SESSION_NAME \
