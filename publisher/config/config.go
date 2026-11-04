@@ -41,6 +41,7 @@ type Config struct {
 	GpgPassphrase        string
 	GpgKeyRing           string
 	AwsRegion            string
+	AwsLockBucketRegion  string
 	AwsRoleARN           string
 	// locking properties (candidate for factoring)
 	AwsLockBucket     string
@@ -97,6 +98,7 @@ func LoadConfig() (Config, error) {
 	viper.BindEnv("aws_s3_lock_bucket_name")
 	viper.BindEnv("aws_role_arn")
 	viper.BindEnv("aws_region")
+	viper.BindEnv("aws_s3_lock_bucket_region")
 	viper.BindEnv("disable_lock")
 	viper.BindEnv("lock_retries")
 	viper.BindEnv("lock_group")
@@ -110,6 +112,12 @@ func LoadConfig() (Config, error) {
 	aptlyF := viper.GetString("aptly_folder")
 	if aptlyF == "" {
 		aptlyF = defaultAptlyFolder
+	}
+
+	// the lock bucket may live in a different region than the publish bucket
+	lockBucketRegion := viper.GetString("aws_s3_lock_bucket_region")
+	if lockBucketRegion == "" {
+		lockBucketRegion = viper.GetString("aws_region")
 	}
 
 	lockGroup := viper.GetString("lock_group")
@@ -146,6 +154,7 @@ func LoadConfig() (Config, error) {
 		AwsBucket:            viper.GetString("aws_s3_bucket_name"),
 		AwsRoleARN:           viper.GetString("aws_role_arn"),
 		AwsRegion:            viper.GetString("aws_region"),
+		AwsLockBucketRegion:  lockBucketRegion,
 		AwsTags:              viper.GetString("aws_tags"),
 		DisableLock:          viper.GetBool("disable_lock"),
 		LockRetries:          viper.GetUint("lock_retries"),
