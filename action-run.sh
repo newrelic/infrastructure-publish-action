@@ -58,6 +58,7 @@ docker run --platform linux/amd64 --rm \
         -e GPG_PRIVATE_KEY_BASE64 \
         -e GPG_PASSPHRASE \
         -e DISABLE_LOCK \
+        -e LOCK_GROUP \
         -e GPG_KEY_RING=/home/gha/keyring.gpg \
         -e DEST_PREFIX \
         -e LOCAL_PACKAGES_PATH \

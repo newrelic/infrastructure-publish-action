@@ -48,6 +48,20 @@ func TestS3_Lock_onLocked(t *testing.T) {
 	defer l2.Release()
 }
 
+func TestS3_Lock_differentGroupsDoNotBlock(t *testing.T) {
+	l1, err := NewS3(newTestConf(t.Name()+"-group-1", "owner-1"), t.Logf)
+	require.NoError(t, err)
+
+	l2, err := NewS3(newTestConf(t.Name()+"-group-2", "owner-2"), t.Logf)
+	require.NoError(t, err)
+
+	defer l1.Release()
+	defer l2.Release()
+
+	assert.NoError(t, l1.Lock())
+	assert.NoError(t, l2.Lock())
+}
+
 func TestS3_Release(t *testing.T) {
 	l, err := NewS3(newTestConf(t.Name(), "owner"), t.Logf)
 	require.NoError(t, err)

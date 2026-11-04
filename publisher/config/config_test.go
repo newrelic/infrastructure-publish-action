@@ -1,7 +1,6 @@
 package config
 
 import (
-	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -57,6 +56,24 @@ func Test_loadConfig(t *testing.T) {
 			},
 		},
 		{
+			name: "explicit empty lock group falls back to default",
+			env: map[string]string{
+				"APP_NAME":   "foo",
+				"TAG":        "vFooBar",
+				"LOCK_GROUP": "",
+			},
+			want: Config{
+				AppName:           "foo",
+				Tag:               "vFooBar",
+				Version:           "FooBar",
+				AccessPointHost:   accessPointProduction,
+				MirrorHost:        mirrorProduction,
+				AptlyFolder:       defaultAptlyFolder,
+				LockGroup:         defaultLockgroup,
+				UseDefLockRetries: true,
+			},
+		},
+		{
 			name: "custom values",
 			env: map[string]string{
 				"TAG":               "vFooBar",
@@ -82,7 +99,7 @@ func Test_loadConfig(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			for k, v := range tt.env {
-				os.Setenv(k, v)
+				t.Setenv(k, v)
 			}
 			config, err := LoadConfig()
 			assert.NoError(t, err)
