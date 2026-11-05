@@ -94,17 +94,19 @@ func runBatch(conf config.Config, opts config.BatchOptions, bucketLock lock.Buck
 }
 
 func newBatchMarker(conf config.Config) (release.BatchMarker, error) {
-	// We'll leave the release marker file in the root of the repository
-	// i.e.
-	// repo = /infrastructure_agent/linux/apt/
-	// release marker = /infrastructure_agent/releases.json
-	repoRootDir := strings.Split(strings.TrimPrefix(conf.DestPrefix, "/"), "/")[0]
 	return release.NewBatchMarkerAWS(release.S3Config{
 		Bucket:    conf.AwsBucket,
 		RoleARN:   conf.AwsRoleARN,
 		Region:    conf.AwsRegion,
-		Directory: repoRootDir,
+		Directory: markerDirectory(conf.DestPrefix),
 	}, l.Printf)
+}
+
+// markerDirectory is where releases.json lives: in the root of the repository the batch publishes to,
+// i.e. the whole dest prefix. infrastructure_agent/ gives infrastructure_agent/releases.json, as for a
+// single app, and a nested prefix such as testing/v2/infrastructure_agent_v2/ keeps it inside that prefix.
+func markerDirectory(destPrefix string) string {
+	return strings.Trim(destPrefix, "/")
 }
 
 // newBucketLock builds the lock the same way the single-app publisher does.

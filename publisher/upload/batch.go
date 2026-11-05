@@ -158,10 +158,10 @@ func groupApt(jobs []AppUploadJob) ([]aptGroup, error) {
 	// One distribution is mirrored and published once, so every app has to agree on where from and where to.
 	for _, group := range groups {
 		first := group.entries[0]
-		firstSrc := generateAptSrcRepoUrl(first.upload.SrcRepo, first.conf.MirrorHost)
+		firstSrc := batchAptSrcRepo(first.conf, first.upload, group.osVersion)
 		firstDest := utils.ReplacePlaceholders(first.upload.Dest, "", "", "", "", "", first.conf.DestPrefix, group.osVersion)
 		for _, entry := range group.entries[1:] {
-			src := generateAptSrcRepoUrl(entry.upload.SrcRepo, entry.conf.MirrorHost)
+			src := batchAptSrcRepo(entry.conf, entry.upload, group.osVersion)
 			dest := utils.ReplacePlaceholders(entry.upload.Dest, "", "", "", "", "", entry.conf.DestPrefix, group.osVersion)
 			if src != firstSrc || dest != firstDest {
 				return nil, fmt.Errorf("apt %s: %s (src %s, dest %s) and %s (src %s, dest %s) must use the same apt repo to be batched",

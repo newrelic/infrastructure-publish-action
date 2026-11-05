@@ -3,8 +3,11 @@ package upload
 import (
 	"fmt"
 	"io/ioutil"
+	"net/http"
 	"os"
 	"path"
+	"strings"
+	"time"
 
 	"github.com/newrelic/infrastructure-publish-action/publisher/config"
 	"github.com/newrelic/infrastructure-publish-action/publisher/download"
@@ -148,13 +151,50 @@ func createAptRepo(conf config.Config, upload config.Upload, osVersion string) (
 
 	if !conf.AptSkipMirror {
 		// Mirror repo start
-		srcRepo := generateAptSrcRepoUrl(upload.SrcRepo, conf.MirrorHost)
+		srcRepo := batchAptSrcRepo(conf, upload, osVersion)
+		exists, existsErr := aptDistExists(srcRepo, osVersion)
+		if existsErr != nil {
+			return fmt.Errorf("cannot check the apt repo to mirror %s: %w (set apt_skip_mirror to start an empty repo)", srcRepo, existsErr)
+		}
+		if !exists {
+			// first publish under this prefix: nothing to mirror, the batch's packages are the whole repo
+			utils.Logger.Printf("[ ] No apt repo for %s at %s yet, starting an empty one", osVersion, srcRepo)
+			return nil
+		}
 		err = mirrorAPTRepo(conf, srcRepo, osVersion)
 		if err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+// batchAptSrcRepo is the apt repo mirrored before the batch adds its packages. It is the repo the batch
+// publishes to (mirror host + rendered dest), so a prefix other than infrastructure_agent/ is
+// updated in place and does not pull the packages of another one. The schema's src_repo is not used.
+func batchAptSrcRepo(conf config.Config, upload config.Upload, osVersion string) string {
+	dest := utils.ReplacePlaceholders(upload.Dest, "", "", "", "", "", conf.DestPrefix, osVersion)
+	return strings.TrimSuffix(conf.MirrorHost, "/") + "/" + strings.Trim(dest, "/")
+}
+
+// aptDistExists tells whether srcRepo already has the distribution. Only a 404 means "not there yet";
+// any other answer (403, 5xx, network error) is an error, so a misread never publishes an empty index
+// over an existing repo. It is a variable for tests.
+var aptDistExists = func(srcRepo, osVersion string) (bool, error) {
+	client := http.Client{Timeout: 30 * time.Second}
+	resp, err := client.Head(srcRepo + "/dists/" + osVersion + "/Release")
+	if err != nil {
+		return false, err
+	}
+	defer resp.Body.Close()
+	switch resp.StatusCode {
+	case http.StatusOK:
+		return true, nil
+	case http.StatusNotFound:
+		return false, nil
+	default:
+		return false, fmt.Errorf("unexpected status %d", resp.StatusCode)
+	}
 }
 
 // addAptPackage adds one package into the local aptly repo and copies it into the pool.
