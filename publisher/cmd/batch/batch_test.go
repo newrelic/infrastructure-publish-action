@@ -120,6 +120,6 @@ func TestBatchResult_write(t *testing.T) {
 func Test_markerDirectory(t *testing.T) {
 	assert.Equal(t, "infrastructure_agent", markerDirectory("infrastructure_agent/"))
 	assert.Equal(t, "infrastructure_agent_v2", markerDirectory("/infrastructure_agent_v2/"))
-	assert.Equal(t, "testing-pre-releases/v2-batch-test3/infrastructure_agent_v2",
-		markerDirectory("testing-pre-releases/v2-batch-test3/infrastructure_agent_v2/"))
+	assert.Equal(t, "nested/prefix/infrastructure_agent_v2",
+		markerDirectory("nested/prefix/infrastructure_agent_v2/"))
 }

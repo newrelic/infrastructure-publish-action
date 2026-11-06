@@ -26,8 +26,8 @@ func Test_batchAptSrcRepo_followsTheDestPrefix(t *testing.T) {
 			"http://mirror", "infrastructure_agent_v2/", "http://mirror/infrastructure_agent_v2/linux/apt",
 		},
 		"nested test prefix and trailing slash on the host": {
-			"http://mirror/", "testing-pre-releases/v2-batch-test3/infrastructure_agent_v2/",
-			"http://mirror/testing-pre-releases/v2-batch-test3/infrastructure_agent_v2/linux/apt",
+			"http://mirror/", "nested/prefix/infrastructure_agent_v2/",
+			"http://mirror/nested/prefix/infrastructure_agent_v2/linux/apt",
 		},
 	}
 	for name, tt := range tests {
