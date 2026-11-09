@@ -72,8 +72,17 @@ func copyRpmFile(rpm rpmFile) error {
 }
 
 // updateRpmRepo creates the repository if missing, writes the .repo file, regenerates the
-// metadata for every package present in s3RepoPath and signs it.
-func updateRpmRepo(conf config.Config, s3RepoPath, destPath, source string) (err error) {
+// metadata for every package present in s3RepoPath and signs it. The new metadata is checked against the
+// repository before it replaces the old one (see checkRpmIndex): when it is incomplete, e.g. because the S3
+// mount dropped while createrepo was reading, the bucket is remounted and the repository is built again.
+func updateRpmRepo(conf config.Config, s3RepoPath, destPath, source string) error {
+	return retryBadIndex(rpmIndexTries,
+		func() error { return updateRpmRepoOnce(conf, s3RepoPath, destPath, source) },
+		func() { _ = os.RemoveAll(path.Join(os.TempDir(), "repodata")) },
+		func() error { return forceRemount(conf.ArtifactsDestFolder) })
+}
+
+func updateRpmRepoOnce(conf config.Config, s3RepoPath, destPath, source string) (err error) {
 	s3DotRepoFilepath := path.Join(s3RepoPath, "newrelic-infra.repo")
 	s3RepoData := path.Join(s3RepoPath, "repodata")
 	s3RepomdFilepath := path.Join(s3RepoPath, repodataRpmPath)
@@ -108,7 +117,19 @@ func updateRpmRepo(conf config.Config, s3RepoPath, destPath, source string) (err
 		}
 	}
 
-	if err = utils.ExecLogOutput(utils.Logger, "createrepo", commandTimeout, "--update", "-s", "sha", s3RepoPath, "-o", os.TempDir()); err != nil {
+	tmpRepodata := path.Join(os.TempDir(), "repodata")
+	previouslyIndexed := 0
+	if n, countErr := indexedPackages(tmpRepodata); countErr == nil {
+		previouslyIndexed = n
+	}
+
+	output, err := runCreaterepo("--update", "-s", "sha", s3RepoPath, "-o", os.TempDir())
+	if err != nil {
+		return fmt.Errorf("%w: createrepo failed: %v", errBadIndex, err)
+	}
+	// createrepo exits successfully even when it could not read some packages: do not replace the
+	// metadata in s3 unless it lists every package of the repository
+	if err = checkRpmIndex(s3RepoPath, tmpRepodata, previouslyIndexed, output); err != nil {
 		return err
 	}
 

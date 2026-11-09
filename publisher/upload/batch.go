@@ -108,7 +108,11 @@ func UploadArtifactsBatch(jobs []AppUploadJob, bucketLock lock.BucketLock, relea
 	}
 	utils.Logger.Printf("[batch] file uploads for %d apps took %s", len(jobs), time.Since(start).Round(time.Second))
 
+	mountDir := jobs[0].Conf.ArtifactsDestFolder
 	for _, group := range aptGroups {
+		if err = ensureFreshMount(mountDir); err != nil {
+			return err
+		}
 		start = time.Now()
 		if err = uploadAptBatch(group); err != nil {
 			return err
@@ -117,6 +121,9 @@ func UploadArtifactsBatch(jobs []AppUploadJob, bucketLock lock.BucketLock, relea
 	}
 
 	for _, repo := range rpmRepos {
+		if err = ensureFreshMount(mountDir); err != nil {
+			return err
+		}
 		start = time.Now()
 		if err = uploadRpmBatch(repo); err != nil {
 			return err
