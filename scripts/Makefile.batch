@@ -40,7 +40,7 @@ endif
 
 mount-s3:
 	@echo "Assuming IAM role for service account..."
-	./mount-s3.sh
+	./mount-s3-batch.sh
 
 mount-s3-check: mount-s3
 	@echo "Confirm s3 mount..."
