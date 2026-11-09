@@ -261,7 +261,7 @@ func uploadRpmBatch(repo rpmRepo) (err error) {
 		}
 	}
 
-	if err = updateRpmRepo(repo.conf, repo.files[0].s3RepoPath, destPath, fmt.Sprintf("%d packages", len(repo.files)), canSkipStat(repo.files)); err != nil {
+	if err = updateRpmRepo(repo.conf, repo.files[0].s3RepoPath, destPath, fmt.Sprintf("%d packages", len(repo.files))); err != nil {
 		return err
 	}
 

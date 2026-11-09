@@ -29,9 +29,6 @@ const (
 	mountMaxAge = 40 * time.Minute
 	// How many times a repository index is built again, remounting S3 in between, before the run fails.
 	rpmIndexTries = 3
-	// The attempt that trusts the old index entries instead of reading every package again (createrepo
-	// --skip-stat). The attempts before it read every package, as the single-app publish does.
-	skipStatFromAttempt = 3
 	// How many names of missing packages are logged when an index is incomplete.
 	diagnoseNames = 10
 )
@@ -191,33 +188,10 @@ func retryBadIndex(tries int, attempt func() error, cleanup func(), remount func
 	return fmt.Errorf("repository index still incomplete after %d attempts: %w", tries, err)
 }
 
-// createrepoUpdateArgs are the arguments of the createrepo run that rebuilds the index of a repository.
-// A sync or a copy of the repository gives every package a new modified time, and createrepo --update reads
-// again each package whose time differs from the one in its index entry: gigabytes over the S3 mount for every
-// repository. skipStat makes it keep the entry of a package that is listed under the same file name and only
-// read the new ones. Published packages never change, so that is safe unless one of them is overwritten.
-func createrepoUpdateArgs(repoDir, outputDir string, skipStat bool) []string {
-	args := []string{"--update"}
-	if skipStat {
-		args = append(args, "--skip-stat")
-	}
-	return append(args, "-s", "sha", repoDir, "-o", outputDir)
-}
-
-// canSkipStat is false when the batch overwrites a package that may already be in the index.
-func canSkipStat(files []rpmFile) bool {
-	for _, file := range files {
-		if file.override {
-			return false
-		}
-	}
-	return true
-}
-
-// skipStatForAttempt tells if an attempt trusts the old index entries: only from skipStatFromAttempt on,
-// and only when the batch does not overwrite any package.
-func skipStatForAttempt(allowed bool, attempt int) bool {
-	return allowed && attempt >= skipStatFromAttempt
+// createrepoUpdateArgs are the arguments of the createrepo run that rebuilds the index of a repository,
+// the same ones the single-app publish uses.
+func createrepoUpdateArgs(repoDir, outputDir string) []string {
+	return []string{"--update", "-s", "sha", repoDir, "-o", outputDir}
 }
 
 type primaryMetadata struct {
@@ -284,24 +258,6 @@ func sizeMismatches(repoDir string, indexed map[string]int64) ([]string, error) 
 	}
 	sort.Strings(mismatches)
 	return mismatches, nil
-}
-
-// trustOldIndex is true when createrepo can keep the old index entries without reading the packages: the old
-// index is there and every package in it has the size of its file. A package that was cut short or replaced
-// changes the size, so it still makes createrepo read everything.
-func trustOldIndex(repoDir, oldRepodataDir string) (bool, string) {
-	indexed, err := indexedFiles(oldRepodataDir)
-	if err != nil {
-		return false, fmt.Sprintf("cannot read the old index: %v", err)
-	}
-	mismatches, err := sizeMismatches(repoDir, indexed)
-	if err != nil {
-		return false, fmt.Sprintf("cannot compare the file sizes: %v", err)
-	}
-	if len(mismatches) > 0 {
-		return false, fmt.Sprintf("%d files do not match their index entry, first: %s", len(mismatches), mismatches[0])
-	}
-	return true, fmt.Sprintf("the %d packages of the old index have the size of their file", len(indexed))
 }
 
 // diagnoseIndex logs what is in the repository folder and in the new metadata when the index is incomplete,

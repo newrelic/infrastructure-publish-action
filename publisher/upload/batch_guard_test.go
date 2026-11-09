@@ -239,17 +239,8 @@ func Test_ensureFreshMount(t *testing.T) {
 
 func Test_createrepoUpdateArgs(t *testing.T) {
 	assert.Equal(t,
-		[]string{"--update", "--skip-stat", "-s", "sha", "/mnt/s3/repo", "-o", "/tmp"},
-		createrepoUpdateArgs("/mnt/s3/repo", "/tmp", true))
-	assert.Equal(t,
 		[]string{"--update", "-s", "sha", "/mnt/s3/repo", "-o", "/tmp"},
-		createrepoUpdateArgs("/mnt/s3/repo", "/tmp", false))
-}
-
-func Test_canSkipStat(t *testing.T) {
-	assert.True(t, canSkipStat([]rpmFile{{override: false}, {override: false}}))
-	assert.True(t, canSkipStat(nil))
-	assert.False(t, canSkipStat([]rpmFile{{override: false}, {override: true}}), "an overwritten package may be in the index already")
+		createrepoUpdateArgs("/mnt/s3/repo", "/tmp"))
 }
 
 // writePrimaryEntries writes a primary.xml.gz like createrepo does: the package count in the root element
@@ -286,48 +277,6 @@ func Test_indexedFiles_readsLocationAndSize(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Equal(t, map[string]int64{"nri-a-1.0.0-1.x86_64.rpm": 100, "nri-b-2.0.0-1.x86_64.rpm": 250}, files)
-}
-
-func Test_trustOldIndex(t *testing.T) {
-	setup := func(t *testing.T, fileSizes map[string]int) (repo, oldIndex string) {
-		repo, oldIndex = t.TempDir(), t.TempDir()
-		for name, size := range fileSizes {
-			writeRpmOfSize(t, repo, name, size)
-		}
-		writePrimaryEntries(t, oldIndex, 2, map[string]int64{"nri-a-1.rpm": 100, "nri-b-1.rpm": 200})
-		return
-	}
-
-	t.Run("every indexed file has the size of its entry, new files are not compared", func(t *testing.T) {
-		repo, oldIndex := setup(t, map[string]int{"nri-a-1.rpm": 100, "nri-b-1.rpm": 200, "nri-new-2.rpm": 7})
-
-		trusted, reason := trustOldIndex(repo, oldIndex)
-
-		assert.True(t, trusted, reason)
-	})
-
-	t.Run("a file that was cut short is not trusted", func(t *testing.T) {
-		repo, oldIndex := setup(t, map[string]int{"nri-a-1.rpm": 100, "nri-b-1.rpm": 1000})
-
-		trusted, reason := trustOldIndex(repo, oldIndex)
-
-		assert.False(t, trusted)
-		assert.Contains(t, reason, "nri-b-1.rpm")
-	})
-
-	t.Run("without an old index there is nothing to trust", func(t *testing.T) {
-		trusted, reason := trustOldIndex(t.TempDir(), filepath.Join(t.TempDir(), "missing"))
-
-		assert.False(t, trusted)
-		assert.Contains(t, reason, "old index")
-	})
-}
-
-func Test_skipStatForAttempt(t *testing.T) {
-	for attempt, want := range map[int]bool{1: false, 2: false, 3: true} {
-		assert.Equal(t, want, skipStatForAttempt(true, attempt), "attempt %d", attempt)
-		assert.False(t, skipStatForAttempt(false, attempt), "never when packages are overwritten, attempt %d", attempt)
-	}
 }
 
 func Test_diagnoseIndex_logsWhatIsMissing(t *testing.T) {

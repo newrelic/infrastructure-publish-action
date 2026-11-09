@@ -75,21 +75,18 @@ func copyRpmFile(rpm rpmFile) error {
 // metadata for every package present in s3RepoPath and signs it. The new metadata is checked against the
 // repository before it replaces the old one (see checkRpmIndex): when it is incomplete, e.g. because the S3
 // mount dropped while createrepo was reading, the bucket is remounted and the repository is built again.
-//
-// With allowSkipStat, the last attempt trusts the old index entries of the packages whose size still matches
-// instead of reading every package again (see createrepoUpdateArgs and skipStatForAttempt).
-func updateRpmRepo(conf config.Config, s3RepoPath, destPath, source string, allowSkipStat bool) error {
+func updateRpmRepo(conf config.Config, s3RepoPath, destPath, source string) error {
 	attempt := 0
 	return retryBadIndex(rpmIndexTries,
 		func() error {
 			attempt++
-			return updateRpmRepoOnce(conf, s3RepoPath, destPath, source, skipStatForAttempt(allowSkipStat, attempt), attempt)
+			return updateRpmRepoOnce(conf, s3RepoPath, destPath, source, attempt)
 		},
 		func() { _ = os.RemoveAll(path.Join(os.TempDir(), "repodata")) },
 		func() error { return forceRemount(conf.ArtifactsDestFolder) })
 }
 
-func updateRpmRepoOnce(conf config.Config, s3RepoPath, destPath, source string, skipStat bool, attempt int) (err error) {
+func updateRpmRepoOnce(conf config.Config, s3RepoPath, destPath, source string, attempt int) (err error) {
 	s3DotRepoFilepath := path.Join(s3RepoPath, "newrelic-infra.repo")
 	s3RepoData := path.Join(s3RepoPath, "repodata")
 	s3RepomdFilepath := path.Join(s3RepoPath, repodataRpmPath)
@@ -130,14 +127,9 @@ func updateRpmRepoOnce(conf config.Config, s3RepoPath, destPath, source string, 
 		previouslyIndexed = n
 	}
 
-	if skipStat {
-		trusted, reason := trustOldIndex(s3RepoPath, tmpRepodata)
-		utils.Logger.Printf("[batch] attempt %d: createrepo --skip-stat: %t (%s)", attempt, trusted, reason)
-		skipStat = trusted
-	}
 	started := time.Now()
-	output, err := runCreaterepo(createrepoUpdateArgs(s3RepoPath, os.TempDir(), skipStat)...)
-	utils.Logger.Printf("[batch] attempt %d: createrepo (skip-stat %t) took %s", attempt, skipStat, time.Since(started).Round(time.Second))
+	output, err := runCreaterepo(createrepoUpdateArgs(s3RepoPath, os.TempDir())...)
+	utils.Logger.Printf("[batch] attempt %d: createrepo took %s", attempt, time.Since(started).Round(time.Second))
 	if err != nil {
 		diagnoseIndex(s3RepoPath, tmpRepodata)
 		return fmt.Errorf("%w: createrepo failed: %v", errBadIndex, err)
