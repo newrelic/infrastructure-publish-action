@@ -1,9 +1,11 @@
 package upload
 
 import (
+	"bytes"
 	"compress/gzip"
 	"errors"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"testing"
@@ -11,7 +13,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"log"
+
+	"github.com/newrelic/infrastructure-publish-action/publisher/utils"
 )
 
 func writeRpms(t *testing.T, dir string, count int) {
@@ -232,4 +235,130 @@ func Test_ensureFreshMount(t *testing.T) {
 		assert.Equal(t, 1, remounts)
 		assert.Error(t, err, "still not available after remounting")
 	})
+}
+
+func Test_createrepoUpdateArgs(t *testing.T) {
+	assert.Equal(t,
+		[]string{"--update", "--skip-stat", "-s", "sha", "/mnt/s3/repo", "-o", "/tmp"},
+		createrepoUpdateArgs("/mnt/s3/repo", "/tmp", true))
+	assert.Equal(t,
+		[]string{"--update", "-s", "sha", "/mnt/s3/repo", "-o", "/tmp"},
+		createrepoUpdateArgs("/mnt/s3/repo", "/tmp", false))
+}
+
+func Test_canSkipStat(t *testing.T) {
+	assert.True(t, canSkipStat([]rpmFile{{override: false}, {override: false}}))
+	assert.True(t, canSkipStat(nil))
+	assert.False(t, canSkipStat([]rpmFile{{override: false}, {override: true}}), "an overwritten package may be in the index already")
+}
+
+// writePrimaryEntries writes a primary.xml.gz like createrepo does: the package count in the root element
+// and one entry per package with its location and size.
+func writePrimaryEntries(t *testing.T, repodataDir string, header int, entries map[string]int64) {
+	t.Helper()
+	require.NoError(t, os.MkdirAll(repodataDir, 0755))
+	file, err := os.Create(filepath.Join(repodataDir, "abc123-primary.xml.gz"))
+	require.NoError(t, err)
+	defer file.Close()
+	writer := gzip.NewWriter(file)
+	_, err = fmt.Fprintf(writer, `<?xml version="1.0" encoding="UTF-8"?>
+<metadata xmlns="http://linux.duke.edu/metadata/common" xmlns:rpm="http://linux.duke.edu/metadata/rpm" packages="%d">`, header)
+	require.NoError(t, err)
+	for name, size := range entries {
+		_, err = fmt.Fprintf(writer, `<package type="rpm"><name>x</name><size package="%d" installed="1" archive="1"/><location href="%s"/></package>`, size, name)
+		require.NoError(t, err)
+	}
+	_, err = fmt.Fprint(writer, `</metadata>`)
+	require.NoError(t, err)
+	require.NoError(t, writer.Close())
+}
+
+func writeRpmOfSize(t *testing.T, dir, name string, size int) {
+	t.Helper()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, name), make([]byte, size), 0644))
+}
+
+func Test_indexedFiles_readsLocationAndSize(t *testing.T) {
+	dir := t.TempDir()
+	writePrimaryEntries(t, dir, 2, map[string]int64{"nri-a-1.0.0-1.x86_64.rpm": 100, "nri-b-2.0.0-1.x86_64.rpm": 250})
+
+	files, err := indexedFiles(dir)
+
+	require.NoError(t, err)
+	assert.Equal(t, map[string]int64{"nri-a-1.0.0-1.x86_64.rpm": 100, "nri-b-2.0.0-1.x86_64.rpm": 250}, files)
+}
+
+func Test_trustOldIndex(t *testing.T) {
+	setup := func(t *testing.T, fileSizes map[string]int) (repo, oldIndex string) {
+		repo, oldIndex = t.TempDir(), t.TempDir()
+		for name, size := range fileSizes {
+			writeRpmOfSize(t, repo, name, size)
+		}
+		writePrimaryEntries(t, oldIndex, 2, map[string]int64{"nri-a-1.rpm": 100, "nri-b-1.rpm": 200})
+		return
+	}
+
+	t.Run("every indexed file has the size of its entry, new files are not compared", func(t *testing.T) {
+		repo, oldIndex := setup(t, map[string]int{"nri-a-1.rpm": 100, "nri-b-1.rpm": 200, "nri-new-2.rpm": 7})
+
+		trusted, reason := trustOldIndex(repo, oldIndex)
+
+		assert.True(t, trusted, reason)
+	})
+
+	t.Run("a file that was cut short is not trusted", func(t *testing.T) {
+		repo, oldIndex := setup(t, map[string]int{"nri-a-1.rpm": 100, "nri-b-1.rpm": 1000})
+
+		trusted, reason := trustOldIndex(repo, oldIndex)
+
+		assert.False(t, trusted)
+		assert.Contains(t, reason, "nri-b-1.rpm")
+	})
+
+	t.Run("without an old index there is nothing to trust", func(t *testing.T) {
+		trusted, reason := trustOldIndex(t.TempDir(), filepath.Join(t.TempDir(), "missing"))
+
+		assert.False(t, trusted)
+		assert.Contains(t, reason, "old index")
+	})
+}
+
+func Test_skipStatForAttempt(t *testing.T) {
+	for attempt, want := range map[int]bool{1: false, 2: false, 3: true} {
+		assert.Equal(t, want, skipStatForAttempt(true, attempt), "attempt %d", attempt)
+		assert.False(t, skipStatForAttempt(false, attempt), "never when packages are overwritten, attempt %d", attempt)
+	}
+}
+
+func Test_diagnoseIndex_logsWhatIsMissing(t *testing.T) {
+	var output bytes.Buffer
+	orig := utils.Logger
+	utils.Logger = log.New(&output, "", 0)
+	t.Cleanup(func() { utils.Logger = orig })
+
+	repo := t.TempDir()
+	for _, name := range []string{"nri-a-1.rpm", "nri-b-1.rpm", "nri-c-1.rpm", "nri-d-1.rpm"} {
+		writeRpmOfSize(t, repo, name, 10)
+	}
+	newIndex := filepath.Join(t.TempDir(), "repodata")
+	// the index stops after nri-b
+	writePrimaryEntries(t, newIndex, 2, map[string]int64{"nri-a-1.rpm": 10, "nri-b-1.rpm": 10})
+
+	diagnoseIndex(repo, newIndex)
+
+	logged := output.String()
+	assert.Contains(t, logged, "rpm files: 4, packages in the index header: 2, entries in the index: 2, files missing from the index: 2")
+	assert.Contains(t, logged, "the index goes from nri-a-1.rpm to nri-b-1.rpm")
+	assert.Contains(t, logged, "first missing files: nri-c-1.rpm, nri-d-1.rpm")
+	assert.Contains(t, logged, "abc123-primary.xml.gz")
+}
+
+func Test_diagnoseIndex_doesNotFailWithoutMetadata(t *testing.T) {
+	var output bytes.Buffer
+	orig := utils.Logger
+	utils.Logger = log.New(&output, "", 0)
+	t.Cleanup(func() { utils.Logger = orig })
+
+	assert.NotPanics(t, func() { diagnoseIndex(t.TempDir(), filepath.Join(t.TempDir(), "missing")) })
+	assert.Contains(t, output.String(), "incomplete index")
 }
