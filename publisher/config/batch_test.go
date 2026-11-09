@@ -23,6 +23,26 @@ func Test_LoadBatch_doesNotNeedAppName(t *testing.T) {
 	assert.Equal(t, "batch_manifest_123", conf.LockOwner())
 }
 
+func Test_LoadBatch_skipAptIsOffByDefaultAndReadFromTheEnv(t *testing.T) {
+	t.Setenv("APPS_MANIFEST_PATH", "/srv/manifest.json")
+	t.Setenv("RUN_ID", "123")
+
+	t.Setenv("SKIP_APT", "")
+	_, opts, err := LoadBatch()
+	require.NoError(t, err)
+	assert.False(t, opts.SkipApt)
+
+	t.Setenv("SKIP_APT", "true")
+	_, opts, err = LoadBatch()
+	require.NoError(t, err)
+	assert.True(t, opts.SkipApt)
+
+	t.Setenv("SKIP_APT", "false")
+	_, opts, err = LoadBatch()
+	require.NoError(t, err)
+	assert.False(t, opts.SkipApt)
+}
+
 func Test_LoadBatch_requiresManifest(t *testing.T) {
 	t.Setenv("APPS_MANIFEST_PATH", "")
 

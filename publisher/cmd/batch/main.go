@@ -80,7 +80,7 @@ func runBatch(conf config.Config, opts config.BatchOptions, bucketLock lock.Buck
 		l.Printf("⚠ skipping %s %s: %s", s.AppName, s.Tag, s.Reason)
 	}
 
-	if err = upload.UploadArtifactsBatch(jobs, bucketLock, releaseMarker); err != nil {
+	if err = upload.UploadArtifactsBatchWithOptions(jobs, bucketLock, releaseMarker, upload.BatchUploadOptions{SkipApt: opts.SkipApt}); err != nil {
 		result.Status = statusFailed
 		result.Error = err.Error()
 		return result, err

@@ -49,6 +49,10 @@ inputs:
     description: s3 path prefix
     required: false
     default: "infrastructure_agent/"
+  skip_apt:
+    description: Do not publish the apt repositories (they are left as they are). Only files and yum/zypp repositories are published.
+    required: false
+    default: "false"
   apt_skip_mirror:
     description: skip mirroring apt repo
     required: false
@@ -79,5 +83,6 @@ runs:
         LOCAL_PACKAGES_PATH: ${{ inputs.local_packages_path }}
         DEST_PREFIX: ${{ inputs.dest_prefix }}
         APT_SKIP_MIRROR: ${{ inputs.apt_skip_mirror }}
+        SKIP_APT: ${{ inputs.skip_apt }}
         APPS_MANIFEST_PATH: ${{ inputs.apps_manifest_path }}
         BATCH_RESULT_PATH: ${{ inputs.batch_result_path }}
