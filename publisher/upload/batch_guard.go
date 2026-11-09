@@ -96,16 +96,39 @@ func countRpmFiles(repoDir string) (int, error) {
 
 var packagesAttr = regexp.MustCompile(`packages="(\d+)"`)
 
+// primaryIndexFile is the primary metadata file the repomd.xml of a repodata folder points to. The folder can
+// hold other primary.xml.gz files of older publishes that repomd.xml does not use: they list other packages.
+func primaryIndexFile(repodataDir string) (string, error) {
+	data, err := os.ReadFile(filepath.Join(repodataDir, "repomd.xml"))
+	if err != nil {
+		return "", err
+	}
+	var repomd struct {
+		Data []struct {
+			Type     string `xml:"type,attr"`
+			Location struct {
+				Href string `xml:"href,attr"`
+			} `xml:"location"`
+		} `xml:"data"`
+	}
+	if err = xml.Unmarshal(data, &repomd); err != nil {
+		return "", err
+	}
+	for _, entry := range repomd.Data {
+		if entry.Type == "primary" && entry.Location.Href != "" {
+			return filepath.Join(repodataDir, filepath.Base(entry.Location.Href)), nil
+		}
+	}
+	return "", fmt.Errorf("no primary metadata in %s", filepath.Join(repodataDir, "repomd.xml"))
+}
+
 // indexedPackages is the number of packages listed in the primary metadata of a repodata folder.
 func indexedPackages(repodataDir string) (int, error) {
-	matches, err := filepath.Glob(filepath.Join(repodataDir, "*primary.xml.gz"))
+	primary, err := primaryIndexFile(repodataDir)
 	if err != nil {
 		return 0, err
 	}
-	if len(matches) == 0 {
-		return 0, fmt.Errorf("no primary.xml.gz in %s", repodataDir)
-	}
-	file, err := os.Open(matches[0])
+	file, err := os.Open(primary)
 	if err != nil {
 		return 0, err
 	}
@@ -123,7 +146,7 @@ func indexedPackages(repodataDir string) (int, error) {
 	}
 	found := packagesAttr.FindSubmatch(head[:n])
 	if found == nil {
-		return 0, fmt.Errorf("no package count in %s", matches[0])
+		return 0, fmt.Errorf("no package count in %s", primary)
 	}
 	return strconv.Atoi(string(found[1]))
 }
@@ -207,14 +230,11 @@ type primaryMetadata struct {
 
 // indexedFiles is the size recorded in the index of every package, by file name.
 func indexedFiles(repodataDir string) (map[string]int64, error) {
-	matches, err := filepath.Glob(filepath.Join(repodataDir, "*primary.xml.gz"))
+	primary, err := primaryIndexFile(repodataDir)
 	if err != nil {
 		return nil, err
 	}
-	if len(matches) == 0 {
-		return nil, fmt.Errorf("no primary.xml.gz in %s", repodataDir)
-	}
-	file, err := os.Open(matches[0])
+	file, err := os.Open(primary)
 	if err != nil {
 		return nil, err
 	}
@@ -295,8 +315,10 @@ func diagnoseIndex(repoDir, newRepodataDir string) {
 		l.Printf("[batch][debug] %s has %d files: %s", dir, len(listing), strings.Join(listing, ", "))
 	}
 
+	used, usedErr := primaryIndexFile(newRepodataDir)
+	l.Printf("[batch][debug] repomd.xml uses %s (%v)", used, usedErr)
 	if primaries, _ := filepath.Glob(filepath.Join(newRepodataDir, "*primary.xml.gz")); len(primaries) != 1 {
-		l.Printf("[batch][debug] %d primary.xml.gz files in the new metadata: %v", len(primaries), primaries)
+		l.Printf("[batch][debug] %d primary.xml.gz files in the new metadata, only the one above is used: %v", len(primaries), primaries)
 	}
 	header, headerErr := indexedPackages(newRepodataDir)
 	indexed, indexErr := indexedFiles(newRepodataDir)
