@@ -52,8 +52,8 @@ func main() {
 	if conf.DisableLock {
 		bucketLock = lock.NewNoop()
 	} else {
-		if conf.AwsRegion == "" {
-			l.Fatal("missing 'aws_region' value")
+		if conf.AwsLockBucketRegion == "" {
+			l.Fatal("missing 'aws_region' or 'aws_s3_lock_bucket_region' value")
 		}
 		if conf.AwsLockBucket == "" {
 			l.Fatal("missing 'aws_s3_lock_bucket_name' value")
@@ -75,7 +75,7 @@ func main() {
 		cfg := lock.NewS3Config(
 			conf.AwsLockBucket,
 			conf.AwsRoleARN,
-			conf.AwsRegion,
+			conf.AwsLockBucketRegion,
 			conf.AwsTags,
 			conf.LockGroup,
 			conf.LockOwner(),
