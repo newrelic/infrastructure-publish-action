@@ -191,12 +191,3 @@ func (m *batchMarkerMock) EndBatch(marks []release.Mark) error {
 func (m *batchMarkerMock) ShouldEndBatch(marks []release.Mark) {
 	m.On("EndBatch", marks).Once().Return(nil)
 }
-
-func Test_aptGroupsToPublish(t *testing.T) {
-	groups, err := groupApt(ohiJobs(t, "nri-apache", "nri-mysql"))
-	require.NoError(t, err)
-	require.NotEmpty(t, groups)
-
-	assert.Equal(t, groups, aptGroupsToPublish(groups, BatchUploadOptions{}), "every distribution by default")
-	assert.Empty(t, aptGroupsToPublish(groups, BatchUploadOptions{SkipApt: true}), "none when apt is skipped")
-}

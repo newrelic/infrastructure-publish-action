@@ -44,26 +44,6 @@ type rpmRepo struct {
 //   - yum/zypp: per repository, copy every app's packages, createrepo + sign once
 //   - file: copied per app, as today
 func UploadArtifactsBatch(jobs []AppUploadJob, bucketLock lock.BucketLock, releaseMarker release.BatchMarker) (err error) {
-	return UploadArtifactsBatchWithOptions(jobs, bucketLock, releaseMarker, BatchUploadOptions{})
-}
-
-// BatchUploadOptions are the choices of a batch that a single-app upload does not have.
-type BatchUploadOptions struct {
-	// SkipApt does not touch the apt repositories (no mirror, no publish). The files and the yum/zypp
-	// repositories are published as usual.
-	SkipApt bool
-}
-
-// aptGroupsToPublish is the apt distributions a batch publishes.
-func aptGroupsToPublish(groups []aptGroup, opts BatchUploadOptions) []aptGroup {
-	if opts.SkipApt {
-		return nil
-	}
-	return groups
-}
-
-// UploadArtifactsBatchWithOptions is UploadArtifactsBatch with the batch options.
-func UploadArtifactsBatchWithOptions(jobs []AppUploadJob, bucketLock lock.BucketLock, releaseMarker release.BatchMarker, opts BatchUploadOptions) (err error) {
 	if len(jobs) == 0 {
 		return ErrEmptyBatch
 	}
@@ -72,10 +52,6 @@ func UploadArtifactsBatchWithOptions(jobs []AppUploadJob, bucketLock lock.Bucket
 	if err != nil {
 		return err
 	}
-	if opts.SkipApt {
-		utils.Logger.Printf("[batch] skip_apt: the %d apt distributions are not published", len(aptGroups))
-	}
-	aptGroups = aptGroupsToPublish(aptGroups, opts)
 	rpmRepos := groupRpm(jobs)
 
 	if err = bucketLock.Lock(); err != nil {

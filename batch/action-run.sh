@@ -63,7 +63,6 @@ docker run --platform linux/amd64 --rm \
         -e DEST_PREFIX \
         -e LOCAL_PACKAGES_PATH \
         -e APT_SKIP_MIRROR \
-        -e SKIP_APT \
         -e APPS_MANIFEST_PATH \
         -e SCHEMAS_FOLDER \
         -e BATCH_RESULT_PATH \

@@ -30,8 +30,6 @@ type BatchOptions struct {
 	SchemasFolder string
 	// ResultPath is where the batch result JSON is written
 	ResultPath string
-	// SkipApt leaves the apt repositories as they are: only files and yum/zypp repositories are published
-	SkipApt bool
 }
 
 // LoadBatch loads the base config shared by every app of a batch, the same way LoadConfig does
@@ -41,7 +39,6 @@ func LoadBatch() (Config, BatchOptions, error) {
 	viper.BindEnv("apps_manifest_path")
 	viper.BindEnv("schemas_folder")
 	viper.BindEnv("batch_result_path")
-	viper.BindEnv("skip_apt")
 
 	manifestPath := viper.GetString("apps_manifest_path")
 	if manifestPath == "" {
@@ -67,7 +64,7 @@ func LoadBatch() (Config, BatchOptions, error) {
 		// next to the manifest, which is the folder shared with the host
 		resultPath = path.Join(path.Dir(manifestPath), "batch-result.json")
 	}
-	return conf, BatchOptions{ManifestPath: manifestPath, SchemasFolder: schemasFolder, ResultPath: resultPath, SkipApt: viper.GetBool("skip_apt")}, nil
+	return conf, BatchOptions{ManifestPath: manifestPath, SchemasFolder: schemasFolder, ResultPath: resultPath}, nil
 }
 
 // AppSpec is one entry of the batch manifest. It carries the same values a single-app run
