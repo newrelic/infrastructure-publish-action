@@ -1,7 +1,6 @@
 package upload
 
 import (
-	"bytes"
 	"compress/gzip"
 	"errors"
 	"fmt"
@@ -13,8 +12,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"github.com/newrelic/infrastructure-publish-action/publisher/utils"
 )
 
 func writeRpms(t *testing.T, dir string, count int) {
@@ -303,39 +300,6 @@ func Test_indexedFiles_readsLocationAndSize(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Equal(t, map[string]int64{"nri-a-1.0.0-1.x86_64.rpm": 100, "nri-b-2.0.0-1.x86_64.rpm": 250}, files)
-}
-
-func Test_diagnoseIndex_logsWhatIsMissing(t *testing.T) {
-	var output bytes.Buffer
-	orig := utils.Logger
-	utils.Logger = log.New(&output, "", 0)
-	t.Cleanup(func() { utils.Logger = orig })
-
-	repo := t.TempDir()
-	for _, name := range []string{"nri-a-1.rpm", "nri-b-1.rpm", "nri-c-1.rpm", "nri-d-1.rpm"} {
-		writeRpmOfSize(t, repo, name, 10)
-	}
-	newIndex := filepath.Join(t.TempDir(), "repodata")
-	// the index stops after nri-b
-	writePrimaryEntries(t, newIndex, 2, map[string]int64{"nri-a-1.rpm": 10, "nri-b-1.rpm": 10})
-
-	diagnoseIndex(repo, newIndex)
-
-	logged := output.String()
-	assert.Contains(t, logged, "rpm files: 4, packages in the index header: 2, entries in the index: 2, files missing from the index: 2")
-	assert.Contains(t, logged, "the index goes from nri-a-1.rpm to nri-b-1.rpm")
-	assert.Contains(t, logged, "first missing files: nri-c-1.rpm, nri-d-1.rpm")
-	assert.Contains(t, logged, "abc123-primary.xml.gz")
-}
-
-func Test_diagnoseIndex_doesNotFailWithoutMetadata(t *testing.T) {
-	var output bytes.Buffer
-	orig := utils.Logger
-	utils.Logger = log.New(&output, "", 0)
-	t.Cleanup(func() { utils.Logger = orig })
-
-	assert.NotPanics(t, func() { diagnoseIndex(t.TempDir(), filepath.Join(t.TempDir(), "missing")) })
-	assert.Contains(t, output.String(), "incomplete index")
 }
 
 func Test_primaryIndexFile_isTheOneRepomdPointsTo(t *testing.T) {

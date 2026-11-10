@@ -29,8 +29,6 @@ const (
 	mountMaxAge = 40 * time.Minute
 	// How many times a repository index is built again, remounting S3 in between, before the run fails.
 	rpmIndexTries = 3
-	// How many names of missing packages are logged when an index is incomplete.
-	diagnoseNames = 10
 )
 
 // errBadIndex means the metadata createrepo built does not list the packages of the repository.
@@ -278,86 +276,4 @@ func sizeMismatches(repoDir string, indexed map[string]int64) ([]string, error) 
 	}
 	sort.Strings(mismatches)
 	return mismatches, nil
-}
-
-// diagnoseIndex logs what is in the repository folder and in the new metadata when the index is incomplete,
-// to find which packages are missing and where the index stops.
-func diagnoseIndex(repoDir, newRepodataDir string) {
-	l := utils.Logger
-	l.Printf("[batch][debug] ---- incomplete index of %s ----", repoDir)
-
-	var files []string
-	if entries, err := os.ReadDir(repoDir); err != nil {
-		l.Printf("[batch][debug] cannot list %s: %v", repoDir, err)
-	} else {
-		for _, entry := range entries {
-			if !entry.IsDir() && strings.HasSuffix(entry.Name(), ".rpm") {
-				files = append(files, entry.Name())
-			}
-		}
-	}
-	sort.Strings(files)
-
-	for _, dir := range []string{newRepodataDir, filepath.Join(filepath.Dir(newRepodataDir), ".repodata")} {
-		entries, err := os.ReadDir(dir)
-		if err != nil {
-			l.Printf("[batch][debug] %s: %v", dir, err)
-			continue
-		}
-		var listing []string
-		for _, entry := range entries {
-			size := int64(-1)
-			if info, infoErr := entry.Info(); infoErr == nil {
-				size = info.Size()
-			}
-			listing = append(listing, fmt.Sprintf("%s (%d bytes)", entry.Name(), size))
-		}
-		l.Printf("[batch][debug] %s has %d files: %s", dir, len(listing), strings.Join(listing, ", "))
-	}
-
-	used, usedErr := primaryIndexFile(newRepodataDir)
-	l.Printf("[batch][debug] repomd.xml uses %s (%v)", used, usedErr)
-	if primaries, _ := filepath.Glob(filepath.Join(newRepodataDir, "*primary.xml.gz")); len(primaries) != 1 {
-		l.Printf("[batch][debug] %d primary.xml.gz files in the new metadata, only the one above is used: %v", len(primaries), primaries)
-	}
-	header, headerErr := indexedPackages(newRepodataDir)
-	indexed, indexErr := indexedFiles(newRepodataDir)
-	if headerErr != nil || indexErr != nil {
-		l.Printf("[batch][debug] cannot read the new index: header: %v, entries: %v", headerErr, indexErr)
-		return
-	}
-	var names, missing []string
-	for name := range indexed {
-		names = append(names, name)
-	}
-	sort.Strings(names)
-	for _, file := range files {
-		if _, ok := indexed[file]; !ok {
-			missing = append(missing, file)
-		}
-	}
-	l.Printf("[batch][debug] rpm files: %d, packages in the index header: %d, entries in the index: %d, files missing from the index: %d",
-		len(files), header, len(indexed), len(missing))
-	if len(names) > 0 {
-		l.Printf("[batch][debug] the index goes from %s to %s", names[0], names[len(names)-1])
-	}
-	if len(missing) > 0 {
-		shown := missing
-		if len(shown) > diagnoseNames {
-			shown = shown[:diagnoseNames]
-		}
-		l.Printf("[batch][debug] first missing files: %s", strings.Join(shown, ", "))
-		l.Printf("[batch][debug] last missing file: %s", missing[len(missing)-1])
-	}
-	if mismatches, err := sizeMismatches(repoDir, indexed); err == nil && len(mismatches) > 0 {
-		l.Printf("[batch][debug] %d indexed files have another size than their index entry, first: %s", len(mismatches), mismatches[0])
-	}
-	logSystemState()
-}
-
-// logSystemState logs the disk and memory of the machine; an index cut short can come from a full /tmp.
-func logSystemState() {
-	for _, command := range [][]string{{"df", "-h", "/tmp", "/mnt/s3"}, {"free", "-m"}} {
-		_ = utils.ExecLogOutput(utils.Logger, command[0], time.Minute, command[1:]...)
-	}
 }

@@ -131,13 +131,11 @@ func updateRpmRepoOnce(conf config.Config, s3RepoPath, destPath, source string, 
 	output, err := runCreaterepo(createrepoUpdateArgs(s3RepoPath, os.TempDir())...)
 	utils.Logger.Printf("[batch] attempt %d: createrepo took %s", attempt, time.Since(started).Round(time.Second))
 	if err != nil {
-		diagnoseIndex(s3RepoPath, tmpRepodata)
 		return fmt.Errorf("%w: createrepo failed: %v", errBadIndex, err)
 	}
 	// createrepo exits successfully even when it could not read some packages: do not replace the
 	// metadata in s3 unless it lists every package of the repository
 	if err = checkRpmIndex(s3RepoPath, tmpRepodata, previouslyIndexed, output); err != nil {
-		diagnoseIndex(s3RepoPath, tmpRepodata)
 		return err
 	}
 
