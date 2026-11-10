@@ -4,6 +4,7 @@ import (
 	"compress/gzip"
 	"errors"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"testing"
@@ -11,7 +12,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"log"
 )
 
 func writeRpms(t *testing.T, dir string, count int) {
@@ -22,6 +22,30 @@ func writeRpms(t *testing.T, dir string, count int) {
 	// not packages
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "newrelic-infra.repo"), []byte("[repo]"), 0644))
 	require.NoError(t, os.Mkdir(filepath.Join(dir, "repodata"), 0755))
+}
+
+// writeRepomd writes the repomd.xml createrepo writes: it names the files of the current metadata.
+func writeRepomd(t *testing.T, repodataDir, primaryName string) {
+	t.Helper()
+	content := fmt.Sprintf(`<?xml version="1.0" encoding="UTF-8"?>
+<repomd xmlns="http://linux.duke.edu/metadata/repo" xmlns:rpm="http://linux.duke.edu/metadata/rpm">
+  <data type="filelists"><location href="repodata/other-filelists.xml.gz"/></data>
+  <data type="primary"><checksum type="sha">abc</checksum><location href="repodata/%s"/></data>
+</repomd>`, primaryName)
+	require.NoError(t, os.WriteFile(filepath.Join(repodataDir, "repomd.xml"), []byte(content), 0644))
+}
+
+// writeStalePrimary writes a primary metadata file of an older publish, which repomd.xml does not use.
+func writeStalePrimary(t *testing.T, repodataDir, name string, packages int) {
+	t.Helper()
+	file, err := os.Create(filepath.Join(repodataDir, name))
+	require.NoError(t, err)
+	defer file.Close()
+	writer := gzip.NewWriter(file)
+	_, err = fmt.Fprintf(writer, `<?xml version="1.0" encoding="UTF-8"?>
+<metadata xmlns="http://linux.duke.edu/metadata/common" packages="%d"></metadata>`, packages)
+	require.NoError(t, err)
+	require.NoError(t, writer.Close())
 }
 
 func writePrimary(t *testing.T, repodataDir string, packages int) {
@@ -37,6 +61,7 @@ func writePrimary(t *testing.T, repodataDir string, packages int) {
 </metadata>`, packages)
 	require.NoError(t, err)
 	require.NoError(t, writer.Close())
+	writeRepomd(t, repodataDir, "abc123-primary.xml.gz")
 }
 
 func Test_countRpmFiles_countsOnlyRpmPackages(t *testing.T) {
@@ -232,4 +257,97 @@ func Test_ensureFreshMount(t *testing.T) {
 		assert.Equal(t, 1, remounts)
 		assert.Error(t, err, "still not available after remounting")
 	})
+}
+
+func Test_createrepoUpdateArgs(t *testing.T) {
+	assert.Equal(t,
+		[]string{"--update", "-s", "sha", "/mnt/s3/repo", "-o", "/tmp"},
+		createrepoUpdateArgs("/mnt/s3/repo", "/tmp"))
+}
+
+// writePrimaryEntries writes a primary.xml.gz like createrepo does: the package count in the root element
+// and one entry per package with its location and size.
+func writePrimaryEntries(t *testing.T, repodataDir string, header int, entries map[string]int64) {
+	t.Helper()
+	require.NoError(t, os.MkdirAll(repodataDir, 0755))
+	file, err := os.Create(filepath.Join(repodataDir, "abc123-primary.xml.gz"))
+	require.NoError(t, err)
+	defer file.Close()
+	writer := gzip.NewWriter(file)
+	_, err = fmt.Fprintf(writer, `<?xml version="1.0" encoding="UTF-8"?>
+<metadata xmlns="http://linux.duke.edu/metadata/common" xmlns:rpm="http://linux.duke.edu/metadata/rpm" packages="%d">`, header)
+	require.NoError(t, err)
+	for name, size := range entries {
+		_, err = fmt.Fprintf(writer, `<package type="rpm"><name>x</name><size package="%d" installed="1" archive="1"/><location href="%s"/></package>`, size, name)
+		require.NoError(t, err)
+	}
+	_, err = fmt.Fprint(writer, `</metadata>`)
+	require.NoError(t, err)
+	require.NoError(t, writer.Close())
+	writeRepomd(t, repodataDir, "abc123-primary.xml.gz")
+}
+
+func writeRpmOfSize(t *testing.T, dir, name string, size int) {
+	t.Helper()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, name), make([]byte, size), 0644))
+}
+
+func Test_indexedFiles_readsLocationAndSize(t *testing.T) {
+	dir := t.TempDir()
+	writePrimaryEntries(t, dir, 2, map[string]int64{"nri-a-1.0.0-1.x86_64.rpm": 100, "nri-b-2.0.0-1.x86_64.rpm": 250})
+
+	files, err := indexedFiles(dir)
+
+	require.NoError(t, err)
+	assert.Equal(t, map[string]int64{"nri-a-1.0.0-1.x86_64.rpm": 100, "nri-b-2.0.0-1.x86_64.rpm": 250}, files)
+}
+
+func Test_primaryIndexFile_isTheOneRepomdPointsTo(t *testing.T) {
+	dir := t.TempDir()
+	writePrimary(t, dir, 2044)
+
+	primary, err := primaryIndexFile(dir)
+
+	require.NoError(t, err)
+	assert.Equal(t, filepath.Join(dir, "abc123-primary.xml.gz"), primary)
+}
+
+func Test_primaryIndexFile_failsWithoutRepomd(t *testing.T) {
+	_, err := primaryIndexFile(t.TempDir())
+	assert.Error(t, err)
+}
+
+// The repodata folders have primary.xml.gz files of older publishes next to the current one: one lists 889
+// packages and sorts before the one repomd.xml uses.
+func Test_indexedPackages_ignoresStaleFilesOfOlderPublishes(t *testing.T) {
+	dir := t.TempDir()
+	writePrimary(t, dir, 2044)
+	writeStalePrimary(t, dir, "05467ab589978b91ce99703de91eb7609d4788bc-primary.xml.gz", 889)
+	writeStalePrimary(t, dir, "primary.xml.gz", 535)
+
+	count, err := indexedPackages(dir)
+
+	require.NoError(t, err)
+	assert.Equal(t, 2044, count)
+}
+
+func Test_indexedFiles_ignoresStaleFilesOfOlderPublishes(t *testing.T) {
+	dir := t.TempDir()
+	writePrimaryEntries(t, dir, 1, map[string]int64{"nri-a-1.rpm": 100})
+	writeStalePrimary(t, dir, "000-primary.xml.gz", 0)
+
+	files, err := indexedFiles(dir)
+
+	require.NoError(t, err)
+	assert.Equal(t, map[string]int64{"nri-a-1.rpm": 100}, files)
+}
+
+func Test_checkRpmIndex_isNotFooledByStaleMetadataFiles(t *testing.T) {
+	repo := t.TempDir()
+	writeRpms(t, repo, 5)
+	repodata := t.TempDir()
+	writePrimary(t, repodata, 5)
+	writeStalePrimary(t, repodata, "05467ab-primary.xml.gz", 3)
+
+	assert.NoError(t, checkRpmIndex(repo, repodata, 0, ""))
 }

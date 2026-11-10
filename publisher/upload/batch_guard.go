@@ -3,6 +3,7 @@ package upload
 import (
 	"bytes"
 	"compress/gzip"
+	"encoding/xml"
 	"errors"
 	"fmt"
 	"io"
@@ -10,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -92,16 +94,39 @@ func countRpmFiles(repoDir string) (int, error) {
 
 var packagesAttr = regexp.MustCompile(`packages="(\d+)"`)
 
+// primaryIndexFile is the primary metadata file the repomd.xml of a repodata folder points to. The folder can
+// hold other primary.xml.gz files of older publishes that repomd.xml does not use: they list other packages.
+func primaryIndexFile(repodataDir string) (string, error) {
+	data, err := os.ReadFile(filepath.Join(repodataDir, "repomd.xml"))
+	if err != nil {
+		return "", err
+	}
+	var repomd struct {
+		Data []struct {
+			Type     string `xml:"type,attr"`
+			Location struct {
+				Href string `xml:"href,attr"`
+			} `xml:"location"`
+		} `xml:"data"`
+	}
+	if err = xml.Unmarshal(data, &repomd); err != nil {
+		return "", err
+	}
+	for _, entry := range repomd.Data {
+		if entry.Type == "primary" && entry.Location.Href != "" {
+			return filepath.Join(repodataDir, filepath.Base(entry.Location.Href)), nil
+		}
+	}
+	return "", fmt.Errorf("no primary metadata in %s", filepath.Join(repodataDir, "repomd.xml"))
+}
+
 // indexedPackages is the number of packages listed in the primary metadata of a repodata folder.
 func indexedPackages(repodataDir string) (int, error) {
-	matches, err := filepath.Glob(filepath.Join(repodataDir, "*primary.xml.gz"))
+	primary, err := primaryIndexFile(repodataDir)
 	if err != nil {
 		return 0, err
 	}
-	if len(matches) == 0 {
-		return 0, fmt.Errorf("no primary.xml.gz in %s", repodataDir)
-	}
-	file, err := os.Open(matches[0])
+	file, err := os.Open(primary)
 	if err != nil {
 		return 0, err
 	}
@@ -119,7 +144,7 @@ func indexedPackages(repodataDir string) (int, error) {
 	}
 	found := packagesAttr.FindSubmatch(head[:n])
 	if found == nil {
-		return 0, fmt.Errorf("no package count in %s", matches[0])
+		return 0, fmt.Errorf("no package count in %s", primary)
 	}
 	return strconv.Atoi(string(found[1]))
 }
@@ -182,4 +207,73 @@ func retryBadIndex(tries int, attempt func() error, cleanup func(), remount func
 		}
 	}
 	return fmt.Errorf("repository index still incomplete after %d attempts: %w", tries, err)
+}
+
+// createrepoUpdateArgs are the arguments of the createrepo run that rebuilds the index of a repository,
+// the same ones the single-app publish uses.
+func createrepoUpdateArgs(repoDir, outputDir string) []string {
+	return []string{"--update", "-s", "sha", repoDir, "-o", outputDir}
+}
+
+type primaryMetadata struct {
+	Packages []struct {
+		Location struct {
+			Href string `xml:"href,attr"`
+		} `xml:"location"`
+		Size struct {
+			Package int64 `xml:"package,attr"`
+		} `xml:"size"`
+	} `xml:"package"`
+}
+
+// indexedFiles is the size recorded in the index of every package, by file name.
+func indexedFiles(repodataDir string) (map[string]int64, error) {
+	primary, err := primaryIndexFile(repodataDir)
+	if err != nil {
+		return nil, err
+	}
+	file, err := os.Open(primary)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+	reader, err := gzip.NewReader(file)
+	if err != nil {
+		return nil, err
+	}
+	defer reader.Close()
+	var metadata primaryMetadata
+	if err = xml.NewDecoder(reader).Decode(&metadata); err != nil {
+		return nil, err
+	}
+	files := make(map[string]int64, len(metadata.Packages))
+	for _, pkg := range metadata.Packages {
+		files[filepath.Base(pkg.Location.Href)] = pkg.Size.Package
+	}
+	return files, nil
+}
+
+// sizeMismatches lists the rpm files of a repository whose size is not the one in their index entry.
+// Files that are not in the index yet are not compared.
+func sizeMismatches(repoDir string, indexed map[string]int64) ([]string, error) {
+	entries, err := os.ReadDir(repoDir)
+	if err != nil {
+		return nil, err
+	}
+	var mismatches []string
+	for _, entry := range entries {
+		want, ok := indexed[entry.Name()]
+		if entry.IsDir() || !ok {
+			continue
+		}
+		info, infoErr := entry.Info()
+		if infoErr != nil {
+			return nil, infoErr
+		}
+		if info.Size() != want {
+			mismatches = append(mismatches, fmt.Sprintf("%s: file has %d bytes, index entry %d", entry.Name(), info.Size(), want))
+		}
+	}
+	sort.Strings(mismatches)
+	return mismatches, nil
 }

@@ -76,13 +76,17 @@ func copyRpmFile(rpm rpmFile) error {
 // repository before it replaces the old one (see checkRpmIndex): when it is incomplete, e.g. because the S3
 // mount dropped while createrepo was reading, the bucket is remounted and the repository is built again.
 func updateRpmRepo(conf config.Config, s3RepoPath, destPath, source string) error {
+	attempt := 0
 	return retryBadIndex(rpmIndexTries,
-		func() error { return updateRpmRepoOnce(conf, s3RepoPath, destPath, source) },
+		func() error {
+			attempt++
+			return updateRpmRepoOnce(conf, s3RepoPath, destPath, source, attempt)
+		},
 		func() { _ = os.RemoveAll(path.Join(os.TempDir(), "repodata")) },
 		func() error { return forceRemount(conf.ArtifactsDestFolder) })
 }
 
-func updateRpmRepoOnce(conf config.Config, s3RepoPath, destPath, source string) (err error) {
+func updateRpmRepoOnce(conf config.Config, s3RepoPath, destPath, source string, attempt int) (err error) {
 	s3DotRepoFilepath := path.Join(s3RepoPath, "newrelic-infra.repo")
 	s3RepoData := path.Join(s3RepoPath, "repodata")
 	s3RepomdFilepath := path.Join(s3RepoPath, repodataRpmPath)
@@ -123,7 +127,9 @@ func updateRpmRepoOnce(conf config.Config, s3RepoPath, destPath, source string) 
 		previouslyIndexed = n
 	}
 
-	output, err := runCreaterepo("--update", "-s", "sha", s3RepoPath, "-o", os.TempDir())
+	started := time.Now()
+	output, err := runCreaterepo(createrepoUpdateArgs(s3RepoPath, os.TempDir())...)
+	utils.Logger.Printf("[batch] attempt %d: createrepo took %s", attempt, time.Since(started).Round(time.Second))
 	if err != nil {
 		return fmt.Errorf("%w: createrepo failed: %v", errBadIndex, err)
 	}
