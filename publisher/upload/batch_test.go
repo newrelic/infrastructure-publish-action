@@ -86,8 +86,8 @@ func Test_groupRpm_oneRepoPerPathWithEveryApp(t *testing.T) {
 
 	repos := groupRpm(jobs)
 
-	// (6 el + 13 sles + 2 amazonlinux) x 3 archs
-	require.Len(t, repos, 21*3)
+	// (6 el + 14 sles + 2 amazonlinux) x 3 archs
+	require.Len(t, repos, 22*3)
 	byPath := map[string]rpmRepo{}
 	for _, repo := range repos {
 		require.Len(t, repo.files, 2)
